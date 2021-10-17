@@ -1,2 +1,2 @@
 # skills
-portable skills 
+portable skills in Reinforcement Learning
