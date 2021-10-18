@@ -9,6 +9,7 @@ import seeding
 import numpy as np
 
 from skills import utils
+from skills.option import Option
 from skills.option_utils import SingleOptionTrial
 
 
@@ -31,10 +32,10 @@ class ExecuteOptionTrial(SingleOptionTrial):
             parents=[self.get_common_arg_parser()]
         )
         parser.add_argument(
-            "--saved_option",
+            "--saved_option_dir",
             type=str,
-            default='results/monte-middle-ladder/trained_option.pkl',
-            help='path the a stored trained option')
+            default='results/monte-right-ladder',
+            help='path to a stored trained policy network')
         args = self.parse_common_args(parser)
         return args
 
@@ -56,10 +57,24 @@ class ExecuteOptionTrial(SingleOptionTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # setup global option and the only option that needs to be learned
-        with open(self.params['saved_option'], 'rb') as f:
-            self.option = pickle.load(f)
-            self.option.params = self.params
-            self.option.env = self.env
+        self.option = Option(
+            name='excute-option',
+            env=self.env,
+            load_from=self.params['saved_option_dir'],
+            gestation_period=None,
+            buffer_length=None,
+            goal_state=None,
+            goal_state_position=None,
+            epsilon_within_goal=None,
+            death_reward=self.params['death_reward'],
+            goal_reward=self.params['goal_reward'],
+            step_reward=self.params['step_reward'],
+            max_episode_len=self.params['max_episode_len'],
+            saving_dir=self.saving_dir,
+            seed=self.params['seed'],
+            logging_frequency=self.params['logging_frequency'],
+            device=self.params['device'],
+        )
 
     def exec_option(self):
         """

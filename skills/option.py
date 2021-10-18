@@ -1,4 +1,5 @@
 import itertools
+import os
 from copy import deepcopy
 from collections import deque
 from pathlib import Path
@@ -27,15 +28,16 @@ class Option:
 				goal_reward,
 				step_reward,
 				max_episode_len,
-				policy_net_lr,
-				policy_net_final_epsilon,
-				policy_net_final_exploration_frames,
-				policy_net_replay_start_size,
-				policy_net_target_update_interval,
-				policy_net_update_interval,
 				saving_dir,
 				seed,
 				logging_frequency,
+				load_from=None,
+				policy_net_lr=None,
+				policy_net_final_epsilon=None,
+				policy_net_final_exploration_frames=None,
+				policy_net_replay_start_size=None,
+				policy_net_target_update_interval=None,
+				policy_net_update_interval=None,
 				device='cuda:1'):
 		self.name = name
 		self.env = env
@@ -49,13 +51,8 @@ class Option:
 		self.saving_dir = saving_dir
 		self.seed = seed
 		self.logging_frequency = logging_frequency
-
-		self.initiation_classifier = None
-		self.termination_classifier = None
-		self.initiation_positive_examples = deque([], maxlen=buffer_length)
-		self.initiation_negative_examples = deque([], maxlen=buffer_length)
-		self.termination_positive_examples = deque([], maxlen=buffer_length)
-		self.termination_negative_examples = deque([], maxlen=buffer_length)
+		self.load_from = load_from
+		self.buffer_length = buffer_length
 
 		self.success_curve = deque([], maxlen=buffer_length)
 		self.success_rates = {}
@@ -82,6 +79,24 @@ class Option:
 			target_update_interval=policy_net_target_update_interval,
 			update_interval=policy_net_update_interval,
 		)
+
+		# load policy network and classifiers
+		if self.load_from is not None:
+			self.policy_net.load(os.path.join(self.load_from, 'saved_model'))
+			self.termination_classifier = SVC()
+			self.termination_classifier.load_from_file(os.path.join(self.load_from, 'termination_classifier'))
+			self.initiation_classifier = SVC()
+			self.initiation_classifier.load_from_file(os.path.join(self.load_from, 'initiation_classifier'))
+			# other stats
+			self.gestation_period = 0
+		else:
+			# init classifiers
+			self.initiation_classifier = None
+			self.termination_classifier = None
+			self.initiation_positive_examples = deque([], maxlen=buffer_length)
+			self.initiation_negative_examples = deque([], maxlen=buffer_length)
+			self.termination_positive_examples = deque([], maxlen=buffer_length)
+			self.termination_negative_examples = deque([], maxlen=buffer_length)
 
 	# ------------------------------------------------------------
 	# Learning Phase Methods
@@ -114,6 +129,9 @@ class Option:
 		"""
 		whether the termination condition is true
 		"""
+		if self.load_from is not None:
+			assert eval_mode
+		
 		if is_dead:
 			# ensure the agent is not dead when hitting the goal
 			return False
@@ -138,6 +156,9 @@ class Option:
 		override the env.step() reward, so that options that hit the subgoal
 		get a reward (the original monte environment gives no rewards)
 		"""
+		if self.load_from is not None:
+			assert eval_mode
+
 		if is_dead:
 			return self.death_reward
 		elif self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode):
@@ -149,6 +170,9 @@ class Option:
 		"""
 		return an action for the specified state according to an epsilon greedy policy
 		"""
+		if self.load_from is not None:
+			assert eval_mode
+
 		if eval_mode:
 			with self.policy_net.eval_mode():
 				return self.policy_net.act(state)
@@ -159,6 +183,9 @@ class Option:
 		"""
 		main control loop for option execution
 		"""
+		if self.load_from is not None:
+			assert eval_mode
+
 		# reset env
 		state = self.env.reset()
 		terminal = False

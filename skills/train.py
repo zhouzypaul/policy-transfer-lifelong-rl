@@ -132,13 +132,11 @@ class TrainOptionTrial(SingleOptionTrial):
                 self.save_results()
                 plot_learning_curve(self.params['experiment_name'], log_file_name=success_curves_file_name)
 
-            # plot_two_class_classifier(self.option, self.option.num_executions, self.params['experiment_name'], plot_examples=True)
-
         end_time = time.time()
 
         print("Time taken: ", end_time - start_time)
     
-    def save_results(self, success_curves_file_name='success_curves.pkl', option_file_name='trained_option.pkl'):
+    def save_results(self, success_curves_file_name='success_curves.pkl'):
         """
         save the results into csv files
         """
@@ -146,10 +144,12 @@ class TrainOptionTrial(SingleOptionTrial):
         success_curve_save_path = os.path.join(self.saving_dir, success_curves_file_name)
         with open(success_curve_save_path, 'wb+') as f:
             pickle.dump(self.option.success_rates, f)
-        # save trained option
-        option_save_path = os.path.join(self.saving_dir, option_file_name)
-        with open(option_save_path, 'wb') as f:
-            pickle.dump(self.option, f)
+        # save trained policy and classifiers
+        self.option.policy_net.save(dirname=os.path.join(self.saving_dir, 'saved_model'))
+        if self.option.termination_classifier is not None:
+            self.option.termination_classifier.save_to_file(os.path.join(self.saving_dir, 'termination_classifier'))
+        if self.option.initiation_classifier is not None:
+            self.option.initiation_classifier.save_to_file(os.path.join(self.saving_dir, 'initiation_classifier'))
 
 
 def main():
