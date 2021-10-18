@@ -15,42 +15,72 @@ class Option:
 	"""
 	the base class for option that all Option class shoud inherit from
 	"""
-	def __init__(self, name, env, params):
+	def __init__(self, 
+				name, 
+				env,
+				gestation_period,
+				buffer_length,
+				goal_state,
+				goal_state_position,
+				epsilon_within_goal,
+				death_reward,
+				goal_reward,
+				step_reward,
+				max_episode_len,
+				policy_net_lr,
+				policy_net_final_epsilon,
+				policy_net_final_exploration_frames,
+				policy_net_replay_start_size,
+				policy_net_target_update_interval,
+				policy_net_update_interval,
+				saving_dir,
+				seed,
+				logging_frequency,
+				device='cuda:1'):
 		self.name = name
 		self.env = env
-		self.params = params
+		self.goal_state_position = goal_state_position
+		self.epsilon_within_goal = epsilon_within_goal
+		self.death_reward = death_reward
+		self.goal_reward = goal_reward
+		self.step_reward = step_reward
+		self.goal_state = goal_state
+		self.max_episode_len = max_episode_len
+		self.saving_dir = saving_dir
+		self.seed = seed
+		self.logging_frequency = logging_frequency
 
 		self.initiation_classifier = None
 		self.termination_classifier = None
-		self.initiation_positive_examples = deque([], maxlen=self.params['buffer_length'])
-		self.initiation_negative_examples = deque([], maxlen=self.params['buffer_length'])
-		self.termination_positive_examples = deque([], maxlen=self.params['buffer_length'])
-		self.termination_negative_examples = deque([], maxlen=self.params['buffer_length'])
+		self.initiation_positive_examples = deque([], maxlen=buffer_length)
+		self.initiation_negative_examples = deque([], maxlen=buffer_length)
+		self.termination_positive_examples = deque([], maxlen=buffer_length)
+		self.termination_negative_examples = deque([], maxlen=buffer_length)
 
-		self.success_curve = deque([], maxlen=self.params['buffer_length'])
+		self.success_curve = deque([], maxlen=buffer_length)
 		self.success_rates = {}
 
-		self.gestation_period = params['gestation_period']
+		self.gestation_period = gestation_period
 		self.num_goal_hits = 0
 		self.num_executions = 0
 
 		# used to store trajectories of positions and finally used for plotting value function
-		self.position_buffer = deque([], maxlen=self.params['buffer_length'])
+		self.position_buffer = deque([], maxlen=buffer_length)
 
 		# learner for the value function 
 		self.policy_net = make_dqn_agent(
 			q_agent_type="DQN",
 			arch="custom",
 			n_actions=self.env.action_space.n,
-			lr=self.params['lr'],
+			lr=policy_net_lr,
 			noisy_net_sigma=None,
-			buffer_length=self.params['buffer_length'],
-			final_epsilon=self.params['final_epsilon'],
-			final_exploration_frames=self.params['final_exploration_frames'],
-			use_gpu=-1 if self.params['device'] == 'cpu' else 0,
-			replay_start_size=self.params['replay_start_size'],
-			target_update_interval=self.params['target_update_interval'],
-			update_interval=self.params['update_interval'],
+			buffer_length=buffer_length,
+			final_epsilon=policy_net_final_epsilon,
+			final_exploration_frames=policy_net_final_exploration_frames,
+			use_gpu=-1 if device == 'cpu' else 0,
+			replay_start_size=policy_net_replay_start_size,
+			target_update_interval=policy_net_target_update_interval,
+			update_interval=policy_net_update_interval,
 		)
 
 	# ------------------------------------------------------------
@@ -90,8 +120,8 @@ class Option:
 		if not eval_mode:
 			# termination is always true if the state is near the goal
 			position = get_player_position(self.env.unwrapped.ale.getRAM())
-			distance_to_goal = np.linalg.norm(position - self.params['goal_state_position'])
-			if distance_to_goal < self.params['epsilon_within_goal']:
+			distance_to_goal = np.linalg.norm(position - self.goal_state_position)
+			if distance_to_goal < self.epsilon_within_goal:
 				return True
 			else:
 				return False
@@ -109,11 +139,11 @@ class Option:
 		get a reward (the original monte environment gives no rewards)
 		"""
 		if is_dead:
-			return self.params['death_reward']
+			return self.death_reward
 		elif self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode):
-			return self.params['goal_reward']
+			return self.goal_reward
 		else:
-			return self.params['step_reward']
+			return self.step_reward
 
 	def act(self, state, eval_mode=False):
 		"""
@@ -141,7 +171,7 @@ class Option:
 		visited_states = []
 		option_transitions = []
 		if not eval_mode:
-			goal = self.params['goal_state']
+			goal = self.goal_state
 			# channel doesn't need to match, in case we down sampled
 			assert goal.shape[:-1] == np.array(state).shape[:-1]
 
@@ -158,7 +188,7 @@ class Option:
 			done = self.is_term_true(next_state.flatten(), is_dead=is_dead, eval_mode=eval_mode)
 			terminal = done or is_dead or info.get('needs_reset', False) # epsidoe is done if agent dies
 			reward = self.reward_function(next_state.flatten(), is_dead=is_dead, eval_mode=eval_mode)
-			if num_steps >= self.params['max_episode_len']:
+			if num_steps >= self.max_episode_len:
 				terminal = True
 			
 			# udpate policy if necessary
@@ -166,8 +196,8 @@ class Option:
 
 			# rendering
 			if rendering or eval_mode:
-				episode_dir = Path(self.params['saving_dir']).joinpath(f'episode_{self.num_executions}')
-				episode_dir.mkdir(exist_ok=True)
+				episode_dir = Path(self.saving_dir).joinpath('episode_rendering').joinpath(f'episode_{self.num_executions}')
+				episode_dir.mkdir(exist_ok=True, parents=True)
 				save_path = episode_dir.joinpath(f"state_at_step_{step_number}.jpeg")
 				try:
 					plt.imsave(save_path, next_state)
@@ -184,12 +214,12 @@ class Option:
 			state_pos = get_player_position(self.env.unwrapped.ale.getRAM())
 			self.position_buffer.append(state_pos)
 			state = next_state
-			if step_number % self.params['logging_frequency'] == 0 and not eval_mode:
-				value_func_plots_dir = Path(self.params['saving_dir']).joinpath('value_function_plots')
+			if step_number % self.logging_frequency == 0 and not eval_mode:
+				value_func_plots_dir = Path(self.saving_dir).joinpath('value_function_plots')
 				value_func_plots_dir.mkdir(exist_ok=True)
 				make_chunked_value_function_plot(self.policy_net, 
 													step_number, 
-													self.params['seed'], 
+													self.seed, 
 													value_func_plots_dir, 
 													pos_replay_buffer=self.position_buffer)
 		visited_states.append(state.flatten())
@@ -223,7 +253,7 @@ class Option:
 
 		if self.is_term_true(final_state, is_dead=final_state_is_dead):
 			# positive
-			positive_states = [start_state] + visited_states[-self.params['buffer_length']:]
+			positive_states = [start_state] + visited_states[-self.buffer_length:]
 			self.initiation_positive_examples += positive_states
 			self.termination_positive_examples.append(final_state)
 		else:
@@ -240,7 +270,7 @@ class Option:
 		"""
 		fit the initiation/termination classifier using positive and negative examples
 		"""
-		assert classifier is 'initiation' or 'termination'
+		assert classifier == 'initiation' or 'termination'
 		if len(negative_examples) > 0 and len(positive_examples) > 0:
 			self.train_two_class_classifier(classifier, positive_examples, negative_examples)
 		elif len(positive_examples) > 0:

@@ -84,7 +84,27 @@ class TrainOptionTrial(SingleOptionTrial):
         print(f"aiming for goal location {self.params['goal_state_position']}")
 
         # setup global option and the only option that needs to be learned
-        self.option = Option(name='only-option', env=self.env, params=self.params)
+        self.option = Option(name='only-option', 
+                            env=self.env, 
+                            gestation_period=self.params['gestation_period'],
+                            buffer_length=self.params['buffer_length'],
+                            goal_state=self.params['goal_state'],
+                            goal_state_position=self.params['goal_state_position'],
+                            epsilon_within_goal=self.params['epsilon_within_goal'],
+                            death_reward=self.params['death_reward'],
+                            goal_reward=self.params['goal_reward'],
+                            step_reward=self.params['step_reward'],
+                            max_episode_len=self.params['max_episode_len'],
+                            policy_net_lr=self.params['lr'],
+                            policy_net_final_epsilon=self.params['final_epsilon'],
+                            policy_net_final_exploration_frames=self.params['final_exploration_frames'],
+                            policy_net_replay_start_size=self.params['replay_start_size'],
+                            policy_net_target_update_interval=self.params['target_update_interval'],
+                            policy_net_update_interval=self.params['update_interval'],
+                            saving_dir=self.saving_dir,
+                            seed=self.params['seed'],
+                            logging_frequency=self.params['logging_frequency'],
+                            device=self.params['device'])
 
     def train_option(self):
         """
