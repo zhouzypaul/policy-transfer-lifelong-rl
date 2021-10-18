@@ -208,8 +208,8 @@ def make_chunked_value_function_plot(solver, step, seed, save_dir, pos_replay_bu
 	helper function to visualize the value function
 	"""
 	replay_buffer = solver.replay_buffer
-	states = np.array([exp[0] for exp in replay_buffer])
-	actions = np.array([exp[1] for exp in replay_buffer])
+	states = np.array([exp[0]['state'] for exp in replay_buffer.memory])
+	actions = np.array([exp[0]['action'] for exp in replay_buffer.memory])
 
 	# Chunk up the inputs so as to conserve GPU memory
 	num_chunks = int(np.ceil(states.shape[0] / chunk_size))
@@ -225,9 +225,12 @@ def make_chunked_value_function_plot(solver, step, seed, save_dir, pos_replay_bu
 	for state_chunk, action_chunk in zip(state_chunks, action_chunks):
 		state_chunk = torch.from_numpy(state_chunk).float().to(solver.device)
 		action_chunk = torch.from_numpy(action_chunk).float().to(solver.device)
-		chunk_qvalues = solver.get_qvalues(state_chunk, action_chunk).cpu().numpy().squeeze(1)
+		with torch.no_grad():
+			chunk_qvalues = solver.model(state_chunk).q_values.cpu().numpy()
+			actions_taken = list(map(lambda a: int(a), action_chunk.cpu().numpy()))
+			chunk_action_taken_qvalues = [chunk_qvalues[i, idx_a] for i, idx_a in enumerate(actions_taken)]
 		current_chunk_size = len(state_chunk)
-		qvalues[current_idx:current_idx + current_chunk_size] = chunk_qvalues
+		qvalues[current_idx:current_idx + current_chunk_size] = chunk_action_taken_qvalues
 		current_idx += current_chunk_size
 
 	x_pos = np.array([pos[0] for pos in pos_replay_buffer])
@@ -243,7 +246,7 @@ def make_chunked_value_function_plot(solver, step, seed, save_dir, pos_replay_bu
 	plt.xlim(0, 160)  # set the limits to the monte frame
 	plt.ylim(145, 240)
 	plt.colorbar()
-	file_name = f"{solver.name}_value_function_seed_{seed}_step_{step}.png"
+	file_name = f"value_function_seed_{seed}_step_{step}.png"
 	save_path = os.path.join(save_dir, file_name)
 	plt.savefig(save_path)
 	plt.close()

@@ -5,10 +5,13 @@ use_global_value_function,True,bool
 use_model,True,bool
 multithread_mpc,False,bool
 use_dense_rewards,True,bool
-lr_a,1e-3,float
-lr_c,1e-3,float
+lr,1e-4,float
 epsilon_within_goal,3.0,float
-epsilon,0.2,float
+final_epsilon,0.01,float
+final_exploration_frames,1000000,int
+replay_start_size,50000,int
+target_update_interval,30000,int
+update_interval,4,int
 logging_frequency,100,int
 saving_frequency,5,int
 max_episode_len,300,int

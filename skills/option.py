@@ -1,7 +1,5 @@
-import random
 import itertools
 from copy import deepcopy
-from functools import reduce
 from collections import deque
 from pathlib import Path
 
@@ -10,6 +8,7 @@ from thundersvm import SVC, OneClassSVM
 import matplotlib.pyplot as plt
 
 from skills.option_utils import get_player_position, make_chunked_value_function_plot
+from skills.agents.dqn import make_dqn_agent
 
 
 class Option:
@@ -39,16 +38,20 @@ class Option:
 		self.position_buffer = deque([], maxlen=self.params['buffer_length'])
 
 		# learner for the value function 
-		# don't use output normalization because this is the model free case
-		self.value_learner = TD3(state_dim=reduce(lambda x, y: x*y, self.env.observation_space.shape, 1),
-								action_dim=self.env.action_space.n,
-								max_action=1.,
-								name=f"{name}-td3-agent",
-								device=self.params['device'],
-								lr_c=self.params['lr_c'], 
-								lr_a=self.params['lr_a'],
-								buffer_length=self.params['buffer_length'],
-								use_output_normalization=False)
+		self.policy_net = make_dqn_agent(
+			q_agent_type="DQN",
+			arch="custom",
+			n_actions=self.env.action_space.n,
+			lr=self.params['lr'],
+			noisy_net_sigma=None,
+			buffer_length=self.params['buffer_length'],
+			final_epsilon=self.params['final_epsilon'],
+			final_exploration_frames=self.params['final_exploration_frames'],
+			use_gpu=-1 if self.params['device'] == 'cpu' else 0,
+			replay_start_size=self.params['replay_start_size'],
+			target_update_interval=self.params['target_update_interval'],
+			update_interval=self.params['update_interval'],
+		)
 
 	# ------------------------------------------------------------
 	# Learning Phase Methods
@@ -116,13 +119,11 @@ class Option:
 		"""
 		return an action for the specified state according to an epsilon greedy policy
 		"""
-		if random.random() < self.params['epsilon'] and not eval_mode:
-			return self.env.action_space.sample()
+		if eval_mode:
+			with self.policy_net.eval_mode():
+				return self.policy_net.act(state)
 		else:
-			# the action selector is the same as the value learner
-			tanh_output = self.value_learner.act(state, evaluation_mode=False)
-			action = np.argmax(tanh_output)
-			return action
+			return self.policy_net.act(state)
 	
 	def rollout(self, step_number, eval_mode=False, rendering=False):
 		"""
@@ -142,7 +143,7 @@ class Option:
 		if not eval_mode:
 			goal = self.params['goal_state']
 			# channel doesn't need to match, in case we down sampled
-			assert goal.shape[:-1] == state.shape[:-1]
+			assert goal.shape[:-1] == np.array(state).shape[:-1]
 
 		# print(f"[Step: {step_number}] Rolling out {self.name}, from {state} targeting {goal}")
 
@@ -151,7 +152,7 @@ class Option:
 		# main while loop
 		while not self.is_term_true(state.flatten(), is_dead=is_dead, eval_mode=eval_mode) and not terminal:
 			# control
-			action = self.act(state.flatten(), eval_mode=eval_mode)
+			action = self.act(state, eval_mode=eval_mode)
 			next_state, reward, done, info = self.env.step(action)
 			is_dead = int(info['ale.lives']) < 6
 			done = self.is_term_true(next_state.flatten(), is_dead=is_dead, eval_mode=eval_mode)
@@ -159,6 +160,9 @@ class Option:
 			reward = self.reward_function(next_state.flatten(), is_dead=is_dead, eval_mode=eval_mode)
 			if num_steps >= self.params['max_episode_len']:
 				terminal = True
+			
+			# udpate policy if necessary
+			self.policy_net.observe(next_state, reward, done, terminal)
 
 			# rendering
 			if rendering or eval_mode:
@@ -183,7 +187,7 @@ class Option:
 			if step_number % self.params['logging_frequency'] == 0 and not eval_mode:
 				value_func_plots_dir = Path(self.params['saving_dir']).joinpath('value_function_plots')
 				value_func_plots_dir.mkdir(exist_ok=True)
-				make_chunked_value_function_plot(self.value_learner, 
+				make_chunked_value_function_plot(self.policy_net, 
 													step_number, 
 													self.params['seed'], 
 													value_func_plots_dir, 
@@ -197,20 +201,15 @@ class Option:
 			self.num_goal_hits += 1
 			print(f"num goal hits increased to {self.num_goal_hits}")
 		
-		# training
+		# training classifiers
 		if not eval_mode:
 			self.derive_positive_and_negative_examples(visited_states, final_state_is_dead=is_dead)
-			# this is updating the value function
-			self.experience_replay(option_transitions)
 			# refining your initiation/termination classifier
 			self.fit_classifier(self.initiation_positive_examples, self.initiation_negative_examples, 'initiation')
 			self.fit_classifier(self.termination_positive_examples, self.termination_negative_examples, 'termination')
 		
 		return option_transitions, total_reward
 
-	def experience_replay(self, trajectory):
-		for state, action, reward, next_state, done in trajectory:
-			self.value_learner.step(state, action, reward, next_state, done)
 
 	# ------------------------------------------------------------
 	# Classifiers
