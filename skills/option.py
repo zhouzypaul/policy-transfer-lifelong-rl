@@ -8,7 +8,8 @@ import numpy as np
 from thundersvm import SVC, OneClassSVM
 import matplotlib.pyplot as plt
 
-from skills.option_utils import get_player_position, make_chunked_value_function_plot
+from skills.option_utils import get_player_position, make_chunked_value_function_plot, \
+		last_in_framestack
 from skills.agents.dqn import make_dqn_agent
 
 
@@ -123,7 +124,7 @@ class Option:
 		if np.array_equal(state, copied_env.reset()):
 			return True
 
-		return self.initiation_classifier.predict([state])[0] == 1
+		return self.initiation_classifier.predict(last_in_framestack(state))[0] == 1
 
 	def is_term_true(self, state, is_dead, eval_mode=False):
 		"""
@@ -146,7 +147,7 @@ class Option:
 		# if termination classifier isn't initialized, and state is not goal state
 		if self.termination_classifier is None:
 			return False
-		return self.termination_classifier.predict([state])[0] == 1
+		return self.termination_classifier.predict(last_in_framestack(state))[0] == 1
 
 	# ------------------------------------------------------------
 	# Control Loop Methods
@@ -207,14 +208,14 @@ class Option:
 		self.num_executions += 1
 
 		# main while loop
-		while not self.is_term_true(state.flatten(), is_dead=is_dead, eval_mode=eval_mode) and not terminal:
+		while not self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode) and not terminal:
 			# control
 			action = self.act(state, eval_mode=eval_mode)
 			next_state, reward, done, info = self.env.step(action)
 			is_dead = int(info['ale.lives']) < 6
-			done = self.is_term_true(next_state.flatten(), is_dead=is_dead, eval_mode=eval_mode)
+			done = self.is_term_true(next_state, is_dead=is_dead, eval_mode=eval_mode)
 			terminal = done or is_dead or info.get('needs_reset', False) # epsidoe is done if agent dies
-			reward = self.reward_function(next_state.flatten(), is_dead=is_dead, eval_mode=eval_mode)
+			reward = self.reward_function(next_state, is_dead=is_dead, eval_mode=eval_mode)
 			if num_steps >= self.max_episode_len:
 				terminal = True
 			
@@ -230,14 +231,14 @@ class Option:
 					plt.imsave(save_path, next_state)
 				except ValueError:
 					# cannot plot because next_state is a framestack of 4
-					plt.imsave(save_path, next_state[0])
+					plt.imsave(save_path, last_in_framestack(next_state))
 
 			# logging
 			num_steps += 1
 			step_number += 1
 			total_reward += reward
-			visited_states.append(state.flatten())
-			option_transitions.append((state.flatten(), action, reward, next_state.flatten(), done))
+			visited_states.append(last_in_framestack(state))
+			option_transitions.append((state, action, reward, next_state, done))
 			state_pos = get_player_position(self.env.unwrapped.ale.getRAM())
 			self.position_buffer.append(state_pos)
 			state = next_state
@@ -249,12 +250,12 @@ class Option:
 													self.seed, 
 													value_func_plots_dir, 
 													pos_replay_buffer=self.position_buffer)
-		visited_states.append(state.flatten())
+		visited_states.append(last_in_framestack(state))
 
 		# more logging
-		self.success_curve.append(self.is_term_true(state.flatten(), is_dead=is_dead, eval_mode=eval_mode))
+		self.success_curve.append(self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode))
 		self.success_rates[step_number] = {'success': self.get_success_rate()}
-		if self.is_term_true(state.flatten(), is_dead=is_dead, eval_mode=eval_mode):
+		if self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode):
 			self.num_goal_hits += 1
 			print(f"num goal hits increased to {self.num_goal_hits}")
 		
@@ -287,6 +288,9 @@ class Option:
 			negative_examples = [start_state]
 			self.initiation_negative_examples += negative_examples
 			self.termination_negative_examples.append(final_state)
+		
+		# all states along the trajectory are negative examples for termination
+		self.termination_negative_examples += visited_states[:-1]
 
 	def construct_feature_matrix(self, examples):
 		states = list(itertools.chain.from_iterable(examples))

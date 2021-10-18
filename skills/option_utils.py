@@ -130,6 +130,14 @@ class SingleOptionTrial:
 		return env
 
 
+def last_in_framestack(state):
+	"""
+	the classifier don't need stacked frames, just the final frame
+	"""
+	assert state.shape[0] == 4
+	return np.copy(state[-1, :, :])
+
+
 def warp_frames(state):
 	"""
 	warp frames from (210, 160, 3) to (1, 84, 84) as in the nature paper
@@ -194,13 +202,9 @@ def make_done_state_plot(replay_buffer, episode_idx, save_dir):
 
 	for i in range(len(done_states)):
 		s = done_states[i]
-		frame = s[:24*24].reshape((24, 24))  # states in replay buffer are flattened, reshape to monte frame
+		frame = s[-1, :, :]  # final frame in framestack
 		file_name = save_dir.joinpath(f"done_state_plot_at_episode_{episode_idx}__{i}.jpg")
-		try:
-			plt.imsave(file_name, frame)
-		except ValueError:
-			# cannot plot image with channel 1
-			plt.imsave(file_name, frame.squeeze())
+		plt.imsave(file_name, frame)
 
 
 def make_chunked_value_function_plot(solver, step, seed, save_dir, pos_replay_buffer, chunk_size=1000):
