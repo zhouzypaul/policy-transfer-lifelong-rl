@@ -57,7 +57,7 @@ class TrainOptionTrial(SingleOptionTrial):
         self.check_params_validity()
 
         # setting random seeds
-        seeding.seed(self.params['seed'], random, np, torch)
+        seeding.seed(self.params['seed'], random, np)
 
         # torch benchmark
         torch.backends.cudnn.benchmark = True
