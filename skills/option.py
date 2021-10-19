@@ -33,12 +33,12 @@ class Option:
 				seed,
 				logging_frequency,
 				load_from=None,
-				policy_net_lr=None,
-				policy_net_final_epsilon=None,
-				policy_net_final_exploration_frames=None,
-				policy_net_replay_start_size=None,
-				policy_net_target_update_interval=None,
-				policy_net_update_interval=None,
+				policy_net_lr=1e-4,
+				policy_net_final_epsilon=0.01,
+				policy_net_final_exploration_frames=10000,
+				policy_net_replay_start_size=1000000,
+				policy_net_target_update_interval=100,
+				policy_net_update_interval=4,
 				device='cuda:1'):
 		self.name = name
 		self.env = env
@@ -220,7 +220,11 @@ class Option:
 				terminal = True
 			
 			# udpate policy if necessary
-			self.policy_net.observe(next_state, reward, done, terminal)
+			if eval_mode:
+				with self.policy_net.eval_mode():
+					self.policy_net.observe(next_state, reward, done, terminal)
+			else:
+				self.policy_net.observe(next_state, reward, done, terminal)
 
 			# rendering
 			if rendering or eval_mode:
