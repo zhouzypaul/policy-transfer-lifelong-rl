@@ -42,8 +42,6 @@ class SingleOptionTrial:
 							help="save the images of states while training")
 		parser.add_argument("--agent_space", action='store_true', default=False,
 							help="train with the agent space")
-		parser.add_argument("--down_sample", "-d", action='store_true', default=False, 
-							help="down sample the monte frame by converting to grey scale and divide by 255")
 		parser.add_argument("--use_deepmind_wrappers", action='store_true', default=True,
 							help="use the deepmind wrappers")
 		parser.add_argument("--suppress_action_prunning", action='store_true', default=False,
@@ -121,9 +119,6 @@ class SingleOptionTrial:
 			start_state_path = self.params['info_dir'].joinpath(self.params['start_state'])
 			start_state_pos_path = self.params['info_dir'].joinpath(self.params['start_state_pos'])
 			env = MonteAgentSpaceForwarding(env, start_state_path, start_state_pos_path)
-		# down sacle observations
-		if self.params['down_sample']:
-			pass
 		logging.info(f'making environment {env_name}')
 		env.seed(env_seed)
 		env.action_space.seed(env_seed)
