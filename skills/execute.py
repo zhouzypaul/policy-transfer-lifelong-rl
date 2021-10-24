@@ -34,7 +34,7 @@ class ExecuteOptionTrial(SingleOptionTrial):
         parser.add_argument(
             "--saved_option_dir",
             type=str,
-            default='results/monte-right-ladder',
+            default='results/right-ladder',
             help='path to a stored trained policy network')
         args = self.parse_common_args(parser)
         return args

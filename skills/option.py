@@ -55,7 +55,7 @@ class Option:
 		self.load_from = load_from
 		self.buffer_length = buffer_length
 
-		self.success_curve = deque([], maxlen=buffer_length)
+		self.success_curve = deque([], maxlen=10)
 		self.success_rates = {}
 
 		self.gestation_period = gestation_period
