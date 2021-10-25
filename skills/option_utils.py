@@ -129,6 +129,7 @@ def last_in_framestack(state):
 	"""
 	the classifier don't need stacked frames, just the final frame
 	"""
+	state = np.array(state)
 	assert state.shape[0] == 4
 	return np.copy(state[-1, :, :])
 
@@ -196,7 +197,7 @@ def make_done_state_plot(replay_buffer, episode_idx, save_dir):
 	done_states = states[dones]
 
 	for i in range(len(done_states)):
-		s = done_states[i]
+		s = np.array(done_states[i])
 		frame = s[-1, :, :]  # final frame in framestack
 		file_name = save_dir.joinpath(f"done_state_plot_at_episode_{episode_idx}__{i}.jpg")
 		plt.imsave(file_name, frame)

@@ -1,6 +1,7 @@
 import numpy as np
 from gym import Wrapper
 from gym.spaces.box import Box
+from pfrl.wrappers.atari_wrappers import LazyFrames
 
 from skills.option_utils import get_player_position
 from skills.wrappers.monte_agent_space_wrapper import MonteAgentSpace
@@ -91,8 +92,7 @@ class MonteDeepMindAgentSpace(MonteAgentSpace):
         for frame in np.array(image):
             # image is an array of stacked frames
             cropped_frame = frame[x_coors[0]: x_coors[-1]+1, y_coors[0]: y_coors[-1]+1]
-            padded_frame = np.zeros(self.img_shape[1:])
-            padded_frame[:cropped_frame.shape[0], :cropped_frame.shape[1]] = cropped_frame
+            padded_frame = np.zeros((1, self.img_shape[-2], self.img_shape[-1]))
+            padded_frame[:, :cropped_frame.shape[0], :cropped_frame.shape[1]] = cropped_frame
             cropped_image.append(padded_frame)
-        cropped_image = np.array(cropped_image)
-        return cropped_image
+        return LazyFrames(cropped_image, stack_axis=0)

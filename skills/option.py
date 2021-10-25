@@ -200,8 +200,8 @@ class Option:
 		option_transitions = []
 		if not eval_mode:
 			goal = self.goal_state
-			# channel doesn't need to match, in case we down sampled
-			assert goal.shape[:-1] == np.array(state).shape[:-1]
+			# state is likely not a LazyFrame because of the MonteForwarding wrapper
+			assert goal.shape == state.shape
 
 		# print(f"[Step: {step_number}] Rolling out {self.name}, from {state} targeting {goal}")
 
@@ -210,7 +210,7 @@ class Option:
 		# main while loop
 		while not self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode) and not terminal:
 			# control
-			action = self.act(state, eval_mode=eval_mode)
+			action = self.act(np.array(state), eval_mode=eval_mode)
 			next_state, reward, done, info = self.env.step(action)
 			is_dead = int(info['ale.lives']) < 6
 			done = self.is_term_true(next_state, is_dead=is_dead, eval_mode=eval_mode)
@@ -222,27 +222,23 @@ class Option:
 			# udpate policy if necessary
 			if eval_mode:
 				with self.policy_net.eval_mode():
-					self.policy_net.observe(next_state, reward, done, terminal)
+					self.policy_net.observe(np.array(next_state), reward, done, terminal)
 			else:
-				self.policy_net.observe(next_state, reward, done, terminal)
+				self.policy_net.observe(np.array(next_state), reward, done, terminal)
 
 			# rendering
 			if rendering or eval_mode:
 				episode_dir = Path(self.saving_dir).joinpath('episode_rendering').joinpath(f'episode_{self.num_executions}')
 				episode_dir.mkdir(exist_ok=True, parents=True)
 				save_path = episode_dir.joinpath(f"state_at_step_{step_number}.jpeg")
-				try:
-					plt.imsave(save_path, next_state)
-				except ValueError:
-					# cannot plot because next_state is a framestack of 4
-					plt.imsave(save_path, last_in_framestack(next_state))
+				plt.imsave(save_path, last_in_framestack(next_state))
 
 			# logging
 			num_steps += 1
 			step_number += 1
 			total_reward += reward
 			visited_states.append(last_in_framestack(state))
-			option_transitions.append((state, action, reward, next_state, done))
+			option_transitions.append((np.array(state), action, reward, np.array(next_state), done))
 			state_pos = get_player_position(self.env.unwrapped.ale.getRAM())
 			self.position_buffer.append(state_pos)
 			state = next_state
