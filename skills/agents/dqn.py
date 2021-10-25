@@ -35,7 +35,7 @@ def parse_arch(arch, n_actions):
     if arch == "custom":
         return nn.Sequential(
             SmallCNN(),
-            init_chainer_default(nn.Linear(64, n_actions)),
+            init_chainer_default(nn.Linear(24, n_actions)),
             DiscreteActionValueHead(),
         )
     elif arch == "nature":

@@ -14,17 +14,16 @@ def constant_bias_initializer(bias=0.0):
 
 
 class SmallCNN(nn.Module):
+    """Small CNN module proposed for DQN in NeurIPS DL Workshop, 2013.
+
+    See: https://arxiv.org/abs/1312.5602
     """
-    the standard nature DQN is too big to process the agent space in monte
-    (because of kernel size and strides, the small 24 * 24 agent space image
-    just disappears)
-    so we build a custom one
-    """
+
     def __init__(
-        self, n_input_channels=4, n_output_channels=64, activation=F.relu, bias=0.1
+        self, n_input_channels=4, n_output_channels=24, activation=F.relu, bias=0.1
     ):
         """
-        input shape is assumed to be (N, 4, 24, 24)
+        expected input shape is (N, 4, 24, 24)
         """
         self.n_input_channels = n_input_channels
         self.activation = activation
@@ -32,12 +31,11 @@ class SmallCNN(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList(
             [
-                nn.Conv2d(n_input_channels, 16, 5, stride=2),
-                nn.Conv2d(16, 20, 5, stride=2),
-                nn.Conv2d(20, 20, 3, stride=1),
+                nn.Conv2d(n_input_channels, 16, 8, stride=4),
+                nn.Conv2d(16, 32, 4, stride=2),
             ]
         )
-        self.output = nn.Linear(20, n_output_channels)
+        self.output = nn.Linear(32, n_output_channels)
 
         self.apply(init_chainer_default)
         self.apply(constant_bias_initializer(bias=bias))
