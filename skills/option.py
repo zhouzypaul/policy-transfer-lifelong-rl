@@ -189,8 +189,8 @@ class Option:
 
 		# reset env
 		state = self.env.reset()
-		terminal = False
 		is_dead = False
+		terminal = self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode)
 
 		assert self.is_init_true(state)
 
@@ -208,7 +208,7 @@ class Option:
 		self.num_executions += 1
 
 		# main while loop
-		while not self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode) and not terminal:
+		while not terminal:
 			# control
 			if directed_rollout:
 				action = 4  # go down
