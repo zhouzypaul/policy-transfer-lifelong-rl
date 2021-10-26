@@ -117,14 +117,23 @@ class TrainOptionTrial(SingleOptionTrial):
         episode_idx = 0
         while self.option.get_training_phase() == "gestation":
             print(f"starting episode {episode_idx} at step {step_number}")
-            option_transitions, total_reward = self.option.rollout(step_number=step_number, eval_mode=False, rendering=self.params['render'])
+            use_directed_rollout = True if episode_idx < 50 else False
+            if use_directed_rollout:
+                print("directed rolling out episode")
+            option_transitions, total_reward = self.option.rollout(
+                step_number=step_number, 
+                directed_rollout=use_directed_rollout,
+                eval_mode=False, 
+                rendering=self.params['render']
+            )
             step_number += len(option_transitions)
             episode_idx += 1
 
             # plot the done state
             done_state_dir = Path(self.saving_dir).joinpath('done_states_plot')
             done_state_dir.mkdir(exist_ok=True)
-            make_done_state_plot(replay_buffer=option_transitions, episode_idx=episode_idx, save_dir=done_state_dir)
+            if not use_directed_rollout:
+                make_done_state_plot(replay_buffer=option_transitions, episode_idx=episode_idx, save_dir=done_state_dir)
 
             # save the results
             if episode_idx % self.params['saving_frequency'] == 0:

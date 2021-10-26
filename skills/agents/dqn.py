@@ -12,6 +12,68 @@ from pfrl.q_functions import DiscreteActionValueHead, DuelingDQN
 from skills.models.small_cnn import SmallCNN
 
 
+class DQN(agents.DQN):
+    """
+    a customr DQN
+    such that the observe() method takes in actions as well
+
+    need it so that actions don't need to come from act()
+
+    this class doesn't support recurrent DQNs
+    """
+    def observe(
+        self,
+        obs,
+        action,
+        reward,
+        next_obs,
+        termimal,
+    ):
+        return self.batch_observe([obs], [action], [reward], [next_obs], [termimal])
+
+    def batch_observe(
+        self,
+        batch_obs,
+        batch_action,
+        batch_reward,
+        batch_next_obs,
+        batch_terminal,
+    ) -> None:
+        if self.training:
+            return self._batch_observe_train(
+                batch_obs, batch_action, batch_reward, batch_next_obs, batch_terminal
+            )
+
+    def _batch_observe_train(
+        self,
+        batch_obs,
+        batch_action,
+        batch_reward,
+        batch_next_obs,
+        batch_terminal,
+    ) -> None:
+
+        for i in range(len(batch_obs)):
+            self.t += 1
+            self._cumulative_steps += 1
+            # Update the target network
+            if self.t % self.target_update_interval == 0:
+                self.sync_target_network()
+            # Add a transition to the replay buffer
+            transition = {
+                "state": batch_obs[i],
+                "action": batch_action[i],
+                "reward": batch_reward[i],
+                "next_state": batch_next_obs[i],
+                "next_action": None,
+                "is_state_terminal": batch_terminal[i],
+            }
+            self.replay_buffer.append(env_id=i, **transition)
+            if batch_terminal[i]:
+                self.replay_buffer.stop_current_episode(env_id=i)
+            self.replay_updater.update_if_necessary(self.t)
+
+
 class SingleSharedBias(nn.Module):
     """
     Single shared bias used in the Double DQN paper.
@@ -67,7 +129,7 @@ def parse_agent(agent):
     """
     which DQN agent to use
     """
-    return {"DQN": agents.DQN, "DoubleDQN": agents.DoubleDQN, "PAL": agents.PAL}[agent]
+    return {"DQN": DQN, "DoubleDQN": agents.DoubleDQN, "PAL": agents.PAL}[agent]
 
 
 def make_dqn_agent(q_agent_type,

@@ -180,7 +180,7 @@ class Option:
 		else:
 			return self.policy_net.act(state)
 	
-	def rollout(self, step_number, eval_mode=False, rendering=False):
+	def rollout(self, step_number, eval_mode=False, directed_rollout=False, rendering=False):
 		"""
 		main control loop for option execution
 		"""
@@ -210,7 +210,10 @@ class Option:
 		# main while loop
 		while not self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode) and not terminal:
 			# control
-			action = self.act(np.array(state), eval_mode=eval_mode)
+			if directed_rollout:
+				action = 4  # go down
+			else:
+				action = self.act(np.array(state), eval_mode=eval_mode)
 			next_state, reward, done, info = self.env.step(action)
 			is_dead = int(info['ale.lives']) < 6
 			done = self.is_term_true(next_state, is_dead=is_dead, eval_mode=eval_mode)
@@ -222,9 +225,9 @@ class Option:
 			# udpate policy if necessary
 			if eval_mode:
 				with self.policy_net.eval_mode():
-					self.policy_net.observe(np.array(next_state), reward, done, terminal)
+					self.policy_net.observe(np.array(state), action, reward, np.array(next_state), terminal)
 			else:
-				self.policy_net.observe(np.array(next_state), reward, done, terminal)
+				self.policy_net.observe(np.array(state), action, reward, np.array(next_state), terminal)
 
 			# rendering
 			if rendering or eval_mode:
@@ -253,11 +256,12 @@ class Option:
 		visited_states.append(last_in_framestack(state))
 
 		# more logging
-		self.success_curve.append(self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode))
-		self.success_rates[step_number] = {'success': self.get_success_rate()}
-		if self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode):
-			self.num_goal_hits += 1
-			print(f"num goal hits increased to {self.num_goal_hits}")
+		if not directed_rollout:
+			self.success_curve.append(self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode))
+			self.success_rates[step_number] = {'success': self.get_success_rate()}
+			if self.is_term_true(state, is_dead=is_dead, eval_mode=eval_mode):
+				self.num_goal_hits += 1
+				print(f"num goal hits increased to {self.num_goal_hits}")
 		
 		# training classifiers
 		if not eval_mode:

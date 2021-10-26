@@ -1,12 +1,12 @@
-gestation_period,40,int
+gestation_period,60,int
 buffer_length,100000,int
 use_dense_rewards,True,bool
-lr,1e-4,float
+lr,3e-4,float
 epsilon_within_goal,3.0,float
 final_epsilon,0.01,float
-final_exploration_frames,10000,int
+final_exploration_frames,100000,int
 replay_start_size,100,int
-target_update_interval,100,int
+target_update_interval,1000,int
 update_interval,4,int
 logging_frequency,100,int
 saving_frequency,5,int
