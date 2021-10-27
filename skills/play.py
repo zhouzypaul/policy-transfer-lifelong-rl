@@ -54,7 +54,7 @@ class PlayGame(SingleOptionTrial):
 		while True:
 			# render env
 			self.env.unwrapped.render()
-			print(f"state shape is {state.shape}")
+			print(f"state shape is {np.array(state).shape}")
 			# user input an action to take
 			action_input = input() 
 			if action_input == 'save':
@@ -63,7 +63,7 @@ class PlayGame(SingleOptionTrial):
 				else:
 					save_path = os.path.join(self.saving_dir, 'goal_state.npy')
 				np.save(file=save_path, arr=state)
-				print(f'saved numpy array {state} of shape {state.shape} to {save_path}')
+				print(f'saved numpy array {state} of shape {np.array(state).shape} to {save_path}')
 				break
 			elif action_input == 'save_position':
 				assert self.params['get_player_position']
