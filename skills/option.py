@@ -124,7 +124,7 @@ class Option:
 		if np.array_equal(state, copied_env.reset()):
 			return True
 
-		return self.initiation_classifier.predict(last_in_framestack(state))[0] == 1
+		return self.initiation_classifier.predict([last_in_framestack(state).flatten()])[0] == 1
 
 	def is_term_true(self, state, is_dead, eval_mode=False):
 		"""
@@ -147,7 +147,7 @@ class Option:
 		# if termination classifier isn't initialized, and state is not goal state
 		if self.termination_classifier is None:
 			return False
-		return self.termination_classifier.predict(last_in_framestack(state))[0] == 1
+		return self.termination_classifier.predict([last_in_framestack(state).flatten()])[0] == 1
 
 	# ------------------------------------------------------------
 	# Control Loop Methods
@@ -297,9 +297,10 @@ class Option:
 		self.termination_negative_examples += visited_states[:-1]
 
 	def construct_feature_matrix(self, examples):
-		states = list(itertools.chain.from_iterable(examples))
-		states = np.array(states).reshape(len(states), -1)  # reshape to (batch_size, state_size)
-		return np.array(states)
+		# reshape to (batch_size, state_size)
+		# this automatically flattens out the 2D image to 1-D
+		states = np.array(examples).reshape(len(examples), -1)
+		return states
 	
 	def fit_classifier(self, positive_examples, negative_examples, classifier):
 		"""
