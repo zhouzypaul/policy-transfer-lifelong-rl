@@ -9,6 +9,7 @@ from pathlib import Path
 import torch
 import seeding
 import numpy as np
+import pfrl
 
 from skills import utils
 from skills.option_utils import SingleOptionTrial, make_done_state_plot
@@ -58,6 +59,7 @@ class TrainOptionTrial(SingleOptionTrial):
 
         # setting random seeds
         seeding.seed(self.params['seed'], random, np)
+        pfrl.utils.set_random_seed(self.params['seed'])
 
         # torch benchmark
         torch.backends.cudnn.benchmark = True

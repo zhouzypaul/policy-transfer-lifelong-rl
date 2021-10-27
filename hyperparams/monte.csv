@@ -4,7 +4,7 @@ use_dense_rewards,True,bool
 lr,3e-4,float
 epsilon_within_goal,3.0,float
 final_epsilon,0.01,float
-final_exploration_frames,100000,int
+final_exploration_frames,20000,int
 replay_start_size,100,int
 target_update_interval,1000,int
 update_interval,4,int
