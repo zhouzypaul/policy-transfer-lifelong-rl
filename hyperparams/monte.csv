@@ -11,6 +11,6 @@ update_interval,4,int
 logging_frequency,100,int
 saving_frequency,5,int
 max_episode_len,300,int
-goal_reward,1000,float
-step_reward,-1,float
-death_reward,-500,float
+goal_reward,1,float
+step_reward,0,float
+death_reward,0,float

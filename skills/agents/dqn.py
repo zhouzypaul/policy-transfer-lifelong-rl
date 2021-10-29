@@ -12,7 +12,7 @@ from pfrl.q_functions import DiscreteActionValueHead, DuelingDQN
 from skills.models.small_cnn import SmallCNN
 
 
-class DQN(agents.DQN):
+class DoubleDQN(agents.DoubleDQN):
     """
     a customr DQN
     such that the observe() method takes in actions as well
@@ -97,7 +97,8 @@ def parse_arch(arch, n_actions):
     if arch == "custom":
         return nn.Sequential(
             SmallCNN(),
-            init_chainer_default(nn.Linear(24, n_actions)),
+            init_chainer_default(nn.Linear(24, n_actions, bias=False)),
+            SingleSharedBias(),
             DiscreteActionValueHead(),
         )
     elif arch == "nature":
@@ -129,7 +130,7 @@ def parse_agent(agent):
     """
     which DQN agent to use
     """
-    return {"DQN": DQN, "DoubleDQN": agents.DoubleDQN, "PAL": agents.PAL}[agent]
+    return {"DQN": agents.DQN, "DoubleDQN": DoubleDQN, "PAL": agents.PAL}[agent]
 
 
 def make_dqn_agent(q_agent_type,

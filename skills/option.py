@@ -67,7 +67,7 @@ class Option:
 
         # learner for the value function 
         self.policy_net = make_dqn_agent(
-            q_agent_type="DQN",
+            q_agent_type="DoubleDQN",
             arch="custom",
             n_actions=self.env.action_space.n,
             lr=policy_net_lr,
