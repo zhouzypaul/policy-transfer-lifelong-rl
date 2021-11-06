@@ -72,6 +72,12 @@ class DoubleDQN(agents.DoubleDQN):
             if batch_terminal[i]:
                 self.replay_buffer.stop_current_episode(env_id=i)
             self.replay_updater.update_if_necessary(self.t)
+    
+    def extract_features(self, state):
+        with torch.no_grad(), evaluating(self.model):
+            cnn = self.model[0]
+            batch_xs = self.batch_states([state], self.device, self.phi)
+            return cnn(batch_xs).cpu().numpy().flatten()
 
 
 class SingleSharedBias(nn.Module):
