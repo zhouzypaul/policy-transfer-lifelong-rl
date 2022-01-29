@@ -1,12 +1,14 @@
 import os
+import random
 import pickle
 import argparse
 
 import seeding
 import numpy as np
+from matplotlib import pyplot as plt
 
 from skills import utils
-from skills.option_utils import SingleOptionTrial
+from skills.option_utils import SingleOptionTrial, get_player_position
 
 
 class GenerateTrajectory(SingleOptionTrial):
@@ -44,6 +46,8 @@ class GenerateTrajectory(SingleOptionTrial):
         # saving
         self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])
         self.saving_file = os.path.join(self.saving_dir, self.params['file_name'])
+        self.random_traj_file = os.path.join(self.saving_dir, 'random_traj.pkl')
+        self.plot_file = os.path.join(self.saving_dir, 'random_traj_positions.png')
         utils.create_log_dir(self.saving_dir)
 
         # make env
@@ -83,22 +87,66 @@ class GenerateTrajectory(SingleOptionTrial):
                     trajectories.append(trajectory)
                     print(f"finished a trajectory, length: {len(trajectory)}")
                     trajectory = []
-                    self.save_traj(trajectories)
+                    self.save_traj(trajectories, file_path=self.saving_file)
         except:
             # save on error
             trajectories.append(trajectory)
-            self.save_traj(trajectories)
+            self.save_traj(trajectories, file_path=self.saving_file)
     
-    def save_traj(self, trajectories):
+    def generate_random_traj(self, total_steps=10000):
+        """
+        generate random trajectory with random control
+        """
+        state = self.env.reset()
+        trajectories = []
+        trajectory = []
+        step_idx = 0
+        while step_idx < total_steps:
+            # render env
+            self.env.unwrapped.render()
+
+            # record the state and ram
+            ram = self.env.unwrapped.ale.getRAM()
+            trajectory.append((np.array(state), ram))
+
+            # take the action
+            action = random.randint(0, self.env.action_space.n - 1)
+            next_state, r, done, info = self.env.step(action)
+            state = next_state
+            if done:
+                state = self.env.reset()
+                trajectories.append(trajectory)
+                print(f"finished a trajectory, length: {len(trajectory)}")
+                trajectory = []
+            step_idx += 1
+        trajectories.append(trajectory)
+        self.save_traj(trajectories, file_path=self.random_traj_file)
+        self.plot_traj_positions(trajectories)
+    
+    def plot_traj_positions(self, trajectories):
+        """
+        plot the position of all the positons in a certain list of trajectories
+        """
+        all_pos = [get_player_position(ram) for traj in trajectories for state, ram in traj]
+        plt.scatter(*zip(*all_pos))
+        plt.xlim(15, 140)
+        plt.ylim(140, 260)
+        plt.title('player positions')
+        plt.show()
+        plt.savefig(self.plot_file)
+        plt.close()
+    
+    def save_traj(self, trajectories, file_path):
         """
         save a list of trajectories
         """
-        with open(self.saving_file, 'wb') as f:
+        with open(file_path, 'wb') as f:
             pickle.dump(trajectories, f)
 
 
 def main():
     game = GenerateTrajectory()
+    game.generate_random_traj()
     game.generate_traj()
 
 
