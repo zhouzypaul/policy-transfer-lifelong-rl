@@ -15,3 +15,8 @@ python3 -m skills.execute --saved_option saving_path [--options]
 ```shell
 python3 -m skills.play [--options]
 ```
+
+## control an agent to generate trajectories
+```shell
+python3 -m skills.generate_traj [--options]
+```
