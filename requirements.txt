@@ -6,7 +6,6 @@ scikit-learn==1.0
 scipy==1.7.1
 seeding==0.1.0
 threadpoolctl==3.0.0
-thundersvm==0.3.4
 torch==1.9.1
 typing-extensions==3.10.0.2
 matplotlib==3.4.3
