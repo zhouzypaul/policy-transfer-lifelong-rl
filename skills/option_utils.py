@@ -83,11 +83,16 @@ class SingleOptionTrial:
             utils.update_param(params, arg_name, arg_value)
         return params
 
-    def make_env(self, env_name, env_seed):
+    def make_env(self, env_name, env_seed, goal=None):
+        """
+        Args:
+            goal: None or (x, y)
+        """
         from skills.wrappers.monte_agent_space_wrapper import MonteAgentSpace
         from skills.wrappers.monte_agent_space_forwarding_wrapper import MonteAgentSpaceForwarding
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
+        from skills.wrappers.new_goal_wrapper import MonteNewGoalWrapper
 
         if self.params['use_deepmind_wrappers']:
             env = pfrl.wrappers.atari_wrappers.make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
@@ -119,6 +124,9 @@ class SingleOptionTrial:
             start_state_path = self.params['info_dir'].joinpath(self.params['start_state'])
             start_state_pos_path = self.params['info_dir'].joinpath(self.params['start_state_pos'])
             env = MonteAgentSpaceForwarding(env, start_state_path, start_state_pos_path)
+        # set new goal if needed
+        if goal is not None:
+            env = MonteNewGoalWrapper(env, goal)
         logging.info(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)

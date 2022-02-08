@@ -86,15 +86,15 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
         # set up env and its goal
-        self.env = self.make_env(self.params['environment'], self.params['seed'])
         if self.params['agent_space']:
             goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state_agent_space'])
         else:
             goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state'])
         goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
         self.params['goal_state'] = np.load(goal_state_path)
-        self.params['goal_state_position'] = np.loadtxt(goal_state_pos_path)
+        self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
         print(f"aiming for goal location {self.params['goal_state_position']}")
+        self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
 
         # set up ensemble
         self.replay_buffer = ReplayBuffer(max_memory=10000)
