@@ -20,3 +20,8 @@ python3 -m skills.play [--options]
 ```shell
 python3 -m skills.generate_traj [--options]
 ```
+
+## traing a skill with ensemble
+```shell
+python3 -m skills.ensemble.train [--options]
+```

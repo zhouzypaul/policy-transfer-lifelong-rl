@@ -44,7 +44,7 @@ class SingleOptionTrial:
                             help="train with the agent space")
         parser.add_argument("--use_deepmind_wrappers", action='store_true', default=True,
                             help="use the deepmind wrappers")
-        parser.add_argument("--suppress_action_prunning", action='store_true', default=False,
+        parser.add_argument("--suppress_action_prunning", action='store_true', default=True,
                             help='do not prune the action space of monte')
         parser.add_argument("--seed", type=int, default=0,
                             help="Random seed")
