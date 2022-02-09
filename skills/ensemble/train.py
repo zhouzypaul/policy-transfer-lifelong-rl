@@ -2,6 +2,7 @@ import time
 import pickle
 import random
 import os
+import csv
 import argparse
 import shutil
 
@@ -9,6 +10,7 @@ import torch
 import seeding
 import numpy as np
 import pfrl
+from matplotlib import pyplot as plt
 
 from skills import utils
 from skills.ensemble.policy_ensemble import PolicyEnsemble
@@ -103,6 +105,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             num_output_classes=self.env.action_space.n,
         )
 
+        # results
+        self.total_reward = 0
+
     def train_option(self):
         """
         run the actual experiment to train one option
@@ -134,10 +139,39 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 dataset = [dataset[i:i+self.params['batch_size']] for i in range(0, len(dataset), self.params['batch_size'])]
                 self.policy_ensemble.train_embedding(dataset=dataset, epochs=self.params['epochs_per_step'])
                 self.policy_ensemble.train_policy(dataset=dataset, epochs=self.params['epochs_per_step'])
+            
+            self.save_total_reward(reward, step_number)
+            step_number += 1
 
         end_time = time.time()
 
         print("Time taken: ", end_time - start_time)
+    
+    def save_total_reward(self, r, step_number, save_every=50):
+        """
+        log the total reward achieved during training every 50 steps
+        """
+        save_file = os.path.join(self.saving_dir, "total_reward.csv")
+        img_file = os.path.join(self.saving_dir, "total_reward.png")
+        self.total_reward += r
+        if step_number % save_every == 0:
+            # write to csv
+            open_mode = 'w' if step_number == 0 else 'a'
+            with open(save_file, open_mode) as f:
+                csv_writer = csv.writer(f)
+                csv_writer.writerow([step_number, self.total_reward])
+            # plot it as well
+            with open(save_file, 'r') as f:
+                csv_reader = csv.reader(f, delimiter=',')
+                data = np.array([row for row in csv_reader])  # (step_number, 2)
+                steps = data[:, 0].astype(int)
+                total_reward = data[:, 1].astype(np.float32)
+                plt.plot(steps, total_reward)
+                plt.title("training reward")
+                plt.xlabel("steps")
+                plt.ylabel("total reward")
+                plt.savefig(img_file)
+                plt.close()
     
     def save_results(self, success_curves_file_name='success_curves.pkl'):
         """

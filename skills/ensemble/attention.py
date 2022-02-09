@@ -57,6 +57,7 @@ class Attention(nn.Module):
         spacial_features = self.spatial_feature_extractor(x)
         attentions = [self.attention_modules[i](spacial_features) for i in range(self.num_attention_modules)]
 
+        # normalize attention to between [0, 1]
         for i in range(self.num_attention_modules):
             N, D, H, W = attentions[i].size()
             attention = attentions[i].view(-1, H*W)
