@@ -55,6 +55,8 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="how many epochs to train the embedding the policy network per step in environment")
         parser.add_argument("--batch_size", type=int, default=16,
                             help="batch size for training")
+        parser.add_argument("--saving_freq", type=int, default=5000,
+                            help="how often to save the trained model")
         args = self.parse_common_args(parser)
         return args
 
@@ -141,6 +143,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 self.policy_ensemble.train_policy(dataset=dataset, epochs=self.params['epochs_per_step'])
             
             self.save_total_reward(reward, step_number)
+            self.save_results(step_number)
             step_number += 1
 
         end_time = time.time()
@@ -173,20 +176,13 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 plt.savefig(img_file)
                 plt.close()
     
-    def save_results(self, success_curves_file_name='success_curves.pkl'):
+    def save_results(self, step_number):
         """
-        save the results into csv files
+        save the trained model
         """
-        # save success curve
-        success_curve_save_path = os.path.join(self.saving_dir, success_curves_file_name)
-        with open(success_curve_save_path, 'wb+') as f:
-            pickle.dump(self.option.success_rates, f)
-        # save trained policy and classifiers
-        self.option.policy_net.save(dirname=os.path.join(self.saving_dir, 'saved_model'))
-        if self.option.termination_classifier is not None:
-            self.option.termination_classifier.save_to_file(os.path.join(self.saving_dir, 'termination_classifier'))
-        if self.option.initiation_classifier is not None:
-            self.option.initiation_classifier.save_to_file(os.path.join(self.saving_dir, 'initiation_classifier'))
+        if step_number % self.params['saving_freq'] == 0:
+            self.policy_ensemble.save(self.saving_dir)
+            print(f"model saved at step {step_number}")
 
 
 def main():
