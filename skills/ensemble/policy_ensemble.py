@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 from queue import PriorityQueue
 
 import torch
@@ -40,9 +41,13 @@ class PolicyEnsemble():
             batch_k=self.batch_k, 
             normalize=self.normalize
         ).to(self.device)
+
         self.policy_networks = nn.ModuleList(
             [MLP(embedding_output_size, self.num_output_classes) for _ in range(self.num_modules)]
         ).to(self.device)
+        self.policy_target_networks = deepcopy(self.policy_networks)
+        for i in range(self.num_modules):
+            self.policy_target_networks[i].eval()
 
         self.embedding_optimizer = optim.SGD(
             self.embedding.parameters(), 
@@ -108,12 +113,12 @@ class PolicyEnsemble():
             loss_heter /= (counter+1)
             loss_div /= (counter+1)
 
-            print('Epoch %d batches %d\tdiv:%.4f\thomo:%.4f\theter:%.4f'%(epoch, counter+1, loss_div, loss_homo, loss_heter))
+            print('batches %d\tdiv:%.4f\thomo:%.4f\theter:%.4f'%(counter+1, loss_div, loss_homo, loss_heter))
 
         self.embedding.eval()
         self.set_policy_eval()
 
-    def train_policy(self, dataset, epochs):
+    def train_policy(self, dataset, epochs, update_target_network=False):
         self.embedding.eval()
         self.set_policy_train()
 
@@ -150,7 +155,7 @@ class PolicyEnsemble():
 
                     # target q values 
                     next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                    next_state_values = get_q_for_action(self.policy_networks[idx](next_state_attention), batch_actions)  # (batch_size,)
+                    next_state_values = get_q_for_action(self.policy_target_networks[idx](next_state_attention), batch_actions)  # (batch_size,)
                     batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
                     
                     # loss
@@ -159,13 +164,18 @@ class PolicyEnsemble():
                     loss.backward(retain_graph=True)
                     self.policy_optimisers[idx].step()
                     avg_loss[idx] += loss.item()
+
                 count += 1
             avg_loss = avg_loss/count
 
-            print("Epoch {}:".format(epoch))
+            # update target network
+            if update_target_network:
+                self.policy_target_networks.load_state_dict(self.policy_networks.state_dict())
+                print(f"updated target network by hard copy")
+
             for idx in range(self.num_modules):
-                print("\t - Classifier {}: loss {:.4f}".format(idx, avg_loss[idx]))
-            print("Average across classifiers: loss = {:.4f}".format(np.mean(avg_loss)))
+                print("\t - Policy {}: loss {:.4f}".format(idx, avg_loss[idx]))
+            print("Average across policy: loss = {:.4f}".format(np.mean(avg_loss)))
 
         self.embedding.eval()
         self.set_policy_eval()

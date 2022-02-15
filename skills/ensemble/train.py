@@ -57,6 +57,8 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="batch size for training")
         parser.add_argument("--saving_freq", type=int, default=5000,
                             help="how often to save the trained model")
+        parser.add_argument("--q_target_update_interval", type=int, default=300,
+                            help="how often to update the target network in number of steps")
         args = self.parse_common_args(parser)
         return args
 
@@ -139,8 +141,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 # sample from replay buffer and split into batches
                 dataset = self.replay_buffer.sample(self.params['warmup_steps'])
                 dataset = [dataset[i:i+self.params['batch_size']] for i in range(0, len(dataset), self.params['batch_size'])]
+                update_target_net =  self.params['steps'] % self.params['q_target_update_interval'] == 0
                 self.policy_ensemble.train_embedding(dataset=dataset, epochs=self.params['epochs_per_step'])
-                self.policy_ensemble.train_policy(dataset=dataset, epochs=self.params['epochs_per_step'])
+                self.policy_ensemble.train_policy(dataset=dataset, epochs=self.params['epochs_per_step'], update_target_network=update_target_net)
             
             self.save_total_reward(reward, step_number)
             self.save_results(step_number)
