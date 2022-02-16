@@ -169,7 +169,7 @@ class PolicyEnsemble():
 
             # update target network
             if update_target_network:
-                self.q_networks.load_state_dict(self.target_q_networks.state_dict())
+                self.target_q_networks.load_state_dict(self.q_networks.state_dict())
                 print(f"updated target network by hard copy")
 
             for idx in range(self.num_modules):
