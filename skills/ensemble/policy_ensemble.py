@@ -42,12 +42,11 @@ class PolicyEnsemble():
             normalize=self.normalize
         ).to(self.device)
 
-        self.policy_networks = nn.ModuleList(
-            [MLP(embedding_output_size, self.num_output_classes) for _ in range(self.num_modules)]
+        self.q_networks = nn.ModuleList(
+            [MLP(input_size=embedding_output_size, class_num=self.num_output_classes) for _ in range(self.num_modules)]
         ).to(self.device)
-        self.policy_target_networks = deepcopy(self.policy_networks)
-        for i in range(self.num_modules):
-            self.policy_target_networks[i].eval()
+        self.target_q_networks = deepcopy(self.q_networks)
+        self.target_q_networks.eval()
 
         self.embedding_optimizer = optim.SGD(
             self.embedding.parameters(), 
@@ -57,7 +56,7 @@ class PolicyEnsemble():
         )
         self.policy_optimisers = []
         for i in range(self.num_modules):
-            optimizer = optim.Adam(self.policy_networks[i].parameters(), policy_learning_rate)
+            optimizer = optim.Adam(self.q_networks[i].parameters(), policy_learning_rate)
             self.policy_optimisers.append(optimizer)
 
     def save(self, path):
@@ -65,19 +64,19 @@ class PolicyEnsemble():
             os.makedirs(path)
 
         torch.save(self.embedding.state_dict(), os.path.join(path, 'embedding.pt'))
-        torch.save(self.policy_networks.state_dict(), os.path.join(path, 'policy_networks.pt'))
+        torch.save(self.q_networks.state_dict(), os.path.join(path, 'policy_networks.pt'))
 
     def load(self, path):
         self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt')))
-        self.policy_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
+        self.q_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
 
     def set_policy_train(self):
         for i in range(self.num_modules):
-            self.policy_networks[i].train()
+            self.q_networks[i].train()
 
     def set_policy_eval(self):
         for i in range(self.num_modules):
-            self.policy_networks[i].eval()
+            self.q_networks[i].eval()
 
     def train_embedding(self, dataset, epochs):
         # dataset is a pytorch dataset
@@ -118,7 +117,7 @@ class PolicyEnsemble():
         self.embedding.eval()
         self.set_policy_eval()
 
-    def train_policy(self, dataset, epochs, update_target_network=False):
+    def train_q_network(self, dataset, epochs, update_target_network=False):
         self.embedding.eval()
         self.set_policy_train()
 
@@ -150,12 +149,12 @@ class PolicyEnsemble():
 
                     # predicted q values
                     state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                    batch_pred_q_all_actions = self.policy_networks[idx](state_attention)  # (batch_size, num_actions)
+                    batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
                     batch_pred_q = get_q_for_action(batch_pred_q_all_actions, batch_actions)  # (batch_size,)
 
                     # target q values 
                     next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                    next_state_values = get_q_for_action(self.policy_target_networks[idx](next_state_attention), batch_actions)  # (batch_size,)
+                    next_state_values = get_q_for_action(self.target_q_networks[idx](next_state_attention), batch_actions)  # (batch_size,)
                     batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
                     
                     # loss
@@ -170,7 +169,7 @@ class PolicyEnsemble():
 
             # update target network
             if update_target_network:
-                self.policy_networks.load_state_dict(self.policy_target_networks.state_dict())
+                self.q_networks.load_state_dict(self.target_q_networks.state_dict())
                 print(f"updated target network by hard copy")
 
             for idx in range(self.num_modules):
@@ -200,7 +199,7 @@ class PolicyEnsemble():
         actions = np.zeros(self.num_modules, dtype=np.int)
         for idx in range(self.num_modules):
             attention = embeddings[:,idx,:]
-            q_vals = self.policy_networks[idx](attention)
+            q_vals = self.q_networks[idx](attention)
             actions[idx] = torch.argmax(q_vals, dim=1).detach().item()
         return actions
 
