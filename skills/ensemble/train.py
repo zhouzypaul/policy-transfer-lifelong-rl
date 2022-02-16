@@ -87,6 +87,8 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             shutil.rmtree(self.saving_dir)
         utils.create_log_dir(self.saving_dir)
         self.params['saving_dir'] = self.saving_dir
+        self.params['plots_dir'] = os.path.join(self.saving_dir, 'plots')
+        os.mkdir(self.params['plots_dir'])
 
         # save the hyperparams
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
@@ -107,6 +109,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         self.policy_ensemble = PolicyEnsemble(
             device=self.params['device'],
             num_output_classes=self.env.action_space.n,
+            plot_dir=self.params['plots_dir'],
         )
 
         # results

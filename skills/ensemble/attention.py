@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from skills.ensemble.distance_weighted_sampling import DistanceWeightedSampling
+from skills.plot import plot_attention_diversity
 
 
 class Attention(nn.Module):
@@ -13,7 +14,8 @@ class Attention(nn.Module):
                 attention_depth=32, 
                 num_attention_modules=8, 
                 batch_k=4, 
-                normalize=False):
+                normalize=False,
+                plot_dir=None):
         super(Attention, self).__init__()
         self.num_attention_modules = num_attention_modules
         self.out_dim = embedding_size
@@ -36,6 +38,8 @@ class Attention(nn.Module):
 
         self.linear = nn.Linear(6400, self.out_dim)
 
+        self.plot_dir = plot_dir
+
     def spatial_feature_extractor(self, x):
         x = F.relu(self.conv1(x))
         x = self.pool1(x)
@@ -45,15 +49,15 @@ class Attention(nn.Module):
     def global_feature_extractor(self, x):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
-
-        x = torch.flatten(x, 1)
-        # print(x.shape)
-        x = self.linear(x)
-        x = F.normalize(x)
-
         return x
 
-    def forward(self, x, sampling, return_attention_mask=False):
+    def compact_global_features(self, x):
+        x = torch.flatten(x, 1)
+        x = self.linear(x)
+        x = F.normalize(x)
+        return x
+
+    def forward(self, x, sampling, return_attention_mask=False, plot=False):
         spacial_features = self.spatial_feature_extractor(x)
         attentions = [self.attention_modules[i](spacial_features) for i in range(self.num_attention_modules)]
 
@@ -65,7 +69,10 @@ class Attention(nn.Module):
             attention_min, _ = attention.min(dim=1, keepdim=True)
             attentions[i] = ((attention - attention_min)/(attention_max-attention_min+1e-8)).view(N, D, H, W)
 
-        embedding = torch.cat([self.global_feature_extractor(attentions[i]*spacial_features).unsqueeze(1) for i in range(self.num_attention_modules)], 1)
+        global_features = [self.global_feature_extractor(attentions[i] * spacial_features) for i in range(self.num_attention_modules)]
+        if plot:
+            plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
+        embedding = torch.cat([self.compact_global_features(f).unsqueeze(1) for f in global_features], dim=1)
 
         if sampling:
             embedding = torch.flatten(embedding, 1)

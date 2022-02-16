@@ -2,6 +2,7 @@ import os
 import pickle
 import argparse
 
+import numpy as np
 from matplotlib import pyplot as plt
 
 
@@ -34,6 +35,34 @@ def plot_learning_curve(file_path):
 	plt.xlabel('time step')
 	plt.ylabel('success')
 	plt.show()
+
+
+def count(f):
+    def wrapped(*args, **kwargs):
+        wrapped.calls += 1
+        return f(*args, **kwargs)
+    wrapped.calls = 0
+    return wrapped
+
+
+@count
+def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_freq=25):
+	"""
+	visualize whether embedding of each attention is getting more and more diverse
+	"""
+	assert len(embedding) == num_attentions
+	assert embedding[0][0, :, :, :].shape == (64, 10, 10), embedding[0].shape
+	for i in range(num_attentions):
+		plt.subplot(2, 4, i+1)
+		plt.imshow(np.mean(embedding[i].detach().numpy(), axis=(0, 1)))
+		plt.title("attention {}".format(i))
+	# show/save fig
+	if save_dir is not None:
+		if plot_attention_diversity.calls % plot_freq == 0:
+			path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}.png")
+			plt.savefig(path)
+	else:
+		plt.show()
 
 
 def main(experiment_name=None, log_file_name='log_file_0.pkl', results_dir='results'):

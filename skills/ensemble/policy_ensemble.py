@@ -25,7 +25,8 @@ class PolicyEnsemble():
         num_modules=8, 
         batch_k=4, 
         normalize=False, 
-        num_output_classes=18):
+        num_output_classes=18,
+        plot_dir=None):
         
         self.num_modules = num_modules
         self.batch_k = batch_k
@@ -39,7 +40,8 @@ class PolicyEnsemble():
             embedding_size=embedding_output_size, 
             num_attention_modules=self.num_modules, 
             batch_k=self.batch_k, 
-            normalize=self.normalize
+            normalize=self.normalize,
+            plot_dir=plot_dir
         ).to(self.device)
 
         self.q_networks = nn.ModuleList(
@@ -89,7 +91,7 @@ class PolicyEnsemble():
             for batch in dataset:
                 batch_states, batch_actions, batch_rewards, batch_next_states, batch_dones = zip(*batch)
                 batch_states = torch.from_numpy(np.array([np.array(s) for s in batch_states])).float().to(self.device)
-                _, anchors, positives, negatives, _ = self.embedding(batch_states, sampling=True, return_attention_mask=False)
+                _, anchors, positives, negatives, _ = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=True)
                 if anchors.size()[0] == 0:
                     continue
                 anchors = anchors.view(anchors.size(0), self.num_modules, -1)
