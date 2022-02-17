@@ -63,6 +63,7 @@ def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_fr
 			plt.savefig(path)
 	else:
 		plt.show()
+	plt.close()
 
 
 def main(experiment_name=None, log_file_name='log_file_0.pkl', results_dir='results'):

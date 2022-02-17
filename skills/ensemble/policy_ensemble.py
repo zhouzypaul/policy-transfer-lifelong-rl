@@ -88,10 +88,10 @@ class PolicyEnsemble():
         for epoch in range(epochs):
             loss_div, loss_homo, loss_heter = 0, 0, 0
             counter = 0
-            for batch in dataset:
+            for i, batch in enumerate(dataset):
                 batch_states, batch_actions, batch_rewards, batch_next_states, batch_dones = zip(*batch)
                 batch_states = torch.from_numpy(np.array([np.array(s) for s in batch_states])).float().to(self.device)
-                _, anchors, positives, negatives, _ = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=True)
+                _, anchors, positives, negatives, _ = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=i==0)
                 if anchors.size()[0] == 0:
                     continue
                 anchors = anchors.view(anchors.size(0), self.num_modules, -1)
