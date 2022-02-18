@@ -43,6 +43,10 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="a file in info_dir that stores the image of the agent in goal state")
         parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
                             help="a file in info_dir that store the x, y coordinates of goal state")
+
+        # ensemble
+        parser.add_argument("--num_policies", type=int, default=8,
+                            help="number of policies in the ensemble")
         
         # training
         parser.add_argument("--steps", type=int, default=100000,
@@ -108,6 +112,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         self.replay_buffer = ReplayBuffer(max_memory=10000)
         self.policy_ensemble = PolicyEnsemble(
             device=self.params['device'],
+            num_modules=self.params['num_policies'],
             num_output_classes=self.env.action_space.n,
             plot_dir=self.params['plots_dir'],
         )

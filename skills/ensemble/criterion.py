@@ -17,7 +17,8 @@ def L_divergence(feats):
         for j in range(i+1, n):
             loss += torch.clamp(1 - torch.sum((feats[i, :] - feats[j, :]).pow(2)), min=0)
             count += 1
-    
+    if count == 0:
+        return torch.tensor(0)
     return loss/count
 
 
