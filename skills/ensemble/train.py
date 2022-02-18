@@ -57,7 +57,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="batch size for training")
         parser.add_argument("--saving_freq", type=int, default=5000,
                             help="how often to save the trained model")
-        parser.add_argument("--q_target_update_interval", type=int, default=300,
+        parser.add_argument("--q_target_update_interval", type=int, default=10,
                             help="how often to update the target network in number of steps")
         args = self.parse_common_args(parser)
         return args
