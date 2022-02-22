@@ -5,6 +5,7 @@ import os
 import csv
 import argparse
 import shutil
+from collections import deque
 
 import torch
 import seeding
@@ -119,6 +120,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
 
         # results
         self.total_reward = 0
+        self.success_rates = deque(maxlen=10)
 
     def train_option(self):
         """
@@ -128,6 +130,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
 
         # train loop
         step_number = 0
+        episode_number = 0
         state = self.env.reset()
         while step_number < self.params['steps']:
             # action selection: epsilon greedy
@@ -142,6 +145,8 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             self.replay_buffer.add(Transition(state, action, reward, next_state, done))
             state = next_state
             if done:
+                self.save_success_rate(done and reward == 1, episode_number)
+                episode_number += 1
                 state = self.env.reset()
 
             # update
@@ -160,6 +165,33 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         end_time = time.time()
 
         print("Time taken: ", end_time - start_time)
+    
+    def save_success_rate(self, success, episode_number, save_every=1):
+        """
+        log the average success rate during training every 5 episodes
+        the success rate at every episode is the average success rate over the last 10 episodes
+        """
+        save_file = os.path.join(self.saving_dir, "success_rate.csv")
+        img_file = os.path.join(self.saving_dir, "success_rate.png")
+        self.success_rates.append(success)
+        if episode_number % save_every == 0:
+            # write to csv
+            open_mode = 'w' if episode_number == 0 else 'a'
+            with open(save_file, open_mode) as f:
+                csv_writer = csv.writer(f)
+                csv_writer.writerow([episode_number, np.mean(self.success_rates)])
+            # plot it as well
+            with open(save_file, 'r') as f:
+                reader = csv.reader(f)
+                data = np.array([row for row in reader])
+                epsidoes = data[:, 0].astype(int)
+                success_rates = data[:, 1].astype(np.float32)
+                plt.plot(epsidoes, success_rates)
+                plt.title("Success rate")
+                plt.xlabel("Episode")
+                plt.ylabel("Success rate")
+                plt.savefig(img_file)
+                plt.close()
     
     def save_total_reward(self, r, step_number, save_every=50):
         """
