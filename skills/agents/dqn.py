@@ -6,6 +6,7 @@ import pfrl
 from pfrl import agents, explorers
 from pfrl import nn as pnn
 from pfrl import replay_buffers
+from pfrl.utils import evaluating
 from pfrl.initializers import init_chainer_default
 from pfrl.q_functions import DiscreteActionValueHead, DuelingDQN
 
