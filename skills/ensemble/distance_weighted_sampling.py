@@ -5,8 +5,8 @@ import torch.nn.functional as F
 
 
 def get_distance(x):
-    _x = x.detach()
-    sim = torch.matmul(_x, _x.t())
+    _x = x.detach()  # (N, *)
+    sim = torch.matmul(_x, _x.t())  # (N, N)
     sim = torch.clamp(sim, max=1.0)
     dist = 2 - 2*sim
     dist += torch.eye(dist.shape[0]).to(dist.device)
@@ -30,7 +30,7 @@ class DistanceWeightedSampling(nn.Module):
 
     def forward(self, x):
         k = self.batch_k
-        n, d = x.shape
+        n, d = x.shape  # (N, num_modules * embedding_size)
         x_in = x
         x = F.normalize(x)
         distance = get_distance(x)

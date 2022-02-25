@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 
 
@@ -9,17 +11,14 @@ def L_metric(feat1, feat2, same_class=True):
         return torch.clamp(1 - d, min=0).sum() / d.size(0)
 
 
-def L_divergence(feats):
+def L_divergence(feats):    
     n = feats.shape[0]
-    loss = 0
-    count = 0
-    for i in range(n):
-        for j in range(i+1, n):
-            loss += torch.clamp(1 - torch.sum((feats[i, :] - feats[j, :]).pow(2)), min=0)
-            count += 1
-    if count == 0:
-        return torch.tensor(0)
-    return loss/count
+    every_tuple = list(itertools.combinations(range(n), 2))
+    every_tuple_features = feats[every_tuple, :]  # (num_tuple, 2, dim)
+    every_tuple_difference = every_tuple_features.diff(dim=1).squeeze(1)  # (num_tuple, dim)
+    loss = torch.clamp(1 - torch.sum(every_tuple_difference.pow(2), dim=-1), min=0)  # (num_tuple, )
+    mean_loss = loss.mean(dim=0)
+    return mean_loss
 
 
 def loss_function(tensor, batch_k):
