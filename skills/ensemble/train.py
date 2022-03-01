@@ -15,7 +15,6 @@ from matplotlib import pyplot as plt
 
 from skills import utils
 from skills.agents.ensemble import EnsembleAgent
-from skills.ensemble.aggregate import choose_most_popular
 from skills.option_utils import SingleOptionTrial
 
 

@@ -14,15 +14,13 @@ from matplotlib import pyplot as plt
 
 from skills import utils
 from skills.agents.dqn import make_dqn_agent
-from skills.agents.replay_buffer import ReplayBuffer, Transition
-from skills.ensemble.aggregate import choose_most_popular
-from skills.option_utils import SingleOptionTrial
+from skills.agents.ensemble import EnsembleAgent
+from skills.option_utils import BaseTrial
 
 
-class TrainFlatDQN(SingleOptionTrial):
+class TrainAgent(BaseTrial):
     """
-    train a flat DQN on monte, as a comparison for other methods
-    by default, it will train a skill trying to climb down the first ladder
+    train an agent on some Atari game
     """
     def __init__(self):
         super().__init__()
@@ -38,26 +36,21 @@ class TrainFlatDQN(SingleOptionTrial):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             parents=[self.get_common_arg_parser()]
         )
-        # goal state
-        parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
-                            help="a file in info_dir that stores the image of the agent in goal state")
-        parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
-                            help="a file in info_dir that store the x, y coordinates of goal state")
+        # # goal state
+        # parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
+        #                     help="a file in info_dir that stores the image of the agent in goal state")
+        # parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
+        #                     help="a file in info_dir that store the x, y coordinates of goal state")
         
+        # agent
+        parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'],
+                            help="the type of agent to train")
+        parser.add_argument("--num_policies", type=int, default=1,
+                            help="the number of policies to train when using ensemble agent")
         # training
-        parser.add_argument("--steps", type=int, default=100000,
+        parser.add_argument("--steps", type=int, default=5000000,
                             help="number of training steps")
 
-        parser.add_argument("--explore_epsilon", type=float, default=0.1,
-                            help="epsilon for epsilon-greedy exploration")
-        parser.add_argument("--warmup_steps", type=int, default=1024,
-                            help="number of steps for warming up before updating the network")
-        parser.add_argument("--batch_size", type=int, default=16,
-                            help="batch size for training")
-        parser.add_argument("--saving_freq", type=int, default=5000,
-                            help="how often to save the trained model")
-        parser.add_argument("--q_target_update_interval", type=int, default=10,
-                            help="how often to update the target network in number of steps")
         args = self.parse_common_args(parser)
         return args
 
@@ -93,28 +86,43 @@ class TrainFlatDQN(SingleOptionTrial):
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
         # set up env and its goal
-        if self.params['agent_space']:
-            goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state_agent_space'])
-        else:
-            goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state'])
-        goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
-        self.params['goal_state'] = np.load(goal_state_path)
-        self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
-        print(f"aiming for goal location {self.params['goal_state_position']}")
-        self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
+        # if self.params['agent_space']:
+        #     goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state_agent_space'])
+        # else:
+        #     goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state'])
+        # goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
+        # self.params['goal_state'] = np.load(goal_state_path)
+        # self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
+        # print(f"aiming for goal location {self.params['goal_state_position']}")
+        # self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'])
 
-        # set up DQN
-        self.agent = make_dqn_agent(
-            q_agent_type="DoubleDQN",
-            arch="nature",
-            n_actions=self.env.action_space.n,
-        )
+        # set up agent
+        if self.params['agent'] == 'dqn':
+            # DQN
+            self.agent = make_dqn_agent(
+                q_agent_type="DoubleDQN",
+                arch="nature",
+                n_actions=self.env.action_space.n,
+            )
+        else:
+            # ensemble
+            self.agent = EnsembleAgent(
+                device=self.params['device'],
+                warmup_steps=self.params['warmup_steps'],
+                batch_size=self.params['batch_size'],
+                update_interval=self.params['update_interval'],
+                q_target_update_interval=self.params['target_update_interval'],
+                explore_epsilon=self.params['explore_epsilon'],
+                num_modules=self.params['num_policies'],
+                num_output_classes=self.env.action_space.n,
+            )
 
         # results
         self.total_reward = 0
         self.success_rates = deque(maxlen=20)
 
-    def train_option(self):
+    def train(self):
         """
         run the actual experiment to train one option
         """
@@ -206,8 +214,8 @@ class TrainFlatDQN(SingleOptionTrial):
 
 
 def main():
-    trial = TrainFlatDQN()
-    trial.train_option()
+    trial = TrainAgent()
+    trial.train()
 
 
 if __name__ == "__main__":
