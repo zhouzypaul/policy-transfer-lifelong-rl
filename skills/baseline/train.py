@@ -119,7 +119,6 @@ class TrainAgent(BaseTrial):
             )
 
         # results
-        self.total_reward = 0
         self.success_rates = deque(maxlen=20)
 
     def train(self):
@@ -131,20 +130,24 @@ class TrainAgent(BaseTrial):
         # train loop
         step_number = 0
         episode_number = 0
+        episode_total_reward = 0
         obs = self.env.reset()
         while step_number < self.params['steps']:
             action = self.agent.act(obs)
             next_obs, reward, done, info = self.env.step(action)
             self.agent.observe(obs, action, reward, next_obs, done)
             obs = next_obs
+            episode_total_reward += reward
+
+            self.save_episode_reward(episode_total_reward, step_number)
+            self.save_results(step_number)
 
             if done:
-                self.save_success_rate(done and reward == 1, episode_number)
+                # self.save_success_rate(done and reward == 1, episode_number)
+                episode_total_reward = 0
                 episode_number += 1
                 obs = self.env.reset()
             
-            self.save_total_reward(reward, step_number)
-            self.save_results(step_number)
             step_number += 1
 
         end_time = time.time()
@@ -178,19 +181,19 @@ class TrainAgent(BaseTrial):
                 plt.savefig(img_file)
                 plt.close()
     
-    def save_total_reward(self, r, step_number, save_every=50):
+    def save_episode_reward(self, r, step_number, save_every=250):
         """
-        log the total reward achieved during training every 50 steps
+        log the episodic reward achieved during training
+        save every 250 steps
         """
-        save_file = os.path.join(self.saving_dir, "total_reward.csv")
-        img_file = os.path.join(self.saving_dir, "total_reward.png")
-        self.total_reward += r
+        save_file = os.path.join(self.saving_dir, "episode_reward.csv")
+        img_file = os.path.join(self.saving_dir, "episode_reward.png")
         if step_number % save_every == 0:
             # write to csv
             open_mode = 'w' if step_number == 0 else 'a'
             with open(save_file, open_mode) as f:
                 csv_writer = csv.writer(f)
-                csv_writer.writerow([step_number, self.total_reward])
+                csv_writer.writerow([step_number, r])
             # plot it as well
             with open(save_file, 'r') as f:
                 csv_reader = csv.reader(f, delimiter=',')
@@ -199,8 +202,8 @@ class TrainAgent(BaseTrial):
                 total_reward = data[:, 1].astype(np.float32)
                 plt.plot(steps, total_reward)
                 plt.title("training reward")
-                plt.xlabel("steps")
-                plt.ylabel("total reward")
+                plt.xlabel("Steps")
+                plt.ylabel("Episode Reward")
                 plt.savefig(img_file)
                 plt.close()
     
