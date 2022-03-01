@@ -58,7 +58,13 @@ class TrainAgent(BaseTrial):
         """
         check whether the params entered by the user is valid
         """
-        pass
+        if self.params['agent'] == 'ensemble':
+            try:
+                assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
+            except AssertionError:
+                new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
+                print(f"updating target_update_interval to be {new_interval}")
+                self.params['target_update_interval'] = new_interval
     
     def setup(self):
         """
