@@ -17,7 +17,6 @@ class PolicyEnsemble():
 
     def __init__(self, 
         device,
-        num_votes_needed=1,
         embedding_output_size=64, 
         embedding_learning_rate=1e-4, 
         policy_learning_rate=1e-2, 
@@ -33,7 +32,6 @@ class PolicyEnsemble():
         self.normalize = normalize
         self.num_output_classes = num_output_classes
         self.device = device
-        self.num_votes_needed = num_votes_needed
         self.gamma = discount_rate
 
         self.embedding = Attention(
@@ -180,14 +178,6 @@ class PolicyEnsemble():
 
         self.embedding.eval()
         self.set_policy_eval()
-
-    def get_ensemble_vote(self, x):
-        pred = self.get_all_votes(x)
-
-        if sum(pred) >= self.num_votes_needed:
-            return 1
-        else:
-            return 0
     
     def predict_actions(self, state):
         """

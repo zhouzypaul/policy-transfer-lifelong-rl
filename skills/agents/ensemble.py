@@ -20,7 +20,6 @@ class EnsembleAgent():
                 device, 
                 warmup_steps,
                 batch_size,
-                num_votes_needed=1, 
                 update_interval=4,
                 q_target_update_interval=40,
                 embedding_output_size=64, 
@@ -47,7 +46,6 @@ class EnsembleAgent():
         # ensemble and replay buffer
         self.policy_ensemble = PolicyEnsemble(
             device=device,
-            num_votes_needed=num_votes_needed,
             embedding_output_size=embedding_output_size,
             embedding_learning_rate=embedding_learning_rate,
             policy_learning_rate=policy_learning_rate,
