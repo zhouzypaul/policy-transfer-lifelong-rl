@@ -14,11 +14,9 @@ import pfrl
 from matplotlib import pyplot as plt
 
 from skills import utils
-from skills.ensemble.policy_ensemble import PolicyEnsemble
-from skills.agents.replay_buffer import ReplayBuffer, Transition
+from skills.agents.ensemble import EnsembleAgent
 from skills.ensemble.aggregate import choose_most_popular
-from skills.option_utils import SingleOptionTrial, make_done_state_plot
-from skills.plot import main as plot_learning_curve
+from skills.option_utils import SingleOptionTrial
 
 
 class TrainEnsembleOfSkills(SingleOptionTrial):
@@ -110,9 +108,13 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
 
         # set up ensemble
-        self.replay_buffer = ReplayBuffer(max_memory=10000)
-        self.policy_ensemble = PolicyEnsemble(
+        self.ensemble_agent = EnsembleAgent(
             device=self.params['device'],
+            warmup_steps=self.params['warmup_steps'],
+            batch_size=self.params['batch_size'],
+            update_interval=4,
+            q_target_update_interval=self.params['q_target_update_interval'],
+            explore_epsilon=self.params['explore_epsilon'],
             num_modules=self.params['num_policies'],
             num_output_classes=self.env.action_space.n,
             plot_dir=self.params['plots_dir'],
@@ -134,29 +136,16 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         state = self.env.reset()
         while step_number < self.params['steps']:
             # action selection: epsilon greedy
-            actions = self.policy_ensemble.predict_actions(torch.from_numpy(np.array(state)).float())
-            if random.random() < self.params['explore_epsilon']:
-                action = random.randint(0, self.env.action_space.n-1)
-            else:
-                action = choose_most_popular(actions)
+            action = self.ensemble_agent.act(state)
             
             # step
             next_state, reward, done, info = self.env.step(action)
-            self.replay_buffer.add(Transition(state, action, reward, next_state, done))
+            self.ensemble_agent.observe(state, action, reward, next_state, done)
             state = next_state
             if done:
                 self.save_success_rate(done and reward == 1, episode_number)
                 episode_number += 1
                 state = self.env.reset()
-
-            # update
-            if len(self.replay_buffer) > self.params['warmup_steps']:
-                # sample from replay buffer and split into batches
-                dataset = self.replay_buffer.sample(self.params['warmup_steps'])
-                dataset = [dataset[i:i+self.params['batch_size']] for i in range(0, len(dataset), self.params['batch_size'])]
-                update_target_net =  step_number % self.params['q_target_update_interval'] == 0
-                self.policy_ensemble.train_embedding(dataset=dataset, epochs=self.params['epochs_per_step'])
-                self.policy_ensemble.train_q_network(dataset=dataset, epochs=self.params['epochs_per_step'], update_target_network=update_target_net)
             
             self.save_total_reward(reward, step_number)
             self.save_results(step_number)
@@ -224,7 +213,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         save the trained model
         """
         if step_number % self.params['saving_freq'] == 0:
-            self.policy_ensemble.save(self.saving_dir)
+            self.ensemble_agent.save(self.saving_dir)
             print(f"model saved at step {step_number}")
 
 
