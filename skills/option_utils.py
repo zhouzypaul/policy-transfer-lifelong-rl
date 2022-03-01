@@ -33,8 +33,8 @@ class BaseTrial:
                             help="Experiment Name, also used as the directory name to save results")
         parser.add_argument("--results_dir", type=str, default='results',
                             help='the name of the directory used to store results')
-        parser.add_argument("--device", type=str, default='cuda:1',
-                            help="cpu/cuda:0/cuda:1")
+        parser.add_argument("--device", type=str, default='cuda',
+                            help="cpu/cuda/cuda:0/cuda:1")
         # environments
         parser.add_argument("--environment", type=str,
                             help="name of the gym environment")
