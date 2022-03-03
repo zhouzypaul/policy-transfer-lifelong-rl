@@ -31,7 +31,8 @@ class EnsembleAgent():
                 batch_k=4, 
                 normalize=False, 
                 num_output_classes=18,
-                plot_dir=None):
+                plot_dir=None,
+                verbose=False,):
         # vars
         self.warmup_steps = warmup_steps
         self.num_data_for_update = warmup_steps
@@ -55,6 +56,7 @@ class EnsembleAgent():
             normalize=normalize,
             num_output_classes=num_output_classes,
             plot_dir=plot_dir,
+            verbose=verbose,
         )
         self.replay_buffer = ReplayBuffer(max_memory=10000)
     

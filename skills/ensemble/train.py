@@ -61,6 +61,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="how often to save the trained model")
         parser.add_argument("--q_target_update_interval", type=int, default=10,
                             help="how often to update the target network in number of steps")
+        
+        parser.add_argument("--verbose", action="store_true", default=False,
+                            help="whether to print the training loss")
         args = self.parse_common_args(parser)
         return args
 
@@ -117,6 +120,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             num_modules=self.params['num_policies'],
             num_output_classes=self.env.action_space.n,
             plot_dir=self.params['plots_dir'],
+            verbose=self.params['verbose']
         )
 
         # results

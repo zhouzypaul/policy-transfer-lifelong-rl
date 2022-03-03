@@ -26,7 +26,8 @@ class PolicyEnsemble():
         batch_k=4, 
         normalize=False, 
         num_output_classes=18,
-        plot_dir=None):
+        plot_dir=None,
+        verbose=False,):
         
         self.num_modules = num_modules
         self.batch_k = batch_k
@@ -34,6 +35,7 @@ class PolicyEnsemble():
         self.num_output_classes = num_output_classes
         self.device = device
         self.gamma = discount_rate
+        self.verbose = verbose
 
         self.embedding = Attention(
             embedding_size=embedding_output_size, 
@@ -101,17 +103,18 @@ class PolicyEnsemble():
                 l.backward()
                 self.embedding_optimizer.step()
 
-                loss_homo += l_homo.item()
-                loss_heter += l_heter.item()
-                loss_div += l_div.item()
+                if self.verbose:
+                    loss_homo += l_homo.item()
+                    loss_heter += l_heter.item()
+                    loss_div += l_div.item()
 
                 counter += 1
 
-            loss_homo /= (counter+1)
-            loss_heter /= (counter+1)
-            loss_div /= (counter+1)
-
-            print('batches %d\tdiv:%.4f\thomo:%.4f\theter:%.4f'%(counter+1, loss_div, loss_homo, loss_heter))
+            if self.verbose:
+                loss_homo /= (counter+1)
+                loss_heter /= (counter+1)
+                loss_div /= (counter+1)
+                print('batches %d\tdiv:%.4f\thomo:%.4f\theter:%.4f'%(counter+1, loss_div, loss_homo, loss_heter))
 
         self.embedding.eval()
         self.set_policy_eval()
@@ -155,7 +158,7 @@ class PolicyEnsemble():
                     self.policy_optimisers[idx].zero_grad()
                     loss.backward(retain_graph=True)
                     self.policy_optimisers[idx].step()
-                    avg_loss[idx] += loss.item()
+                    if self.verbose: avg_loss[idx] += loss.item()
 
                 count += 1
             avg_loss = avg_loss/count
@@ -165,9 +168,10 @@ class PolicyEnsemble():
                 self.target_q_networks.load_state_dict(self.q_networks.state_dict())
                 print(f"updated target network by hard copy")
 
-            for idx in range(self.num_modules):
-                print("\t - Policy {}: loss {:.4f}".format(idx, avg_loss[idx]))
-            print("Average across policy: loss = {:.4f}".format(np.mean(avg_loss)))
+            if self.verbose:
+                for idx in range(self.num_modules):
+                    print("\t - Policy {}: loss {:.6f}".format(idx, avg_loss[idx]))
+                print("Average across policy: loss = {:.6f}".format(np.mean(avg_loss)))
 
         self.embedding.eval()
         self.set_policy_eval()
