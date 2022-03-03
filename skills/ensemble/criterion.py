@@ -11,9 +11,9 @@ def L_metric(feat1, feat2, same_class=True):
         return torch.clamp(1 - d, min=0).sum() / d.size(0)
 
 
+n_modules = None  # number of modules, global variable that needs to be initialized once
+every_tuple = None  # initialized in criterion(), so that we don't repeatedly compute it in L_divergence()
 def L_divergence(feats):    
-    n = feats.shape[0]
-    every_tuple = list(itertools.combinations(range(n), 2))
     every_tuple_features = feats[every_tuple, :]  # (num_tuple, 2, dim)
     every_tuple_difference = every_tuple_features.diff(dim=1).squeeze(1)  # (num_tuple, dim)
     loss = torch.clamp(1 - torch.sum(every_tuple_difference.pow(2), dim=-1), min=0)  # (num_tuple, )
@@ -47,6 +47,12 @@ def criterion(anchors, positives, negatives):
     loss_homo = L_metric(anchors, positives)
     loss_heter = L_metric(anchors, negatives, False)
     loss_div = 0
+
+    global n_modules
+    global every_tuple
+    if n_modules is None:
+        n_modules = anchors.shape[1]  # init the global variable for L_divergence
+        every_tuple = torch.combinations(torch.Tensor(range(n_modules)), 2).long()
     for i in range(anchors.shape[0]):
         loss_div += (L_divergence(anchors[i, ...]) + L_divergence(positives[i, ...]) + L_divergence(negatives[i, ...])) / 3
     
