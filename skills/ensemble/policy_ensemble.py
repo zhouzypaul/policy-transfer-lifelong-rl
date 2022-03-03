@@ -11,6 +11,7 @@ import numpy as np
 from skills.ensemble import criterion
 from skills.ensemble.attention import Attention
 from skills.models.mlp import MLP
+from skills.option_utils import extract
 
 
 class PolicyEnsemble():
@@ -71,12 +72,10 @@ class PolicyEnsemble():
         self.q_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
 
     def set_policy_train(self):
-        for i in range(self.num_modules):
-            self.q_networks[i].train()
+        self.q_networks.train()
 
     def set_policy_eval(self):
-        for i in range(self.num_modules):
-            self.q_networks[i].eval()
+        self.q_networks.eval()
 
     def train_embedding(self, dataset, epochs):
         # dataset is a pytorch dataset
@@ -138,24 +137,18 @@ class PolicyEnsemble():
 
                 for idx in range(self.num_modules):
 
-                    def get_q_for_action(qvals, actions):
-                        """
-                        take the q-values for the given actions
-                        qvals: (batch_size, num_actions)
-                        actions: (batch_size,)
-                        """
-                        batch_size = len(qvals)
-                        return qvals[np.arange(batch_size), actions.long()]
-
                     # predicted q values
                     state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
                     batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
-                    batch_pred_q = get_q_for_action(batch_pred_q_all_actions, batch_actions)  # (batch_size,)
+                    batch_pred_q = extract(batch_pred_q_all_actions, idx=batch_actions.long(), idx_dim=-1)  # (batch_size,)
 
                     # target q values 
-                    next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                    next_state_values = get_q_for_action(self.target_q_networks[idx](next_state_attention), batch_actions)  # (batch_size,)
-                    batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
+                    with torch.no_grad():
+                        next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
+                        batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
+                        ap = torch.argmax(batch_next_state_q_all_actions, dim=-1)
+                        next_state_values = extract(batch_next_state_q_all_actions, idx=ap.long(), idx_dim=-1)  # (batch_size,)
+                        batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
                     
                     # loss
                     loss = F.smooth_l1_loss(batch_pred_q, batch_q_target)
@@ -185,14 +178,16 @@ class PolicyEnsemble():
         """
         self.embedding.eval()
         self.set_policy_eval()
-        state = state.to(self.device).unsqueeze(0)  # add batch dimension
-        embeddings = self.embedding(state, sampling=False, return_attention_mask=False).detach()
+        with torch.no_grad():
+            state = state.to(self.device).unsqueeze(0)  # add batch dimension
+            embeddings = self.embedding(state, sampling=False, return_attention_mask=False).detach()
 
-        actions = np.zeros(self.num_modules, dtype=np.int)
-        for idx in range(self.num_modules):
-            attention = embeddings[:,idx,:]
-            q_vals = self.q_networks[idx](attention)
-            actions[idx] = torch.argmax(q_vals, dim=1).detach().item()
+            actions = np.zeros(self.num_modules, dtype=np.int)
+            for idx in range(self.num_modules):
+                attention = embeddings[:,idx,:]
+                q_vals = self.q_networks[idx](attention)
+                actions[idx] = torch.argmax(q_vals, dim=1)
+
         return actions
 
     def get_attention(self, x):
