@@ -28,8 +28,7 @@ class EnsembleAgent():
                 explore_epsilon=0.1,
                 discount_rate=0.9,
                 num_modules=8, 
-                batch_k=4, 
-                normalize=False, 
+                normalize=True, 
                 num_output_classes=18,
                 plot_dir=None,
                 verbose=False,):
@@ -52,7 +51,6 @@ class EnsembleAgent():
             policy_learning_rate=policy_learning_rate,
             discount_rate=discount_rate,
             num_modules=num_modules,
-            batch_k=batch_k,
             normalize=normalize,
             num_output_classes=num_output_classes,
             plot_dir=plot_dir,

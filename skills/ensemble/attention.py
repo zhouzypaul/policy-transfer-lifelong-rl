@@ -13,15 +13,14 @@ class Attention(nn.Module):
                 embedding_size=64, 
                 attention_depth=32, 
                 num_attention_modules=8, 
-                batch_k=4, 
-                normalize=False,
+                normalize=True,
                 plot_dir=None):
         super(Attention, self).__init__()
         self.num_attention_modules = num_attention_modules
         self.out_dim = embedding_size
         self.attention_depth = attention_depth
         
-        self.sampled = DistanceWeightedSampling(batch_k=batch_k, normalize=normalize)
+        self.sampled = DistanceWeightedSampling(normalize=normalize)
 
         self.conv1 = nn.Conv2d(in_channels=stack_size, out_channels=self.attention_depth, kernel_size=3, stride=1)
         self.pool1 = nn.MaxPool2d(2)

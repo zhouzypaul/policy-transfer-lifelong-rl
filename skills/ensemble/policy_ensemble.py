@@ -23,14 +23,12 @@ class PolicyEnsemble():
         policy_learning_rate=1e-2, 
         discount_rate=0.9,
         num_modules=8, 
-        batch_k=4, 
-        normalize=False, 
+        normalize=True, 
         num_output_classes=18,
         plot_dir=None,
         verbose=False,):
         
         self.num_modules = num_modules
-        self.batch_k = batch_k
         self.normalize = normalize
         self.num_output_classes = num_output_classes
         self.device = device
@@ -40,7 +38,6 @@ class PolicyEnsemble():
         self.embedding = Attention(
             embedding_size=embedding_output_size, 
             num_attention_modules=self.num_modules, 
-            batch_k=self.batch_k, 
             normalize=self.normalize,
             plot_dir=plot_dir
         ).to(self.device)
@@ -90,15 +87,13 @@ class PolicyEnsemble():
             for i, batch in enumerate(dataset):
                 batch_states, batch_actions, batch_rewards, batch_next_states, batch_dones = zip(*batch)
                 batch_states = torch.from_numpy(np.array([np.array(s) for s in batch_states])).float().to(self.device)
-                _, anchors, positives, negatives, _ = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=i==0)
-                if anchors.size()[0] == 0:
+                embedding, class_label_matrix = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=i==0)
+                if embedding.size()[0] == 0:
                     continue
-                anchors = anchors.view(anchors.size(0), self.num_modules, -1)
-                positives = positives.view(positives.size(0), self.num_modules, -1)
-                negatives = negatives.view(negatives.size(0), self.num_modules, -1)
+                embedding = embedding.view(embedding.size(0), self.num_modules, -1)
 
                 self.embedding_optimizer.zero_grad()
-                l_div, l_homo, l_heter = criterion.criterion(anchors, positives, negatives)
+                l_div, l_homo, l_heter = criterion.criterion(embedding, class_label_matrix)
                 l = l_div + l_homo + l_heter
                 l.backward()
                 self.embedding_optimizer.step()
