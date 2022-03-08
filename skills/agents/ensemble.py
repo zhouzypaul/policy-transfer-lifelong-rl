@@ -20,6 +20,7 @@ class EnsembleAgent():
                 device, 
                 warmup_steps,
                 batch_size,
+                buffer_length=100000,
                 update_interval=4,
                 q_target_update_interval=40,
                 embedding_output_size=64, 
@@ -31,6 +32,7 @@ class EnsembleAgent():
                 normalize=True, 
                 num_output_classes=18,
                 plot_dir=None,
+                embedding_plot_freq=10000,
                 verbose=False,):
         # vars
         self.warmup_steps = warmup_steps
@@ -42,6 +44,7 @@ class EnsembleAgent():
         self.num_output_classes = num_output_classes
         self.step_number = 0
         self.update_epochs_per_step = 1
+        self.embedding_plot_freq = embedding_plot_freq
         
         # ensemble and replay buffer
         self.policy_ensemble = PolicyEnsemble(
@@ -56,7 +59,7 @@ class EnsembleAgent():
             plot_dir=plot_dir,
             verbose=verbose,
         )
-        self.replay_buffer = ReplayBuffer(max_memory=10000)
+        self.replay_buffer = ReplayBuffer(max_memory=buffer_length)
     
     def observe(self, obs, action, reward, next_obs, termimal):
         """
@@ -69,7 +72,7 @@ class EnsembleAgent():
             dataset = self.replay_buffer.sample(self.warmup_steps)
             dataset = [dataset[i:i+self.batch_size] for i in range(0, len(dataset), self.batch_size)]
             update_target_net =  self.step_number % self.q_target_update_interval == 0
-            self.policy_ensemble.train_embedding(dataset=dataset, epochs=self.update_epochs_per_step)
+            self.policy_ensemble.train_embedding(dataset=dataset, epochs=self.update_epochs_per_step, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
             self.policy_ensemble.train_q_network(dataset=dataset, epochs=self.update_epochs_per_step, update_target_network=update_target_net)
         self.step_number += 1
 

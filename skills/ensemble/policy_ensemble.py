@@ -76,7 +76,7 @@ class PolicyEnsemble():
     def set_policy_eval(self):
         self.q_networks.eval()
 
-    def train_embedding(self, dataset, epochs):
+    def train_embedding(self, dataset, epochs, plot_embedding=False):
         # dataset is a pytorch dataset
         self.embedding.train()
         self.set_policy_eval()
@@ -85,9 +85,9 @@ class PolicyEnsemble():
             loss_div, loss_homo, loss_heter = 0, 0, 0
             counter = 0
             for i, batch in enumerate(dataset):
-                batch_states, batch_actions, batch_rewards, batch_next_states, batch_dones = zip(*batch)
+                batch_states, _, _, _, _ = zip(*batch)
                 batch_states = torch.from_numpy(np.array([np.array(s) for s in batch_states])).float().to(self.device)
-                embedding, class_label_matrix = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=i==0)
+                embedding, class_label_matrix = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=(i==0 and plot_embedding))
                 if embedding.size()[0] == 0:
                     continue
                 embedding = embedding.view(embedding.size(0), self.num_modules, -1)

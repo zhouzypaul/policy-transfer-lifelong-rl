@@ -110,6 +110,10 @@ class TrainAgent(BaseTrial):
                 q_agent_type="DoubleDQN",
                 arch="nature",
                 n_actions=self.env.action_space.n,
+                replay_start_size=self.params['warmup_steps'],
+                buffer_length=self.params['buffer_length'],
+                update_interval=self.params['update_interval'],
+                target_update_interval=self.params['target_update_interval'],
             )
         else:
             # ensemble
@@ -117,11 +121,13 @@ class TrainAgent(BaseTrial):
                 device=self.params['device'],
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
+                buffer_length=self.params['buffer_length'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
                 explore_epsilon=self.params['explore_epsilon'],
                 num_modules=self.params['num_policies'],
                 num_output_classes=self.env.action_space.n,
+                embedding_plot_freq=self.params['embedding_plot_freq'],
             )
 
         # results
