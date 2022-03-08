@@ -2,9 +2,11 @@ import random
 
 import torch
 import numpy as np
+from pfrl import explorers
 from pfrl.replay_buffers import ReplayBuffer
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
+from pfrl.utils.contexts import evaluating
 
 from skills.ensemble.policy_ensemble import PolicyEnsemble
 from skills.ensemble.aggregate import choose_most_popular
@@ -29,6 +31,8 @@ class EnsembleAgent():
                 embedding_learning_rate=1e-4, 
                 policy_learning_rate=1e-2, 
                 explore_epsilon=0.1,
+                final_epsilon=0.01,
+                final_exploration_frames=10 ** 6,
                 discount_rate=0.9,
                 num_modules=8, 
                 normalize=True, 
@@ -51,7 +55,7 @@ class EnsembleAgent():
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
         
-        # ensemble and replay buffer
+        # ensemble
         self.policy_ensemble = PolicyEnsemble(
             device=device,
             embedding_output_size=embedding_output_size,
@@ -64,6 +68,16 @@ class EnsembleAgent():
             plot_dir=plot_dir,
             verbose=verbose,
         )
+
+        # explorer
+        self.explorer = explorers.LinearDecayEpsilonGreedy(
+            1.0,
+            final_epsilon,
+            final_exploration_frames,
+            lambda: np.random.randint(num_output_classes),
+        )
+
+        # replay buffer
         self.replay_buffer = ReplayBuffer(capacity=buffer_length)
         self.replay_updater = ReplayUpdater(
             replay_buffer=self.replay_buffer,
@@ -126,11 +140,13 @@ class EnsembleAgent():
         """
         epsilon-greedy policy
         """
-        actions = self.policy_ensemble.predict_actions(torch.from_numpy(np.array(obs)).float())
-        if random.random() < self.explore_epsilon:
-            a = random.randint(0, self.num_output_classes-1)
-        else:
-            a = choose_most_popular(actions)
+        obs = batch_states([obs], self.device, self.phi)
+        actions = self.policy_ensemble.predict_actions(obs)
+        # epsilon-greedy
+        a = self.explorer.select_action(
+            self.step_number,
+            greedy_action_func=lambda: choose_most_popular(actions),
+        )   
         return a
 
     def save(self, path):

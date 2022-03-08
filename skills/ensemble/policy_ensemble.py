@@ -168,7 +168,6 @@ class PolicyEnsemble():
         self.embedding.eval()
         self.set_policy_eval()
         with torch.no_grad():
-            state = state.to(self.device).unsqueeze(0)  # add batch dimension
             embeddings = self.embedding(state, sampling=False, return_attention_mask=False).detach()
 
             actions = np.zeros(self.num_modules, dtype=np.int)
