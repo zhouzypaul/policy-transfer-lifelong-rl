@@ -110,8 +110,11 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
 
         # set up ensemble
+        def phi(x):  # Feature extractor
+            return np.asarray(x, dtype=np.float32) / 255
         self.ensemble_agent = EnsembleAgent(
             device=self.params['device'],
+            phi=phi,
             warmup_steps=self.params['warmup_steps'],
             batch_size=self.params['batch_size'],
             update_interval=4,

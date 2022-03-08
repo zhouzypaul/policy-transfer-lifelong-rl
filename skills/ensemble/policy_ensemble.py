@@ -76,87 +76,77 @@ class PolicyEnsemble():
     def set_policy_eval(self):
         self.q_networks.eval()
 
-    def train_embedding(self, dataset, epochs, plot_embedding=False):
+    def train_embedding(self, batch, epochs, plot_embedding=False):
+        """
+        update the embedding network using a batch of experiences
+        """
         # dataset is a pytorch dataset
         self.embedding.train()
         self.set_policy_eval()
 
-        for epoch in range(epochs):
-            loss_div, loss_homo, loss_heter = 0, 0, 0
-            counter = 0
-            for i, batch in enumerate(dataset):
-                batch_states, _, _, _, _ = zip(*batch)
-                batch_states = torch.from_numpy(np.array([np.array(s) for s in batch_states])).float().to(self.device)
-                embedding, class_label_matrix = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=(i==0 and plot_embedding))
-                if embedding.size()[0] == 0:
-                    continue
-                embedding = embedding.view(embedding.size(0), self.num_modules, -1)
+        for _ in range(epochs):
+            batch_states = batch['state']
+            embedding, class_label_matrix = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=plot_embedding)
+            if embedding.size()[0] == 0:
+                continue
+            embedding = embedding.view(embedding.size(0), self.num_modules, -1)
 
-                self.embedding_optimizer.zero_grad()
-                l_div, l_homo, l_heter = criterion.criterion(embedding, class_label_matrix)
-                l = l_div + l_homo + l_heter
-                l.backward()
-                self.embedding_optimizer.step()
-
-                if self.verbose:
-                    loss_homo += l_homo.item()
-                    loss_heter += l_heter.item()
-                    loss_div += l_div.item()
-
-                counter += 1
+            self.embedding_optimizer.zero_grad()
+            l_div, l_homo, l_heter = criterion.criterion(embedding, class_label_matrix)
+            l = l_div + l_homo + l_heter
+            l.backward()
+            self.embedding_optimizer.step()
 
             if self.verbose:
-                loss_homo /= (counter+1)
-                loss_heter /= (counter+1)
-                loss_div /= (counter+1)
-                print('batches %d\tdiv:%.4f\thomo:%.4f\theter:%.4f'%(counter+1, loss_div, loss_homo, loss_heter))
+                loss_homo = l_homo.item()
+                loss_heter = l_heter.item()
+                loss_div = l_div.item()
+
+            if self.verbose:
+                print(f"LOSS div: {loss_div}  homo: {loss_homo}  heter: {loss_heter}")
 
         self.embedding.eval()
         self.set_policy_eval()
 
-    def train_q_network(self, dataset, epochs, update_target_network=False):
+    def train_q_network(self, batch, epochs, update_target_network=False):
+        """
+        train the q network with a batch of experience
+        """
         self.embedding.eval()
         self.set_policy_train()
 
-        for epoch in range(epochs):
+        for _ in range(epochs):
             avg_loss = np.zeros(self.num_modules)
-            count = 0
-            for batch in dataset:
-                batch_states, batch_actions, batch_rewards, batch_next_states, batch_dones = zip(*batch)
+            batch_states = batch['state']
+            batch_actions = batch['action']
+            batch_rewards = batch['reward']
+            batch_next_states = batch['next_state']
+            batch_dones = batch['is_state_terminal']
 
-                batch_states = torch.from_numpy(np.array([np.array(s) for s in batch_states])).float().to(self.device)
-                batch_actions = torch.from_numpy(np.array(batch_actions)).float().to(self.device)
-                batch_next_states = torch.from_numpy(np.array([np.array(s) for s in batch_next_states])).float().to(self.device)
-                batch_rewards = torch.from_numpy(np.array(batch_rewards)).float().to(self.device)
-                batch_dones = torch.from_numpy(np.array(batch_dones)).float().to(self.device)
+            state_embeddings = self.embedding(batch_states, sampling=False, return_attention_mask=False)
+            next_state_embeddings = self.embedding(batch_next_states, sampling=False, return_attention_mask=False)
 
-                state_embeddings = self.embedding(batch_states, sampling=False, return_attention_mask=False)
-                next_state_embeddings = self.embedding(batch_next_states, sampling=False, return_attention_mask=False)
+            for idx in range(self.num_modules):
 
-                for idx in range(self.num_modules):
+                # predicted q values
+                state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
+                batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
+                batch_pred_q = extract(batch_pred_q_all_actions, idx=batch_actions.long(), idx_dim=-1)  # (batch_size,)
 
-                    # predicted q values
-                    state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                    batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
-                    batch_pred_q = extract(batch_pred_q_all_actions, idx=batch_actions.long(), idx_dim=-1)  # (batch_size,)
-
-                    # target q values 
-                    with torch.no_grad():
-                        next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                        batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
-                        ap = torch.argmax(batch_next_state_q_all_actions, dim=-1)
-                        next_state_values = extract(batch_next_state_q_all_actions, idx=ap.long(), idx_dim=-1)  # (batch_size,)
-                        batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
-                    
-                    # loss
-                    loss = F.smooth_l1_loss(batch_pred_q, batch_q_target)
-                    self.policy_optimisers[idx].zero_grad()
-                    loss.backward(retain_graph=True)
-                    self.policy_optimisers[idx].step()
-                    if self.verbose: avg_loss[idx] += loss.item()
-
-                count += 1
-            avg_loss = avg_loss/count
+                # target q values 
+                with torch.no_grad():
+                    next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
+                    batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
+                    ap = torch.argmax(batch_next_state_q_all_actions, dim=-1)
+                    next_state_values = extract(batch_next_state_q_all_actions, idx=ap.long(), idx_dim=-1)  # (batch_size,)
+                    batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
+                
+                # loss
+                loss = F.smooth_l1_loss(batch_pred_q, batch_q_target)
+                self.policy_optimisers[idx].zero_grad()
+                loss.backward(retain_graph=True)
+                self.policy_optimisers[idx].step()
+                if self.verbose: avg_loss[idx] += loss.item()
 
             # update target network
             if update_target_network:
