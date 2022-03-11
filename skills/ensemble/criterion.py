@@ -26,6 +26,10 @@ def batched_L_divergence(batch_feats):
     """
     batch_feats is of shape (batch_size, n_modules, n_features)
     """
+    global every_tuple
+    if every_tuple is None:
+        every_tuple = torch.combinations(torch.Tensor(range(batch_feats.shape[1])), 2).long()
+        
     every_tuple_features = batch_feats[:, every_tuple, :]  # (batch_size, num_tuple, 2, dim)
     every_tuple_difference = every_tuple_features.diff(dim=2).squeeze(2)  # (batch_size, num_tuple, dim)
     loss = torch.clamp(1 - torch.sum(every_tuple_difference.pow(2), dim=-1), min=0)  # (batch_size, num_tuple)
@@ -55,18 +59,24 @@ def loss_function(tensor, batch_k):
     return loss_div/batch_size, loss_homo/count_homo, loss_heter/count_heter
 
 
-def criterion(anchors, positives, negatives):
-    loss_homo = L_metric(anchors, positives)
-    loss_heter = L_metric(anchors, negatives, False)
-    loss_div = 0
+def criterion(examples, class_label_matrix):
+    # L_metric loss for examples of the same class
+    class_label_matrix = torch.triu(class_label_matrix, diagonal=1)  # only consider the strict upper triangle
+    positive_x, positive_y = torch.where(class_label_matrix == 1)
+    loss_homo = L_metric(examples[positive_x, ...], examples[positive_y, ...], same_class=True)
 
+    # L_metric loss for examples of different class
+    class_label_matrix = class_label_matrix + torch.tril(torch.ones_like(class_label_matrix))  # change lower triangular of class_label to 1
+    negative_x, negative_y = torch.where(class_label_matrix == 0)
+    loss_heter = L_metric(examples[negative_x, ...], examples[negative_y, ...], False)
+
+    # divergence loss
     global n_modules
     global every_tuple
     if n_modules is None:
-        n_modules = anchors.shape[1]  # init the global variable for L_divergence
+        n_modules = examples.shape[1]  # init the global variable for L_divergence
         every_tuple = torch.combinations(torch.Tensor(range(n_modules)), 2).long()
-    all_examples = torch.cat((anchors, positives, negatives), 0)
-    loss_div = batched_L_divergence(all_examples)
+    loss_div = batched_L_divergence(examples)
     
     return loss_div, loss_homo, loss_heter
 

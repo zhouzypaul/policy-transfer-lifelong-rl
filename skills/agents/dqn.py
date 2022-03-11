@@ -143,6 +143,7 @@ def parse_agent(agent):
 def make_dqn_agent(q_agent_type,
                     arch,
                     n_actions,
+                    phi,
                     lr=2.5e-4,
                     noisy_net_sigma=None,
                     buffer_length=10 ** 6,
@@ -160,6 +161,8 @@ def make_dqn_agent(q_agent_type,
     args:
         q_agent_type: choices=["DQN", "DoubleDQN", "PAL"]
         arch: choices=["nature", "nips", "dueling", "doubledqn"]
+        n_actions: number of actions
+        phi: the function to apply to the state, usually a feature extractor
         final_epsilon: Final value of epsilon during training
         final_exploration_frames: Timesteps after which we stop annealing exploration rate
         replay_start_size: Minimum replay buffer size before performing gradient updates.
@@ -196,10 +199,6 @@ def make_dqn_agent(q_agent_type,
 
     # replay_buffer
     rbuf = replay_buffers.ReplayBuffer(buffer_length)     
-
-    # Feature extractor
-    def phi(x):
-        return np.asarray(x, dtype=np.float32) / 255
 
     Agent = parse_agent(q_agent_type)
     agent = Agent(

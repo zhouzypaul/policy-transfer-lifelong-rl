@@ -104,24 +104,35 @@ class TrainAgent(BaseTrial):
         self.env = self.make_env(self.params['environment'], self.params['seed'])
 
         # set up agent
+        def phi(x):  # Feature extractor
+            return np.asarray(x, dtype=np.float32) / 255
         if self.params['agent'] == 'dqn':
             # DQN
             self.agent = make_dqn_agent(
                 q_agent_type="DoubleDQN",
                 arch="nature",
+                phi=phi,
                 n_actions=self.env.action_space.n,
+                replay_start_size=self.params['warmup_steps'],
+                buffer_length=self.params['buffer_length'],
+                update_interval=self.params['update_interval'],
+                target_update_interval=self.params['target_update_interval'],
             )
         else:
             # ensemble
             self.agent = EnsembleAgent(
                 device=self.params['device'],
+                phi=phi,
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
+                buffer_length=self.params['buffer_length'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
                 explore_epsilon=self.params['explore_epsilon'],
                 num_modules=self.params['num_policies'],
                 num_output_classes=self.env.action_space.n,
+                embedding_plot_freq=self.params['embedding_plot_freq'],
+                plot_dir=self.params['plots_dir'],
             )
 
         # results
