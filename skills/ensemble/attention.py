@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from skills.ensemble.distance_weighted_sampling import DistanceWeightedSampling
 from skills.plot import plot_attention_diversity
 
 
@@ -13,14 +12,11 @@ class Attention(nn.Module):
                 embedding_size=64, 
                 attention_depth=32, 
                 num_attention_modules=8, 
-                normalize=True,
                 plot_dir=None):
         super(Attention, self).__init__()
         self.num_attention_modules = num_attention_modules
         self.out_dim = embedding_size
         self.attention_depth = attention_depth
-        
-        self.sampled = DistanceWeightedSampling(normalize=normalize)
 
         self.conv1 = nn.Conv2d(in_channels=stack_size, out_channels=self.attention_depth, kernel_size=3, stride=1)
         self.pool1 = nn.MaxPool2d(2)
@@ -56,7 +52,7 @@ class Attention(nn.Module):
         x = F.normalize(x)
         return x
 
-    def forward(self, x, sampling, return_attention_mask=False, plot=False):
+    def forward(self, x, return_attention_mask=False, plot=False):
         spacial_features = self.spatial_feature_extractor(x)
         attentions = [self.attention_modules[i](spacial_features) for i in range(self.num_attention_modules)]
 
@@ -73,10 +69,6 @@ class Attention(nn.Module):
             plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
         embedding = torch.cat([self.compact_global_features(f).unsqueeze(1) for f in global_features], dim=1)  # (N, num_modules, embedding_size)
 
-        if sampling:
-            embedding = torch.flatten(embedding, 1)  # (N, num_modules*embedding_size)
-            return self.sampled(embedding) if not return_attention_mask else (self.sampled(embedding), attentions)
-        else:
-            return embedding if not return_attention_mask else (embedding, attentions)
+        return embedding if not return_attention_mask else (embedding, attentions)
 
 

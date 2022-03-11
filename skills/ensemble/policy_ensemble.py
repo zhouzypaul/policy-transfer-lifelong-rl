@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 
-from skills.ensemble import criterion
+from skills.ensemble.criterion import batched_L_divergence
 from skills.ensemble.attention import Attention
 from skills.models.mlp import MLP
 from skills.option_utils import extract
@@ -23,13 +23,11 @@ class PolicyEnsemble():
         policy_learning_rate=1e-2, 
         discount_rate=0.9,
         num_modules=8, 
-        normalize=True, 
         num_output_classes=18,
         plot_dir=None,
         verbose=False,):
         
         self.num_modules = num_modules
-        self.normalize = normalize
         self.num_output_classes = num_output_classes
         self.device = device
         self.gamma = discount_rate
@@ -38,7 +36,6 @@ class PolicyEnsemble():
         self.embedding = Attention(
             embedding_size=embedding_output_size, 
             num_attention_modules=self.num_modules, 
-            normalize=self.normalize,
             plot_dir=plot_dir
         ).to(self.device)
 
@@ -86,24 +83,21 @@ class PolicyEnsemble():
 
         for _ in range(epochs):
             batch_states = batch['state']
-            embedding, class_label_matrix = self.embedding(batch_states, sampling=True, return_attention_mask=False, plot=plot_embedding)
+            embedding = self.embedding(batch_states, return_attention_mask=False, plot=plot_embedding)
             if embedding.size()[0] == 0:
                 continue
             embedding = embedding.view(embedding.size(0), self.num_modules, -1)
 
             self.embedding_optimizer.zero_grad()
-            l_div, l_homo, l_heter = criterion.criterion(embedding, class_label_matrix)
-            l = l_div + l_homo + l_heter
-            l.backward()
+            l_div = batched_L_divergence(embedding)
+            l_div.backward()
             self.embedding_optimizer.step()
 
             if self.verbose:
-                loss_homo = l_homo.item()
-                loss_heter = l_heter.item()
                 loss_div = l_div.item()
 
             if self.verbose:
-                print(f"LOSS div: {loss_div}  homo: {loss_homo}  heter: {loss_heter}")
+                print(f"LOSS div: {loss_div}")
 
         self.embedding.eval()
         self.set_policy_eval()
@@ -123,8 +117,8 @@ class PolicyEnsemble():
             batch_next_states = batch['next_state']
             batch_dones = batch['is_state_terminal']
 
-            state_embeddings = self.embedding(batch_states, sampling=False, return_attention_mask=False)
-            next_state_embeddings = self.embedding(batch_next_states, sampling=False, return_attention_mask=False)
+            state_embeddings = self.embedding(batch_states, return_attention_mask=False)
+            next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
 
             for idx in range(self.num_modules):
 
@@ -168,7 +162,7 @@ class PolicyEnsemble():
         self.embedding.eval()
         self.set_policy_eval()
         with torch.no_grad():
-            embeddings = self.embedding(state, sampling=False, return_attention_mask=False).detach()
+            embeddings = self.embedding(state, return_attention_mask=False).detach()
 
             actions = np.zeros(self.num_modules, dtype=np.int)
             for idx in range(self.num_modules):
@@ -181,7 +175,7 @@ class PolicyEnsemble():
     def get_attention(self, x):
         self.embedding.eval()
         x = x.to(self.device)
-        _, atts = self.embedding(x, sampling=False, return_attention_mask=True).detach()
+        _, atts = self.embedding(x, return_attention_mask=True).detach()
         return atts
         
     def test_embedding(self, dataset, check_top=5):
@@ -196,7 +190,7 @@ class PolicyEnsemble():
             x = x.to(self.device)
             y = y.item()
 
-            query = self.embedding(x, sampling=False, return_attention_mask=False)
+            query = self.embedding(x, return_attention_mask=False)
             for x in range(self.num_modules):
                 current_query = query[:, x, ...].detach().cpu().numpy()           
 
