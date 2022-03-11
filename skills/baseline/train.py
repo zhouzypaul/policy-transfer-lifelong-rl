@@ -132,6 +132,7 @@ class TrainAgent(BaseTrial):
                 num_modules=self.params['num_policies'],
                 num_output_classes=self.env.action_space.n,
                 embedding_plot_freq=self.params['embedding_plot_freq'],
+                plot_dir=self.params['plots_dir'],
             )
 
         # results

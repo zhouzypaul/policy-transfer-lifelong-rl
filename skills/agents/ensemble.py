@@ -6,7 +6,6 @@ from pfrl import explorers
 from pfrl.replay_buffers import ReplayBuffer
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
-from pfrl.utils.contexts import evaluating
 
 from skills.ensemble.policy_ensemble import PolicyEnsemble
 from skills.ensemble.aggregate import choose_most_popular
@@ -113,7 +112,7 @@ class EnsembleAgent():
     def update(self, experiences):
         """
         update the model
-        accepts as argument a list of transition dicts # TODO
+        accepts as argument a list of transition dicts
         args:
             transitions (list): List of lists of dicts.
                 For DQN, each dict must contains:

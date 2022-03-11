@@ -46,7 +46,7 @@ def count(f):
 
 
 @count
-def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_freq=25):
+def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_freq=1):
 	"""
 	visualize whether embedding of each attention is getting more and more diverse
 	"""
