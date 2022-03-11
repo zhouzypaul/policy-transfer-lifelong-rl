@@ -48,7 +48,7 @@ class TrainAgent(BaseTrial):
         parser.add_argument("--num_policies", type=int, default=1,
                             help="the number of policies to train when using ensemble agent")
         # training
-        parser.add_argument("--steps", type=int, default=5000000,
+        parser.add_argument("--steps", type=int, default=10000000,
                             help="number of training steps")
 
         args = self.parse_common_args(parser)
