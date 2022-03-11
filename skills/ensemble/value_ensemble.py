@@ -10,8 +10,7 @@ import numpy as np
 
 from skills.ensemble.criterion import batched_L_divergence
 from skills.ensemble.attention import Attention
-from skills.models.mlp import MLP
-from skills.option_utils import extract
+from skills.models.q_function import LinearQFunction, compute_value_loss
 
 
 class ValueEnsemble():
@@ -40,7 +39,7 @@ class ValueEnsemble():
         ).to(self.device)
 
         self.q_networks = nn.ModuleList(
-            [MLP(input_size=embedding_output_size, class_num=self.num_output_classes) for _ in range(self.num_modules)]
+            [LinearQFunction(in_features=embedding_output_size, n_actions=num_output_classes) for _ in range(self.num_modules)]
         ).to(self.device)
         self.target_q_networks = deepcopy(self.q_networks)
         self.target_q_networks.eval()
@@ -125,18 +124,17 @@ class ValueEnsemble():
                 # predicted q values
                 state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
                 batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
-                batch_pred_q = extract(batch_pred_q_all_actions, idx=batch_actions.long(), idx_dim=-1)  # (batch_size,)
+                batch_pred_q = batch_pred_q_all_actions.evaluate_actions(batch_actions)  # (batch_size,)
 
                 # target q values 
                 with torch.no_grad():
                     next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
                     batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
-                    ap = torch.argmax(batch_next_state_q_all_actions, dim=-1)
-                    next_state_values = extract(batch_next_state_q_all_actions, idx=ap.long(), idx_dim=-1)  # (batch_size,)
+                    next_state_values = batch_next_state_q_all_actions.max  # (batch_size,)
                     batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
                 
                 # loss
-                loss = F.smooth_l1_loss(batch_pred_q, batch_q_target)
+                loss = compute_value_loss(batch_pred_q, batch_q_target, clip_delta=True, batch_accumulator="mean")
                 self.policy_optimisers[idx].zero_grad()
                 loss.backward(retain_graph=True)
                 self.policy_optimisers[idx].step()
@@ -168,7 +166,7 @@ class ValueEnsemble():
             for idx in range(self.num_modules):
                 attention = embeddings[:,idx,:]
                 q_vals = self.q_networks[idx](attention)
-                actions[idx] = torch.argmax(q_vals, dim=1)
+                actions[idx] = q_vals.greedy_actions
 
         return actions
 
