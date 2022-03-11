@@ -1,6 +1,3 @@
-import random
-
-import torch
 import numpy as np
 from pfrl import explorers
 from pfrl.replay_buffers import ReplayBuffer
@@ -27,8 +24,7 @@ class EnsembleAgent():
                 update_interval=4,
                 q_target_update_interval=40,
                 embedding_output_size=64, 
-                embedding_learning_rate=1e-4, 
-                policy_learning_rate=1e-2, 
+                learning_rate=2.5e-4,
                 explore_epsilon=0.1,
                 final_epsilon=0.01,
                 final_exploration_frames=10 ** 6,
@@ -57,8 +53,7 @@ class EnsembleAgent():
         self.value_ensemble = ValueEnsemble(
             device=device,
             embedding_output_size=embedding_output_size,
-            embedding_learning_rate=embedding_learning_rate,
-            policy_learning_rate=policy_learning_rate,
+            learning_rate=learning_rate,
             discount_rate=discount_rate,
             num_modules=num_modules,
             num_output_classes=num_output_classes,
@@ -130,8 +125,7 @@ class EnsembleAgent():
             batch_states=batch_states,
         )
         update_target_net =  self.step_number % self.q_target_update_interval == 0
-        self.value_ensemble.train_embedding(exp_batch, epochs=self.update_epochs_per_step, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
-        self.value_ensemble.train_q_network(exp_batch, epochs=self.update_epochs_per_step, update_target_network=update_target_net)
+        self.value_ensemble.train(exp_batch, update_target_net, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
 
     def act(self, obs):
         """

@@ -3,7 +3,6 @@ from copy import deepcopy
 from queue import PriorityQueue
 
 import torch
-import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
@@ -18,8 +17,7 @@ class ValueEnsemble():
     def __init__(self, 
         device,
         embedding_output_size=64, 
-        embedding_learning_rate=1e-4, 
-        policy_learning_rate=1e-2, 
+        learning_rate=2.5e-4,
         discount_rate=0.9,
         num_modules=8, 
         num_output_classes=18,
@@ -44,16 +42,10 @@ class ValueEnsemble():
         self.target_q_networks = deepcopy(self.q_networks)
         self.target_q_networks.eval()
 
-        self.embedding_optimizer = optim.SGD(
-            self.embedding.parameters(), 
-            embedding_learning_rate, 
-            momentum=0.95, 
-            weight_decay=1e-4
+        self.optimizer = optim.Adam(
+            list(self.embedding.parameters()) + list(self.q_networks.parameters()),
+            learning_rate,
         )
-        self.policy_optimisers = []
-        for i in range(self.num_modules):
-            optimizer = optim.Adam(self.q_networks[i].parameters(), policy_learning_rate)
-            self.policy_optimisers.append(optimizer)
 
     def save(self, path):
         if not os.path.exists(path):
@@ -66,99 +58,82 @@ class ValueEnsemble():
         self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt')))
         self.q_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
 
-    def set_policy_train(self):
+    def set_value_train(self):
         self.q_networks.train()
 
-    def set_policy_eval(self):
+    def set_value_eval(self):
         self.q_networks.eval()
 
-    def train_embedding(self, batch, epochs, plot_embedding=False):
+    def train(self, batch, update_target_network=False, plot_embedding=False):
         """
-        update the embedding network using a batch of experiences
+        update both the embedding network and the value network by backproping
+        the sumed divergence and q learning loss
         """
-        # dataset is a pytorch dataset
         self.embedding.train()
-        self.set_policy_eval()
+        self.set_value_train()
 
-        for _ in range(epochs):
-            batch_states = batch['state']
-            embedding = self.embedding(batch_states, return_attention_mask=False, plot=plot_embedding)
-            if embedding.size()[0] == 0:
-                continue
-            embedding = embedding.view(embedding.size(0), self.num_modules, -1)
+        batch_states = batch['state']
+        batch_actions = batch['action']
+        batch_rewards = batch['reward']
+        batch_next_states = batch['next_state']
+        batch_dones = batch['is_state_terminal']
 
-            self.embedding_optimizer.zero_grad()
-            l_div = batched_L_divergence(embedding)
-            l_div.backward()
-            self.embedding_optimizer.step()
+        loss = 0
 
-            if self.verbose:
-                loss_div = l_div.item()
+        # divergence loss
+        state_embeddings = self.embedding(batch_states, return_attention_mask=False, plot=plot_embedding)
+        state_embeddings = state_embeddings.view(state_embeddings.size(0), self.num_modules, -1)
+        l_div = batched_L_divergence(state_embeddings)
+        loss += l_div
 
-            if self.verbose:
-                print(f"LOSS div: {loss_div}")
+        # q learning loss
+        td_losses = np.zeros((self.num_modules,))
+        next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
 
-        self.embedding.eval()
-        self.set_policy_eval()
+        for idx in range(self.num_modules):
 
-    def train_q_network(self, batch, epochs, update_target_network=False):
-        """
-        train the q network with a batch of experience
-        """
-        self.embedding.eval()
-        self.set_policy_train()
+            # predicted q values
+            state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
+            batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
+            batch_pred_q = batch_pred_q_all_actions.evaluate_actions(batch_actions)  # (batch_size,)
 
-        for _ in range(epochs):
-            avg_loss = np.zeros(self.num_modules)
-            batch_states = batch['state']
-            batch_actions = batch['action']
-            batch_rewards = batch['reward']
-            batch_next_states = batch['next_state']
-            batch_dones = batch['is_state_terminal']
+            # target q values 
+            with torch.no_grad():
+                next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
+                batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
+                next_state_values = batch_next_state_q_all_actions.max  # (batch_size,)
+                batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
+            
+            # loss
+            td_loss = compute_value_loss(batch_pred_q, batch_q_target, clip_delta=True, batch_accumulator="mean")
+            loss += td_loss
+            if self.verbose: td_losses[idx] = td_loss.item()
+    
+        # update TODO
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
 
-            state_embeddings = self.embedding(batch_states, return_attention_mask=False)
-            next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
+        # update target network
+        if update_target_network:
+            self.target_q_networks.load_state_dict(self.q_networks.state_dict())
+            print(f"updated target network by hard copy")
 
-            for idx in range(self.num_modules):
-
-                # predicted q values
-                state_attention = state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
-                batch_pred_q = batch_pred_q_all_actions.evaluate_actions(batch_actions)  # (batch_size,)
-
-                # target q values 
-                with torch.no_grad():
-                    next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                    batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
-                    next_state_values = batch_next_state_q_all_actions.max  # (batch_size,)
-                    batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
-                
-                # loss
-                loss = compute_value_loss(batch_pred_q, batch_q_target, clip_delta=True, batch_accumulator="mean")
-                self.policy_optimisers[idx].zero_grad()
-                loss.backward(retain_graph=True)
-                self.policy_optimisers[idx].step()
-                if self.verbose: avg_loss[idx] += loss.item()
-
-            # update target network
-            if update_target_network:
-                self.target_q_networks.load_state_dict(self.q_networks.state_dict())
-                print(f"updated target network by hard copy")
-
-            if self.verbose:
-                for idx in range(self.num_modules):
-                    print("\t - Policy {}: loss {:.6f}".format(idx, avg_loss[idx]))
-                print("Average across policy: loss = {:.6f}".format(np.mean(avg_loss)))
+        # logging
+        if self.verbose:
+            # for idx in range(self.num_modules):
+            #     print("\t - Value {}: loss {:.6f}".format(idx, td_losses[idx]))
+            print(f"Div loss: {l_div.item()}. Q loss: {np.sum(td_losses)}")
 
         self.embedding.eval()
-        self.set_policy_eval()
+        self.set_value_eval()
     
     def predict_actions(self, state):
         """
         given a state, each one in the ensemble predicts an action
         """
         self.embedding.eval()
-        self.set_policy_eval()
+        self.set_value_eval()
         with torch.no_grad():
             embeddings = self.embedding(state, return_attention_mask=False).detach()
 
