@@ -14,7 +14,7 @@ from skills.models.mlp import MLP
 from skills.option_utils import extract
 
 
-class PolicyEnsemble():
+class ValueEnsemble():
 
     def __init__(self, 
         device,

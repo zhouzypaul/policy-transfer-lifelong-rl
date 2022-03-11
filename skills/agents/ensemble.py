@@ -7,7 +7,7 @@ from pfrl.replay_buffers import ReplayBuffer
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
-from skills.ensemble.policy_ensemble import PolicyEnsemble
+from skills.ensemble.value_ensemble import ValueEnsemble
 from skills.ensemble.aggregate import choose_most_popular
 
 
@@ -54,7 +54,7 @@ class EnsembleAgent():
         self.discount_rate = discount_rate
         
         # ensemble
-        self.policy_ensemble = PolicyEnsemble(
+        self.value_ensemble = ValueEnsemble(
             device=device,
             embedding_output_size=embedding_output_size,
             embedding_learning_rate=embedding_learning_rate,
@@ -130,15 +130,15 @@ class EnsembleAgent():
             batch_states=batch_states,
         )
         update_target_net =  self.step_number % self.q_target_update_interval == 0
-        self.policy_ensemble.train_embedding(exp_batch, epochs=self.update_epochs_per_step, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
-        self.policy_ensemble.train_q_network(exp_batch, epochs=self.update_epochs_per_step, update_target_network=update_target_net)
+        self.value_ensemble.train_embedding(exp_batch, epochs=self.update_epochs_per_step, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
+        self.value_ensemble.train_q_network(exp_batch, epochs=self.update_epochs_per_step, update_target_network=update_target_net)
 
     def act(self, obs):
         """
         epsilon-greedy policy
         """
         obs = batch_states([obs], self.device, self.phi)
-        actions = self.policy_ensemble.predict_actions(obs)
+        actions = self.value_ensemble.predict_actions(obs)
         # epsilon-greedy
         a = self.explorer.select_action(
             self.step_number,
@@ -147,8 +147,8 @@ class EnsembleAgent():
         return a
 
     def save(self, path):
-        self.policy_ensemble.save(path)
+        self.value_ensemble.save(path)
 
     def load(self, path):
-        self.policy_ensemble = PolicyEnsemble.load(path)
+        self.value_ensemble = ValueEnsemble.load(path)
         # still need to load replay buffer and other vars
