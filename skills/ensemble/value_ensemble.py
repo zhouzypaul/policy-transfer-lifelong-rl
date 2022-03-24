@@ -16,6 +16,7 @@ class ValueEnsemble():
     def __init__(self, 
         device,
         embedding_output_size=64, 
+        gru_hidden_size=128,
         learning_rate=2.5e-4,
         discount_rate=0.9,
         num_modules=8, 
@@ -35,8 +36,14 @@ class ValueEnsemble():
             plot_dir=plot_dir
         ).to(self.device)
 
+        self.recurrent_memory = nn.GRU(
+            input_size=embedding_output_size,
+            hidden_size=gru_hidden_size,
+            batch_first=True,
+        ).to(self.device)
+
         self.q_networks = nn.ModuleList(
-            [LinearQFunction(in_features=embedding_output_size, n_actions=num_output_classes) for _ in range(self.num_modules)]
+            [LinearQFunction(in_features=gru_hidden_size, n_actions=num_output_classes) for _ in range(self.num_modules)]
         ).to(self.device)
         self.target_q_networks = deepcopy(self.q_networks)
         self.target_q_networks.eval()
@@ -75,12 +82,14 @@ class ValueEnsemble():
 
         # divergence loss
         state_embeddings = self.embedding(batch_states, return_attention_mask=False, plot=plot_embedding)  # (batch_size, num_modules, embedding_size)
+        state_embeddings, _ = self.recurrent_memory(state_embeddings)  # (batch_size, num_modules, gru_out_size)
         l_div = batched_L_divergence(state_embeddings)
         loss += l_div
 
         # q learning loss
         td_losses = np.zeros((self.num_modules,))
         next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
+        next_state_embeddings, _ = self.recurrent_memory(next_state_embeddings)
 
         for idx in range(self.num_modules):
 
@@ -101,7 +110,7 @@ class ValueEnsemble():
             loss += td_loss
             if self.verbose: td_losses[idx] = td_loss.item()
     
-        # update TODO
+        # update
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -128,6 +137,7 @@ class ValueEnsemble():
         self.q_networks.eval()
         with torch.no_grad():
             embeddings = self.embedding(state, return_attention_mask=False).detach()
+            embeddings, _ = self.recurrent_memory(embeddings)
 
             actions = np.zeros(self.num_modules, dtype=np.int)
             for idx in range(self.num_modules):
