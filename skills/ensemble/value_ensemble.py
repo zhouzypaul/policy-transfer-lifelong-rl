@@ -1,6 +1,5 @@
 import os
 from copy import deepcopy
-from queue import PriorityQueue
 
 import torch
 import torch.nn as nn
@@ -58,19 +57,13 @@ class ValueEnsemble():
         self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt')))
         self.q_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
 
-    def set_value_train(self):
-        self.q_networks.train()
-
-    def set_value_eval(self):
-        self.q_networks.eval()
-
     def train(self, batch, update_target_network=False, plot_embedding=False):
         """
         update both the embedding network and the value network by backproping
         the sumed divergence and q learning loss
         """
         self.embedding.train()
-        self.set_value_train()
+        self.q_networks.train()
 
         batch_states = batch['state']
         batch_actions = batch['action']
@@ -81,8 +74,7 @@ class ValueEnsemble():
         loss = 0
 
         # divergence loss
-        state_embeddings = self.embedding(batch_states, return_attention_mask=False, plot=plot_embedding)
-        state_embeddings = state_embeddings.view(state_embeddings.size(0), self.num_modules, -1)
+        state_embeddings = self.embedding(batch_states, return_attention_mask=False, plot=plot_embedding)  # (batch_size, num_modules, embedding_size)
         l_div = batched_L_divergence(state_embeddings)
         loss += l_div
 
@@ -126,14 +118,14 @@ class ValueEnsemble():
             print(f"Div loss: {l_div.item()}. Q loss: {np.sum(td_losses)}")
 
         self.embedding.eval()
-        self.set_value_eval()
+        self.q_networks.eval()
     
     def predict_actions(self, state):
         """
         given a state, each one in the ensemble predicts an action
         """
         self.embedding.eval()
-        self.set_value_eval()
+        self.q_networks.eval()
         with torch.no_grad():
             embeddings = self.embedding(state, return_attention_mask=False).detach()
 
@@ -150,34 +142,3 @@ class ValueEnsemble():
         x = x.to(self.device)
         _, atts = self.embedding(x, return_attention_mask=True).detach()
         return atts
-        
-    def test_embedding(self, dataset, check_top=5):
-        self.embedding.eval()
-        embedding = np.zeros([])
-        class_test = [0]*self.num_modules
-        results = [PriorityQueue()]*self.num_modules
-
-        for i, batch in enumerate(dataset):
-            
-            x, y = batch
-            x = x.to(self.device)
-            y = y.item()
-
-            query = self.embedding(x, return_attention_mask=False)
-            for x in range(self.num_modules):
-                current_query = query[:, x, ...].detach().cpu().numpy()           
-
-                if i == 0:
-                    embedding = current_query
-                    class_test[x] = y
-                else:
-                    dist = np.sum((embedding - current_query)**2)
-                    results[x].put((dist, y))
-
-        for x in range(self.num_modules):
-            print("Testing Module: {}".format(x))
-            print("Test image class: {}".format(class_test[x]))
-
-            for i in range(check_top):
-                _, result_class = results[x].get()
-                print("{}) Class: {}".format(i, result_class))
