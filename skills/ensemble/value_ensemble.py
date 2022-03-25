@@ -49,7 +49,7 @@ class ValueEnsemble():
         self.target_q_networks.eval()
 
         self.optimizer = optim.Adam(
-            list(self.embedding.parameters()) + list(self.q_networks.parameters()),
+            list(self.embedding.parameters()) + list(self.q_networks.parameters()) + list(self.recurrent_memory.parameters()),
             learning_rate,
         )
 
