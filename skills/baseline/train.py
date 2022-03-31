@@ -156,7 +156,7 @@ class TrainAgent(BaseTrial):
             obs = next_obs
             episode_total_reward += reward
 
-            self.save_episode_reward(episode_total_reward, step_number)
+            self.save_episode_reward(episode_total_reward, step_number, save_every=self.params['reward_logging_freq'])
             self.save_results(step_number)
 
             if done:
@@ -198,7 +198,7 @@ class TrainAgent(BaseTrial):
                 plt.savefig(img_file)
                 plt.close()
     
-    def save_episode_reward(self, r, step_number, save_every=250):
+    def save_episode_reward(self, r, step_number, save_every):
         """
         log the episodic reward achieved during training
         save every 250 steps
