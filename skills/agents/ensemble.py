@@ -5,7 +5,7 @@ from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
 from skills.ensemble.value_ensemble import ValueEnsemble
-from skills.ensemble.aggregate import choose_most_popular
+from skills.ensemble.aggregate import choose_most_popular, uniform_stochastic_leader
 
 
 class EnsembleAgent():
@@ -20,6 +20,7 @@ class EnsembleAgent():
                 warmup_steps,
                 batch_size,
                 phi,
+                action_selection_strategy,
                 buffer_length=100000,
                 update_interval=4,
                 q_target_update_interval=40,
@@ -27,7 +28,7 @@ class EnsembleAgent():
                 learning_rate=2.5e-4,
                 explore_epsilon=0.1,
                 final_epsilon=0.01,
-                final_exploration_frames=10 ** 6,
+                final_exploration_frames=10**6,
                 discount_rate=0.9,
                 num_modules=8, 
                 num_output_classes=18,
@@ -37,6 +38,8 @@ class EnsembleAgent():
         # vars
         self.device = device
         self.phi = phi
+        self.action_selection_strategy = action_selection_strategy
+        print(f"using action selection strategy: {self.action_selection_strategy}")
         self.warmup_steps = warmup_steps
         self.num_data_for_update = warmup_steps
         self.batch_size = batch_size
@@ -133,10 +136,15 @@ class EnsembleAgent():
         """
         obs = batch_states([obs], self.device, self.phi)
         actions = self.value_ensemble.predict_actions(obs)
+        # action selection strategy
+        if self.action_selection_strategy == 'vote':
+            action_selection_func = choose_most_popular
+        elif self.action_selection_strategy == 'uniform_leader':
+            action_selection_func = uniform_stochastic_leader
         # epsilon-greedy
         a = self.explorer.select_action(
             self.step_number,
-            greedy_action_func=lambda: choose_most_popular(actions),
+            greedy_action_func=lambda: action_selection_func(actions),
         )   
         return a
 

@@ -45,6 +45,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         # ensemble
         parser.add_argument("--num_policies", type=int, default=8,
                             help="number of policies in the ensemble")
+        parser.add_argument("--action_selection_strat", type=str, default="uniform_leader",
+                            choices=['vote', 'uniform_leader'],
+                            help="the action selection strategy when using ensemble agent")
         
         # training
         parser.add_argument("--steps", type=int, default=100000,
@@ -115,6 +118,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         self.ensemble_agent = EnsembleAgent(
             device=self.params['device'],
             phi=phi,
+            action_selection_strategy=self.params['action_selection_strat'],
             warmup_steps=self.params['warmup_steps'],
             batch_size=self.params['batch_size'],
             update_interval=4,
