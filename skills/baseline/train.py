@@ -150,7 +150,6 @@ class TrainAgent(BaseTrial):
 
         # train loop
         step_number = 0
-        episode_number = 0
         episode_total_reward = 0
         obs = self.env.reset()
         while step_number < self.params['steps']:
@@ -166,7 +165,6 @@ class TrainAgent(BaseTrial):
             if done:
                 # self.save_success_rate(done and reward == 1, episode_number)
                 episode_total_reward = 0
-                episode_number += 1
                 obs = self.env.reset()
             
             step_number += 1

@@ -12,11 +12,19 @@ def choose_most_popular(actions):
     return np.argmax(counts)
 
 
-def uniform_stochastic_leader(actions):
+def choose_leader(actions, leader=None):
     """
-    choose a `leader` according to a uniform random distribution
-    and all learners in the ensemble will listen to that leader for action selection
+    choose a `leader` and all learners in the ensemble will listen to that 
+    leader for action selection
 
     the hope is eventually all learners will converge to the same action selection policy
+
+    args:
+        leader: an int indicating which learner is the leader. The calling function is
+            responsible for setting this value.
+            The leader in evey episode should be the same.
     """
-    return np.random.choice(actions)
+    if leader is None:
+        return np.random.choice(actions)
+    else:
+        return actions[leader]

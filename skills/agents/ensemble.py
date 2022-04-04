@@ -5,7 +5,7 @@ from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
 from skills.ensemble.value_ensemble import ValueEnsemble
-from skills.ensemble.aggregate import choose_most_popular, uniform_stochastic_leader
+from skills.ensemble.aggregate import choose_most_popular, choose_leader
 
 
 class EnsembleAgent():
@@ -47,7 +47,10 @@ class EnsembleAgent():
         self.update_interval = update_interval
         self.explore_epsilon = explore_epsilon
         self.num_output_classes = num_output_classes
+        self.num_modules = num_modules
         self.step_number = 0
+        self.episode_number = 0
+        self.action_leader = np.random.choice(self.num_modules)
         self.update_epochs_per_step = 1
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
@@ -104,6 +107,9 @@ class EnsembleAgent():
 
         self.replay_updater.update_if_necessary(self.step_number)
         self.step_number += 1
+        if terminal:
+            self.episode_number += 1
+            self.action_leader = np.random.choice(self.num_modules)
 
     def update(self, experiences):
         """
@@ -140,7 +146,7 @@ class EnsembleAgent():
         if self.action_selection_strategy == 'vote':
             action_selection_func = choose_most_popular
         elif self.action_selection_strategy == 'uniform_leader':
-            action_selection_func = uniform_stochastic_leader
+            action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
         # epsilon-greedy
         a = self.explorer.select_action(
             self.step_number,
