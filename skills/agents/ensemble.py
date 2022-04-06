@@ -51,6 +51,7 @@ class EnsembleAgent():
         self.step_number = 0
         self.episode_number = 0
         self.action_leader = np.random.choice(self.num_modules)
+        self.learner_accumulated_reward = {l: 1 for l in range(self.num_modules)}  # laplace smoothing
         self.update_epochs_per_step = 1
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
@@ -107,9 +108,15 @@ class EnsembleAgent():
 
         self.replay_updater.update_if_necessary(self.step_number)
         self.step_number += 1
+        self.learner_accumulated_reward[self.action_leader] += reward
         if terminal:
             self.episode_number += 1
-            self.action_leader = np.random.choice(self.num_modules)
+            if self.action_selection_strategy == 'uniform_leader':
+                self.action_leader = np.random.choice(self.num_modules)
+            elif self.action_selection_strategy == 'leader':
+                acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
+                probability = acc_reward / np.sum(acc_reward)
+                self.action_leader = np.random.choice(self.num_modules, p=probability)
 
     def update(self, experiences):
         """
@@ -145,8 +152,10 @@ class EnsembleAgent():
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = choose_most_popular
-        elif self.action_selection_strategy == 'uniform_leader':
+        elif self.action_selection_strategy in ['leader', 'uniform_leader']:
             action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
+        else:
+            raise NotImplementedError("action selection strat not supported")
         # epsilon-greedy
         a = self.explorer.select_action(
             self.step_number,

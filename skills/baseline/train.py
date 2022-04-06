@@ -47,8 +47,8 @@ class TrainAgent(BaseTrial):
                             help="the type of agent to train")
         parser.add_argument("--num_policies", type=int, default=1,
                             help="the number of policies to train when using ensemble agent")
-        parser.add_argument("--action_selection_strat", type=str, default="uniform_leader",
-                            choices=['vote', 'uniform_leader'],
+        parser.add_argument("--action_selection_strat", type=str, default="leader",
+                            choices=['vote', 'uniform_leader', 'leader'],
                             help="the action selection strategy when using ensemble agent")
         # training
         parser.add_argument("--steps", type=int, default=10000000,
