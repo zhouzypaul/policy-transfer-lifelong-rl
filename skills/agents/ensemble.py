@@ -4,11 +4,12 @@ from pfrl.replay_buffers import ReplayBuffer
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
+from skills.agents.abstract_agent import Agent
 from skills.ensemble.value_ensemble import ValueEnsemble
 from skills.ensemble.aggregate import choose_most_popular, choose_leader
 
 
-class EnsembleAgent():
+class EnsembleAgent(Agent):
     """
     an Agent that keeps an ensemble of policies
     an agent needs to support two methods: observe() and act()
@@ -94,23 +95,29 @@ class EnsembleAgent():
         store the experience tuple into the replay buffer
         and update the agent if necessary
         """
-        transition = {
-            "state": obs,
-            "action": action,
-            "reward": reward,
-            "next_state": next_obs,
-            "next_action": None,
-            "is_state_terminal": terminal,
-        }
-        self.replay_buffer.append(**transition)
-        if terminal:
-            self.replay_buffer.stop_current_episode()
-
-        self.replay_updater.update_if_necessary(self.step_number)
         self.step_number += 1
-        self.learner_accumulated_reward[self.action_leader] += reward
+
+        # update replay buffer 
+        if self.training:
+            transition = {
+                "state": obs,
+                "action": action,
+                "reward": reward,
+                "next_state": next_obs,
+                "next_action": None,
+                "is_state_terminal": terminal,
+            }
+            self.replay_buffer.append(**transition)
+            if terminal:
+                self.replay_buffer.stop_current_episode()
+
+            self.replay_updater.update_if_necessary(self.step_number)
+            self.learner_accumulated_reward[self.action_leader] += reward
+            
+        # new episode
         if terminal:
             self.episode_number += 1
+            # set leader
             if self.action_selection_strategy == 'uniform_leader':
                 self.action_leader = np.random.choice(self.num_modules)
             elif self.action_selection_strategy == 'leader':
@@ -133,22 +140,27 @@ class EnsembleAgent():
                   - weight (float, optional): Weight coefficient. It can be
                     used for importance sampling.
         """
-        exp_batch = batch_experiences(
-            experiences,
-            device=self.device,
-            phi=self.phi,
-            gamma=self.discount_rate,
-            batch_states=batch_states,
-        )
-        update_target_net =  self.step_number % self.q_target_update_interval == 0
-        self.value_ensemble.train(exp_batch, update_target_net, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
+        if self.training:
+            exp_batch = batch_experiences(
+                experiences,
+                device=self.device,
+                phi=self.phi,
+                gamma=self.discount_rate,
+                batch_states=batch_states,
+            )
+            update_target_net =  self.step_number % self.q_target_update_interval == 0
+            self.value_ensemble.train(exp_batch, update_target_net, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
 
-    def act(self, obs):
+    def act(self, obs, return_ensemble_info=False):
         """
         epsilon-greedy policy
+        args:
+            obs (object): Observation from the environment.
+            return_ensemble_info (bool): when set to true, this function returns
+                (action_selected, actions_selected_by_each_learner, q_values_of_each_actions_selected)
         """
         obs = batch_states([obs], self.device, self.phi)
-        actions = self.value_ensemble.predict_actions(obs)
+        actions, q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = choose_most_popular
@@ -157,15 +169,26 @@ class EnsembleAgent():
         else:
             raise NotImplementedError("action selection strat not supported")
         # epsilon-greedy
-        a = self.explorer.select_action(
-            self.step_number,
-            greedy_action_func=lambda: action_selection_func(actions),
-        )   
+        if self.training:
+            a = self.explorer.select_action(
+                self.step_number,
+                greedy_action_func=lambda: action_selection_func(actions),
+            )
+        else:
+            a = action_selection_func(actions)
+        if return_ensemble_info:
+            return a, actions, q_vals
         return a
 
     def save(self, path):
         self.value_ensemble.save(path)
 
-    def load(self, path):
-        self.value_ensemble = ValueEnsemble.load(path)
+    def load(self, path): 
+        self.value_ensemble = ValueEnsemble(
+            device="cuda", 
+            num_output_classes=self.num_output_classes,
+            num_modules=self.num_modules
+        )
+        self.value_ensemble.load(path)
+        return self
         # still need to load replay buffer and other vars

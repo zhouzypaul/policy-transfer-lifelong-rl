@@ -78,7 +78,7 @@ class BaseTrial:
                 clip_rewards=True,
                 frame_stack=True,
                 scale=False,
-                fire_reset=False,
+                fire_reset=True,
                 channel_order="chw",
                 flicker=False,
             )

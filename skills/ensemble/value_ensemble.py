@@ -128,10 +128,12 @@ class ValueEnsemble():
 
         self.embedding.eval()
         self.q_networks.eval()
-    
-    def predict_actions(self, state):
+
+    def predict_actions(self, state, return_q_values=False):
         """
         given a state, each one in the ensemble predicts an action
+        args:
+            return_q_values: if True, return the predicted q values each learner predicts on the action of their choice.
         """
         self.embedding.eval()
         self.q_networks.eval()
@@ -140,11 +142,15 @@ class ValueEnsemble():
             embeddings, _ = self.recurrent_memory(embeddings)
 
             actions = np.zeros(self.num_modules, dtype=np.int)
+            q_values = np.zeros(self.num_modules, dtype=np.float)
             for idx in range(self.num_modules):
                 attention = embeddings[:,idx,:]
                 q_vals = self.q_networks[idx](attention)
                 actions[idx] = q_vals.greedy_actions
+                q_values[idx] = q_vals.max
 
+        if return_q_values:
+            return actions, q_values
         return actions
 
     def get_attention(self, x):
