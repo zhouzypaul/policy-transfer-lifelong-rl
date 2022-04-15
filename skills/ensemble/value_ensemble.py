@@ -118,7 +118,6 @@ class ValueEnsemble():
         # update target network
         if update_target_network:
             self.target_q_networks.load_state_dict(self.q_networks.state_dict())
-            print(f"updated target network by hard copy")
 
         # logging
         if self.verbose:
