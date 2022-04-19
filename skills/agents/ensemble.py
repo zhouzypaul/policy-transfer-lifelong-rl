@@ -122,11 +122,12 @@ class EnsembleAgent(Agent):
                 self.action_leader = np.random.choice(self.num_modules)
             elif self.action_selection_strategy == 'leader':
                 acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
-                probability = np.exp(acc_reward) / np.exp(acc_reward).sum()  # softmax
                 try:
+                    normalized_reward = acc_reward - acc_reward.max()
+                    probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
                     self.action_leader = np.random.choice(self.num_modules, p=probability)
                 except ValueError:
-                    print(acc_reward)
+                    print(f"normalized reward: {normalized_reward}")
                     print(f"probability: {probability}")
                     print(probability.sum())
                     raise
