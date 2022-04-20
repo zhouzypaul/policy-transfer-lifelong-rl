@@ -1,5 +1,4 @@
 import time
-import pickle
 import random
 import os
 import csv
@@ -36,6 +35,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             parents=[self.get_common_arg_parser()]
         )
+        # hyperparams
+        parser.set_defaults(hyperparams='hyperparams/atari.csv')
+
         # goal state
         parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
                             help="a file in info_dir that stores the image of the agent in goal state")
@@ -43,27 +45,15 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="a file in info_dir that store the x, y coordinates of goal state")
 
         # ensemble
-        parser.add_argument("--num_policies", type=int, default=8,
+        parser.add_argument("--num_policies", type=int, default=3,
                             help="number of policies in the ensemble")
         parser.add_argument("--action_selection_strat", type=str, default="leader",
                             choices=['vote', 'uniform_leader', 'leader'],
                             help="the action selection strategy when using ensemble agent")
         
         # training
-        parser.add_argument("--steps", type=int, default=100000,
+        parser.add_argument("--steps", type=int, default=2000000,
                             help="number of training steps")
-        parser.add_argument("--explore_epsilon", type=float, default=0.1,
-                            help="epsilon for epsilon-greedy exploration")
-        parser.add_argument("--warmup_steps", type=int, default=1024,
-                            help="number of steps for warming up before updating the network")
-        parser.add_argument("--epochs_per_step", type=int, default=1,
-                            help="how many epochs to train the embedding the policy network per step in environment")
-        parser.add_argument("--batch_size", type=int, default=64,
-                            help="batch size for training")
-        parser.add_argument("--saving_freq", type=int, default=5000,
-                            help="how often to save the trained model")
-        parser.add_argument("--q_target_update_interval", type=int, default=40,
-                            help="how often to update the target network in number of steps")
         
         parser.add_argument("--verbose", action="store_true", default=False,
                             help="whether to print the training loss")
@@ -74,7 +64,12 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         """
         check whether the params entered by the user is valid
         """
-        pass
+        try:
+            assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
+        except AssertionError:
+            new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
+            print(f"updating target_update_interval to be {new_interval}")
+            self.params['target_update_interval'] = new_interval
     
     def setup(self):
         """
@@ -121,8 +116,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             action_selection_strategy=self.params['action_selection_strat'],
             warmup_steps=self.params['warmup_steps'],
             batch_size=self.params['batch_size'],
-            update_interval=4,
-            q_target_update_interval=self.params['q_target_update_interval'],
+            buffer_length=self.params['buffer_length'],
+            update_interval=self.params['update_interval'],
+            q_target_update_interval=self.params['target_update_interval'],
             explore_epsilon=self.params['explore_epsilon'],
             num_modules=self.params['num_policies'],
             num_output_classes=self.env.action_space.n,
