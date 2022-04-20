@@ -146,6 +146,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             
             # step
             next_state, reward, done, info = self.env.step(action)
+            # self.visualize_positive_reward_state(next_state, reward, step_number)
             self.ensemble_agent.observe(state, action, reward, next_state, done)
             state = next_state
             if done:
@@ -160,6 +161,18 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         end_time = time.time()
 
         print("Time taken: ", end_time - start_time)
+    
+    def visualize_positive_reward_state(self, state, reward, step_number):
+        """
+        when the reward is positive, visualize it to see what the agent is doing
+        """
+        if reward > 0:
+            frame_stack = np.array(state)
+            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_0.png"), frame_stack[0])
+            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_1.png"), frame_stack[1])
+            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_2.png"), frame_stack[2])
+            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_3.png"), frame_stack[3])
+            print(f"plotted at step {step_number}")
     
     def save_success_rate(self, success, episode_number, save_every=1):
         """
