@@ -47,6 +47,8 @@ class PlayGame(SingleOptionTrial):
 		play through the environment, with user-input actions
 		"""
 		print([(i, meaning) for i, meaning in enumerate(self.env.unwrapped.get_action_meanings())])
+		meaning_to_action = {meaning.lower(): i for i, meaning in enumerate(self.env.unwrapped.get_action_meanings())}
+		
 		state = self.env.reset()
 		if self.params['get_player_position']:  # get position
 			pos = get_player_position(self.env.unwrapped.ale.getRAM())
@@ -54,7 +56,7 @@ class PlayGame(SingleOptionTrial):
 		while True:
 			# render env
 			self.env.unwrapped.render()
-			print(f"state shape is {np.array(state).shape}")
+			# print(f"state shape is {np.array(state).shape}")
 			# user input an action to take
 			action_input = input() 
 			if action_input == 'save':
@@ -64,15 +66,27 @@ class PlayGame(SingleOptionTrial):
 					save_path = os.path.join(self.saving_dir, 'goal_state.npy')
 				np.save(file=save_path, arr=state)
 				print(f'saved numpy array {state} of shape {np.array(state).shape} to {save_path}')
-				break
-			elif action_input == 'save_position':
+				action_input = input()
+			if action_input == 'save_position':
 				assert self.params['get_player_position']
 				save_path = os.path.join(self.saving_dir, "goal_state_pos.txt")
 				np.savetxt(fname=save_path, X=pos)
 				print(f"saved numpy array {pos} to {save_path}")
-				break
-			else:
-				action = int(action_input)
+				action_input = input()
+
+			# parse action
+			def parse_action(act_input):
+				if act_input.isnumeric():
+					act = int(act_input)
+				else:
+					act = meaning_to_action[act_input.lower()]
+					print(act)
+				return act
+			try:
+				action = parse_action(action_input)
+			except:
+				print("invalid action input, please try again")
+				action = parse_action(input())
 
 			# take the action
 			next_state, r, done, info = self.env.step(action)
