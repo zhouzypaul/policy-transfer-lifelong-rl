@@ -7,12 +7,12 @@ import numpy as np
 from PIL import Image, ImageFont, ImageDraw 
 
 from skills import utils
-from skills.option_utils import BaseTrial
+from skills.option_utils import SingleOptionTrial
 from skills.agents.ensemble import EnsembleAgent
 from skills.agents.abstract_agent import evaluating
 
 
-class TestTrial(BaseTrial):
+class TestTrial(SingleOptionTrial):
     """
     load the trained agent the step through the envs to see if the Q values and the 
     action taken make sense
@@ -33,6 +33,13 @@ class TestTrial(BaseTrial):
         )
         parser.add_argument("--tag", type=str, required=True,
                             help="the experiment_name of the trained agent so we know where to look for loading it")
+
+        # goal state
+        parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
+                            help="a file in info_dir that stores the image of the agent in goal state")
+        parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
+                            help="a file in info_dir that store the x, y coordinates of goal state")
+
         args = self.parse_common_args(parser)
         return args
 
@@ -57,7 +64,15 @@ class TestTrial(BaseTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # env
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000)
+        if saved_params['agent_space']:
+            goal_state_path = self.params['info_dir'].joinpath(saved_params['goal_state_agent_space'])
+        else:
+            goal_state_path = self.params['info_dir'].joinpath(saved_params['goal_state'])
+        goal_state_pos_path = self.params['info_dir'].joinpath(saved_params['goal_state_pos'])
+        saved_params['goal_state'] = np.load(goal_state_path)
+        saved_params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
+        print(f"aiming for goal location {saved_params['goal_state_position']}")
+        self.env = self.make_env(saved_params['environment'], saved_params['seed'], goal=saved_params['goal_state_position'])
 
         # agent
         def phi(x):  # Feature extractor
