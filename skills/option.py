@@ -66,10 +66,13 @@ class Option:
         self.position_buffer = deque([], maxlen=buffer_length)
 
         # learner for the value function 
+        def phi(x):  # Feature extractor
+            return np.asarray(x, dtype=np.float32) / 255
         self.policy_net = make_dqn_agent(
             q_agent_type="DoubleDQN",
             arch="custom",
             n_actions=self.env.action_space.n,
+            phi=phi,
             lr=policy_net_lr,
             noisy_net_sigma=None,
             buffer_length=buffer_length,

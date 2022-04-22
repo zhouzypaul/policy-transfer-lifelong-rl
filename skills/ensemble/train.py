@@ -157,6 +157,23 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             self.save_total_reward(reward, step_number)
             self.save_results(step_number)
             step_number += 1
+        
+        # visualize the last 5 episodes
+        for i in range(10):
+            obs = self.env.reset()
+            step = 0
+            done = False
+            while not done and step < 50:
+                # visualize
+                visualization_dir = os.path.join(self.saving_dir, f"trained_agent_episode_{i}")
+                if not os.path.exists(visualization_dir):
+                    os.mkdir(visualization_dir)
+                plt.imsave(os.path.join(visualization_dir, f"{step}.png"), np.array(obs)[-1])
+                # step
+                action = self.ensemble_agent.act(state)
+                next_obs, reward, done, info = self.env.step(action)
+                step += 1
+                obs = next_obs
 
         end_time = time.time()
 

@@ -31,6 +31,7 @@ class TestTrial(SingleOptionTrial):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             parents=[self.get_common_arg_parser()]
         )
+        parser.set_defaults(experiment_name="visualize")
         parser.add_argument("--tag", type=str, required=True,
                             help="the experiment_name of the trained agent so we know where to look for loading it")
 
@@ -99,10 +100,12 @@ class TestTrial(SingleOptionTrial):
         action_meanings = self.env.unwrapped.get_action_meanings()
         print(action_meanings)
         with evaluating(self.agent):
+            total_reward = 0
             while step < 200:
                 a, ensemble_actions, ensemble_q_vals = self.agent.act(obs, return_ensemble_info=True)
                 step += 1
                 obs, reward, done, info = self.env.step(a)
+                total_reward += reward
 
                 # render the image
                 frame = np.array(obs)[-1]
@@ -121,6 +124,8 @@ class TestTrial(SingleOptionTrial):
 
                 if done:
                     obs = self.env.reset()
+            
+            print(f"total reward: {total_reward}")
 
 
 def pillow_im_add_margin(pil_img, top=0, right=0, bottom=0, left=0, color=0):
