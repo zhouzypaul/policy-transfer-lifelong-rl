@@ -16,6 +16,8 @@ from skills import utils
 from skills.agents.ensemble import EnsembleAgent
 from skills.agents.dqn import make_dqn_agent
 from skills.option_utils import SingleOptionTrial
+from skills.ensemble.ensemble_utils import visualize_state_with_ensemble_actions, \
+    visualize_state_with_action
 
 
 class TrainEnsembleOfSkills(SingleOptionTrial):
@@ -40,7 +42,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         parser.set_defaults(hyperparams='hyperparams/atari.csv')
 
         # agent
-        parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'],
+        parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'], default='ensemble',
                             help="the type of agent to train")
 
         # goal state
@@ -176,27 +178,61 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             self.save_total_reward(reward, step_number)
             self.save_results(step_number)
             step_number += 1
-        
-        # visualize the last 5 episodes
-        for i in range(10):
-            obs = self.env.reset()
-            step = 0
-            done = False
-            while not done and step < 50:
-                # visualize
-                visualization_dir = os.path.join(self.saving_dir, f"trained_agent_episode_{i}")
-                if not os.path.exists(visualization_dir):
-                    os.mkdir(visualization_dir)
-                plt.imsave(os.path.join(visualization_dir, f"{step}.png"), np.array(obs)[-1])
-                # step
-                action = self.agent.act(state)
-                next_obs, reward, done, info = self.env.step(action)
-                step += 1
-                obs = next_obs
+
+        # testing
+        self.test_option()
 
         end_time = time.time()
 
         print("Time taken: ", end_time - start_time)
+    
+    def test_option(self, num_episodes=10, max_steps_per_episode=50):
+        """
+        manually test the option by running the trained agent for num_episode episodes
+        in the env and visualizing the trajectory
+        """
+        action_meanings = self.env.unwrapped.get_action_meanings()
+        for i in range(num_episodes):
+            # set up save dir
+            visualization_dir = os.path.join(self.saving_dir, f"trained_agent_episode_{i}")
+            os.mkdir(visualization_dir)
+
+            # init
+            self.env.unwrapped.reset()  # real reset, or else EpisodicLife just takes Noop
+            obs = self.env.reset()  # get the warped frame 
+            step = 0
+            total_reward = 0
+            done = False
+
+            while not done and step < max_steps_per_episode:
+                # step
+                if self.params['agent'] == 'dqn':
+                    a = self.agent.act(obs)
+                elif self.params['agent'] == 'ensemble':
+                    a, ensemble_actions, ensemble_q_vals = self.agent.act(obs, return_ensemble_info=True)
+                next_obs, reward, done, info = self.env.step(a)
+                total_reward += reward
+
+                # visualize
+                save_path = os.path.join(visualization_dir, f"{step}.png")
+                if self.params['agent'] == 'dqn':
+                    visualize_state_with_action(obs, str(action_meanings[a]), save_path)
+                elif self.params['agent'] == 'ensemble':
+                    meaningful_actions = [action_meanings[i] for i in ensemble_actions]
+                    meaningful_q_vals = [str(round(q, 2)) for q in ensemble_q_vals]
+                    action_taken = str(action_meanings[a])
+                    visualize_state_with_ensemble_actions(
+                        obs,
+                        meaningful_actions,
+                        meaningful_q_vals,
+                        action_taken,
+                        save_path,
+                    )
+
+                # advance
+                step += 1
+                obs = next_obs
+            print(f"episode {i} reward: {total_reward}")
     
     def visualize_positive_reward_state(self, state, reward, step_number):
         """

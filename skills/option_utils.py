@@ -196,6 +196,7 @@ def warp_frames(state):
     )
     return warped.reshape(observation_space.low.shape)
 
+
 def get_player_position(ram):
     """
     given the ram state, get the position of the player
