@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 
 from skills import utils
 from skills.agents.ensemble import EnsembleAgent
+from skills.agents.dqn import make_dqn_agent
 from skills.option_utils import SingleOptionTrial
 
 
@@ -37,6 +38,10 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         )
         # hyperparams
         parser.set_defaults(hyperparams='hyperparams/atari.csv')
+
+        # agent
+        parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'],
+                            help="the type of agent to train")
 
         # goal state
         parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
@@ -64,12 +69,13 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         """
         check whether the params entered by the user is valid
         """
-        try:
-            assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
-        except AssertionError:
-            new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
-            print(f"updating target_update_interval to be {new_interval}")
-            self.params['target_update_interval'] = new_interval
+        if self.params['agent'] == 'ensemble':
+            try:
+                assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
+            except AssertionError:
+                new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
+                print(f"updating target_update_interval to be {new_interval}")
+                self.params['target_update_interval'] = new_interval
     
     def setup(self):
         """
@@ -110,21 +116,34 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         # set up ensemble
         def phi(x):  # Feature extractor
             return np.asarray(x, dtype=np.float32) / 255
-        self.ensemble_agent = EnsembleAgent(
-            device=self.params['device'],
-            phi=phi,
-            action_selection_strategy=self.params['action_selection_strat'],
-            warmup_steps=self.params['warmup_steps'],
-            batch_size=self.params['batch_size'],
-            buffer_length=self.params['buffer_length'],
-            update_interval=self.params['update_interval'],
-            q_target_update_interval=self.params['target_update_interval'],
-            explore_epsilon=self.params['explore_epsilon'],
-            num_modules=self.params['num_policies'],
-            num_output_classes=self.env.action_space.n,
-            plot_dir=self.params['plots_dir'],
-            verbose=self.params['verbose']
-        )
+        if self.params['agent'] == 'dqn':
+            # DQN
+            self.agent = make_dqn_agent(
+                q_agent_type="DoubleDQN",
+                arch="nature",
+                phi=phi,
+                n_actions=self.env.action_space.n,
+                replay_start_size=self.params['warmup_steps'],
+                buffer_length=self.params['buffer_length'],
+                update_interval=self.params['update_interval'],
+                target_update_interval=self.params['target_update_interval'],
+            )
+        else:
+            self.agent = EnsembleAgent(
+                device=self.params['device'],
+                phi=phi,
+                action_selection_strategy=self.params['action_selection_strat'],
+                warmup_steps=self.params['warmup_steps'],
+                batch_size=self.params['batch_size'],
+                buffer_length=self.params['buffer_length'],
+                update_interval=self.params['update_interval'],
+                q_target_update_interval=self.params['target_update_interval'],
+                explore_epsilon=self.params['explore_epsilon'],
+                num_modules=self.params['num_policies'],
+                num_output_classes=self.env.action_space.n,
+                plot_dir=self.params['plots_dir'],
+                verbose=self.params['verbose']
+            )
 
         # results
         self.total_reward = 0
@@ -142,12 +161,12 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         state = self.env.reset()
         while step_number < self.params['steps']:
             # action selection: epsilon greedy
-            action = self.ensemble_agent.act(state)
+            action = self.agent.act(state)
             
             # step
             next_state, reward, done, info = self.env.step(action)
             # self.visualize_positive_reward_state(next_state, reward, step_number)
-            self.ensemble_agent.observe(state, action, reward, next_state, done)
+            self.agent.observe(state, action, reward, next_state, done)
             state = next_state
             if done:
                 self.save_success_rate(done and reward == 1, episode_number)
@@ -170,7 +189,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                     os.mkdir(visualization_dir)
                 plt.imsave(os.path.join(visualization_dir, f"{step}.png"), np.array(obs)[-1])
                 # step
-                action = self.ensemble_agent.act(state)
+                action = self.agent.act(state)
                 next_obs, reward, done, info = self.env.step(action)
                 step += 1
                 obs = next_obs
@@ -249,7 +268,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         save the trained model
         """
         if step_number % self.params['saving_freq'] == 0:
-            self.ensemble_agent.save(self.saving_dir)
+            self.agent.save(self.saving_dir)
             print(f"model saved at step {step_number}")
 
 
