@@ -125,6 +125,7 @@ class SingleOptionTrial(BaseTrial):
 
     def make_env(self, env_name, env_seed, goal=None):
         """
+        Make a monte environemnt for training skills
         Args:
             goal: None or (x, y)
         """
@@ -134,11 +135,18 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.new_goal_wrapper import MonteNewGoalWrapper
 
+        assert env_name == 'MontezumaRevengeNoFrameskip-v4'
+
         if self.params['use_deepmind_wrappers']:
+            # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
             env = pfrl.wrappers.atari_wrappers.make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
+            # deepmind wrappers without EpisodicLife
+            # EpisodicLife needs to after MonteNewGoalWrapper because that wrapper determines done
+            # any wrappers after EpisodicLife should NOT change how `done` is determined, 
+            # because EpisodicLife will not treat it as real terminal and only reset with a noop action
             env = pfrl.wrappers.atari_wrappers.wrap_deepmind(
                 env,
-                episode_life=True,
+                episode_life=False,
                 clip_rewards=True,
                 frame_stack=True,
                 scale=False,
@@ -167,6 +175,8 @@ class SingleOptionTrial(BaseTrial):
         # set new goal if needed
         if goal is not None:
             env = MonteNewGoalWrapper(env, goal)
+        # episodic life
+        env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         logging.info(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
