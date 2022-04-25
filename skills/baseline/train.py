@@ -84,9 +84,7 @@ class TrainAgent(BaseTrial):
 
         # create the saving directories
         self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])
-        if os.path.exists(self.saving_dir):  # remove all existing contents
-            shutil.rmtree(self.saving_dir)
-        utils.create_log_dir(self.saving_dir)
+        utils.create_log_dir(self.saving_dir, remove_existing=True)
         self.params['saving_dir'] = self.saving_dir
         self.params['plots_dir'] = os.path.join(self.saving_dir, 'plots')
         os.mkdir(self.params['plots_dir'])

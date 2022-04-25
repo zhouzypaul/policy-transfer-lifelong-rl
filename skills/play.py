@@ -37,7 +37,7 @@ class PlayGame(SingleOptionTrial):
 
 		# saving
 		self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])
-		utils.create_log_dir(self.saving_dir)
+		utils.create_log_dir(self.saving_dir, remove_existing=True)
 
 		# make env
 		self.env = self.make_env(self.params['environment'], self.params['seed'])

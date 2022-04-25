@@ -59,9 +59,7 @@ class TestTrial(SingleOptionTrial):
 
         # create the saving directories
         self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name'])
-        if self.saving_dir.exists():  # remove all existing contents
-            shutil.rmtree(self.saving_dir)
-        utils.create_log_dir(self.saving_dir)
+        utils.create_log_dir(self.saving_dir, remove_existing=True)
         self.params['saving_dir'] = self.saving_dir
 
         # env

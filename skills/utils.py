@@ -1,13 +1,14 @@
 import os
 import csv
 import sys
+import shutil
 import logging
 from pydoc import locate
 from collections import defaultdict
 from distutils.util import strtobool
 
 
-def create_log_dir(experiment_name):
+def create_log_dir(dir_path, remove_existing=True):
     """
     Prepare a directory for outputting training results.
     Then the following infomation is saved into the directory:
@@ -19,7 +20,12 @@ def create_log_dir(experiment_name):
         git-log.txt: result of `git log`
         git-diff.txt: result of `git diff HEAD`
     """
-    outdir = os.path.join(os.getcwd(), experiment_name)
+    outdir = os.path.join(os.getcwd(), dir_path)
+    # remove existing dir
+    if remove_existing:
+        if os.path.exists(outdir):
+            shutil.rmtree(outdir)
+            print(f"Removed existing directory {outdir}")
     # create log dir
     try:
         os.makedirs(outdir, exist_ok=False)

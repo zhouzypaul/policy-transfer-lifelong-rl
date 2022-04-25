@@ -48,7 +48,7 @@ class GenerateTrajectory(SingleOptionTrial):
         self.saving_file = os.path.join(self.saving_dir, self.params['file_name'])
         self.random_traj_file = os.path.join(self.saving_dir, 'random_traj.pkl')
         self.plot_file = os.path.join(self.saving_dir, 'random_traj_positions.png')
-        utils.create_log_dir(self.saving_dir)
+        utils.create_log_dir(self.saving_dir, remove_existing=True)
 
         # make env
         self.env = self.make_env(self.params['environment'], self.params['seed'])
