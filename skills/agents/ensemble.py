@@ -27,7 +27,6 @@ class EnsembleAgent(Agent):
                 q_target_update_interval=40,
                 embedding_output_size=64, 
                 learning_rate=2.5e-4,
-                explore_epsilon=0.1,
                 final_epsilon=0.01,
                 final_exploration_frames=10**6,
                 discount_rate=0.9,
@@ -46,7 +45,6 @@ class EnsembleAgent(Agent):
         self.batch_size = batch_size
         self.q_target_update_interval = q_target_update_interval
         self.update_interval = update_interval
-        self.explore_epsilon = explore_epsilon
         self.num_output_classes = num_output_classes
         self.num_modules = num_modules
         self.step_number = 0

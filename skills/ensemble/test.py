@@ -1,4 +1,4 @@
-import shutil
+import os
 import argparse
 from pathlib import Path
 
@@ -9,7 +9,60 @@ from skills import utils
 from skills.option_utils import SingleOptionTrial
 from skills.agents.ensemble import EnsembleAgent
 from skills.agents.abstract_agent import evaluating
-from skills.ensemble.ensemble_utils import visualize_state_with_ensemble_actions
+from skills.ensemble.ensemble_utils import visualize_state_with_ensemble_actions, \
+    visualize_state_with_action
+
+
+def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_episode=50):
+    """
+    test the ensemble agent manually by running the agent on a specific environment
+    for a number of episodes
+    visualize the trajectory and also keep track of the total reward
+    """
+    with evaluating(agent):
+        action_meanings = env.unwrapped.get_action_meanings()
+        for i in range(num_episodes):
+            # set up save dir
+            visualization_dir = os.path.join(saving_dir, f"trained_agent_episode_{i}")
+            os.mkdir(visualization_dir)
+
+            # init
+            env.unwrapped.reset()  # real reset, or else EpisodicLife just takes Noop
+            obs = env.reset()  # get the warped frame 
+            step = 0
+            total_reward = 0
+            done = False
+
+            while not done and step < max_steps_per_episode:
+                # step
+                if type(agent) == EnsembleAgent:
+                    a, ensemble_actions, ensemble_q_vals = agent.act(obs, return_ensemble_info=True)
+                else:
+                    a = agent.act(obs)  # DQN
+                next_obs, reward, done, info = env.step(a)
+                total_reward += reward
+
+                # visualize
+                save_path = os.path.join(visualization_dir, f"{step}.png")
+                if type(agent) == EnsembleAgent:
+                    meaningful_actions = [action_meanings[i] for i in ensemble_actions]
+                    meaningful_q_vals = [str(round(q, 2)) for q in ensemble_q_vals]
+                    action_taken = str(action_meanings[a])
+                    visualize_state_with_ensemble_actions(
+                        obs,
+                        meaningful_actions,
+                        meaningful_q_vals,
+                        action_taken,
+                        save_path,
+                    )
+                else:
+                    # DQN
+                    visualize_state_with_action(obs, str(action_meanings[a]), save_path)
+
+                # advance
+                step += 1
+                obs = next_obs
+            print(f"episode {i} reward: {total_reward}")
 
 
 class TestTrial(SingleOptionTrial):
@@ -63,12 +116,7 @@ class TestTrial(SingleOptionTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # env
-        if saved_params['agent_space']:
-            goal_state_path = self.params['info_dir'].joinpath(saved_params['goal_state_agent_space'])
-        else:
-            goal_state_path = self.params['info_dir'].joinpath(saved_params['goal_state'])
         goal_state_pos_path = self.params['info_dir'].joinpath(saved_params['goal_state_pos'])
-        saved_params['goal_state'] = np.load(goal_state_path)
         saved_params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
         print(f"aiming for goal location {saved_params['goal_state_position']}")
         self.env = self.make_env(saved_params['environment'], saved_params['seed'], goal=saved_params['goal_state_position'])
@@ -84,44 +132,14 @@ class TestTrial(SingleOptionTrial):
             phi=phi,
             num_modules=saved_params['num_policies'],
             num_output_classes=self.env.action_space.n,
-            action_selection_strategy=saved_params['action_selection_strat'],
         )
         self.agent.load(agent_file)
     
-    def run(self):
+    def run(self, num_episodes=10, max_steps_per_episode=50):
         """
-        start the environment and just execute the trained agent, and see what 
-        actions the agent chooses
+        test the loaded agent
         """
-        obs = self.env.reset()
-        step = 0
-        action_meanings = self.env.unwrapped.get_action_meanings()
-        print(action_meanings)
-        with evaluating(self.agent):
-            total_reward = 0
-            while step < 200:
-                a, ensemble_actions, ensemble_q_vals = self.agent.act(obs, return_ensemble_info=True)
-                step += 1
-                obs, reward, done, info = self.env.step(a)
-                total_reward += reward
-
-                # render the image
-                meaningful_actions = [action_meanings[i] for i in ensemble_actions]
-                meaningful_q_vals = [str(round(q, 2)) for q in ensemble_q_vals]
-                save_path = self.saving_dir / f"{step}.png"
-                action_taken = str(action_meanings[a])
-                visualize_state_with_ensemble_actions(
-                    obs,
-                    meaningful_actions,
-                    meaningful_q_vals,
-                    action_taken,
-                    save_path,
-                )
-
-                if done:
-                    obs = self.env.reset()
-            
-            print(f"total reward: {total_reward}")
+        test_ensemble_agent(self.agent, self.env, self.saving_dir, num_episodes, max_steps_per_episode)
 
 
 def main():

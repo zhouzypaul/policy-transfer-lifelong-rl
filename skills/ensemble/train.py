@@ -3,7 +3,6 @@ import random
 import os
 import csv
 import argparse
-import shutil
 from collections import deque
 
 import torch
@@ -16,8 +15,7 @@ from skills import utils
 from skills.agents.ensemble import EnsembleAgent
 from skills.agents.dqn import make_dqn_agent
 from skills.option_utils import SingleOptionTrial
-from skills.ensemble.ensemble_utils import visualize_state_with_ensemble_actions, \
-    visualize_state_with_action
+from skills.ensemble.test import test_ensemble_agent
 
 
 class TrainEnsembleOfSkills(SingleOptionTrial):
@@ -103,12 +101,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
         # set up env and its goal
-        if self.params['agent_space']:
-            goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state_agent_space'])
-        else:
-            goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state'])
         goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
-        self.params['goal_state'] = np.load(goal_state_path)
         self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
         print(f"aiming for goal location {self.params['goal_state_position']}")
         self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
@@ -138,7 +131,6 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 buffer_length=self.params['buffer_length'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
-                explore_epsilon=self.params['explore_epsilon'],
                 num_modules=self.params['num_policies'],
                 num_output_classes=self.env.action_space.n,
                 plot_dir=self.params['plots_dir'],
@@ -178,59 +170,11 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             step_number += 1
 
         # testing
-        self.test_option()
+        test_ensemble_agent(self.agent, self.env, self.saving_dir, num_episodes=10, max_steps_per_episode=50)
 
         end_time = time.time()
 
         print("Time taken: ", end_time - start_time)
-    
-    def test_option(self, num_episodes=10, max_steps_per_episode=50):
-        """
-        manually test the option by running the trained agent for num_episode episodes
-        in the env and visualizing the trajectory
-        """
-        action_meanings = self.env.unwrapped.get_action_meanings()
-        for i in range(num_episodes):
-            # set up save dir
-            visualization_dir = os.path.join(self.saving_dir, f"trained_agent_episode_{i}")
-            os.mkdir(visualization_dir)
-
-            # init
-            self.env.unwrapped.reset()  # real reset, or else EpisodicLife just takes Noop
-            obs = self.env.reset()  # get the warped frame 
-            step = 0
-            total_reward = 0
-            done = False
-
-            while not done and step < max_steps_per_episode:
-                # step
-                if self.params['agent'] == 'dqn':
-                    a = self.agent.act(obs)
-                elif self.params['agent'] == 'ensemble':
-                    a, ensemble_actions, ensemble_q_vals = self.agent.act(obs, return_ensemble_info=True)
-                next_obs, reward, done, info = self.env.step(a)
-                total_reward += reward
-
-                # visualize
-                save_path = os.path.join(visualization_dir, f"{step}.png")
-                if self.params['agent'] == 'dqn':
-                    visualize_state_with_action(obs, str(action_meanings[a]), save_path)
-                elif self.params['agent'] == 'ensemble':
-                    meaningful_actions = [action_meanings[i] for i in ensemble_actions]
-                    meaningful_q_vals = [str(round(q, 2)) for q in ensemble_q_vals]
-                    action_taken = str(action_meanings[a])
-                    visualize_state_with_ensemble_actions(
-                        obs,
-                        meaningful_actions,
-                        meaningful_q_vals,
-                        action_taken,
-                        save_path,
-                    )
-
-                # advance
-                step += 1
-                obs = next_obs
-            print(f"episode {i} reward: {total_reward}")
     
     def visualize_positive_reward_state(self, state, reward, step_number):
         """
