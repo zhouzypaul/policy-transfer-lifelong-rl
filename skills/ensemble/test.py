@@ -122,18 +122,8 @@ class TestTrial(SingleOptionTrial):
         self.env = self.make_env(saved_params['environment'], saved_params['seed'], goal=saved_params['goal_state_position'])
 
         # agent
-        def phi(x):  # Feature extractor
-            return np.asarray(x, dtype=np.float32) / 255
-        agent_file = Path(self.params['results_dir']) / self.params['tag'] 
-        self.agent = EnsembleAgent(
-            device=saved_params['device'],
-            warmup_steps=np.inf,  # never update
-            batch_size=saved_params['batch_size'],
-            phi=phi,
-            num_modules=saved_params['num_policies'],
-            num_output_classes=self.env.action_space.n,
-        )
-        self.agent.load(agent_file)
+        agent_file = Path(self.params['results_dir']) / self.params['tag'] / 'agent.pkl'
+        self.agent = EnsembleAgent.load(agent_file)
     
     def run(self, num_episodes=10, max_steps_per_episode=50):
         """

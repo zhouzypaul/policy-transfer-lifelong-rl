@@ -1,3 +1,6 @@
+import os
+import dill
+
 import numpy as np
 from pfrl import explorers
 from pfrl.replay_buffers import ReplayBuffer
@@ -185,15 +188,12 @@ class EnsembleAgent(Agent):
             return a, actions, q_vals
         return a
 
-    def save(self, path):
-        self.value_ensemble.save(path)
+    def save(self, save_dir):
+        path = os.path.join(save_dir, "agent.pkl")
+        with open(path, 'wb') as f:
+            dill.dump(self, f)
 
-    def load(self, path): 
-        self.value_ensemble = ValueEnsemble(
-            device="cuda", 
-            num_output_classes=self.num_output_classes,
-            num_modules=self.num_modules
-        )
-        self.value_ensemble.load(path)
-        return self
-        # still need to load replay buffer and other vars
+    @classmethod
+    def load(cls, load_path):
+        with open(load_path, 'rb') as f:
+            return dill.load(f)
