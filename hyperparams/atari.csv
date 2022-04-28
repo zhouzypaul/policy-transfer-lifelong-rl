@@ -7,3 +7,5 @@ embedding_plot_freq,50000,int
 update_interval,4,int
 ensemble_target_update_interval,10,int
 target_update_interval,1000,int
+success_rate_save_freq,20,int
+success_threshold_for_stopping,0.90,float

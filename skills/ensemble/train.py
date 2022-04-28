@@ -139,7 +139,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
 
         # results
         self.total_reward = 0
-        self.success_rates = deque(maxlen=10)
+        self.success_rates = deque(maxlen=25)
 
     def train_option(self):
         """
@@ -157,11 +157,13 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             
             # step
             next_state, reward, done, info = self.env.step(action)
-            # self.visualize_positive_reward_state(next_state, reward, step_number)
             self.agent.observe(state, action, reward, next_state, done)
             state = next_state
             if done:
-                self.save_success_rate(done and reward == 1, episode_number)
+                self.save_success_rate(done and reward == 1, episode_number, save_every=self.params['success_rate_save_freq'])
+                if self.is_well_trained():  # stop training if done
+                    print(f"finished training early at step {step_number}")
+                    break
                 episode_number += 1
                 state = self.env.reset()
             
@@ -176,17 +178,14 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
 
         print("Time taken: ", end_time - start_time)
     
-    def visualize_positive_reward_state(self, state, reward, step_number):
+    def is_well_trained(self):
         """
-        when the reward is positive, visualize it to see what the agent is doing
+        determine if the agent is well trained enough for the current particular skill
         """
-        if reward > 0:
-            frame_stack = np.array(state)
-            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_0.png"), frame_stack[0])
-            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_1.png"), frame_stack[1])
-            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_2.png"), frame_stack[2])
-            plt.imsave(os.path.join(self.params['plots_dir'], f"{step_number}_3.png"), frame_stack[3])
-            print(f"plotted at step {step_number}")
+        return self.get_success_rate() >= self.params['success_threshold_for_stopping']
+    
+    def get_success_rate(self):
+        return np.mean(self.success_rates)
     
     def save_success_rate(self, success, episode_number, save_every=1):
         """
@@ -201,7 +200,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             open_mode = 'w' if episode_number == 0 else 'a'
             with open(save_file, open_mode) as f:
                 csv_writer = csv.writer(f)
-                csv_writer.writerow([episode_number, np.mean(self.success_rates)])
+                csv_writer.writerow([episode_number, self.get_success_rate()])
             # plot it as well
             with open(save_file, 'r') as f:
                 reader = csv.reader(f)

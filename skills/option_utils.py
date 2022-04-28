@@ -343,3 +343,16 @@ def make_chunked_value_function_plot(solver, step, seed, save_dir, pos_replay_bu
     plt.close()
 
     return qvalues.max()
+
+
+def visualize_positive_reward_state(state, reward, step_number, save_dir):
+    """
+    when the reward is positive, visualize it to see what the agent is doing
+    """
+    if reward > 0:
+        frame_stack = np.array(state)
+        plt.imsave(os.path.join(save_dir, f"{step_number}_0.png"), frame_stack[0])
+        plt.imsave(os.path.join(save_dir, f"{step_number}_1.png"), frame_stack[1])
+        plt.imsave(os.path.join(save_dir, f"{step_number}_2.png"), frame_stack[2])
+        plt.imsave(os.path.join(save_dir, f"{step_number}_3.png"), frame_stack[3])
+        print(f"plotted at step {step_number}")
