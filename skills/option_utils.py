@@ -117,8 +117,6 @@ class SingleOptionTrial(BaseTrial):
         parser.add_argument("--info_dir", type=Path, default="resources/monte_info",
                             help="where the goal state files are stored")
 
-        parser.add_argument("--start_state", type=str, default=None,
-                            help='a path to the file that saved the starting state obs. e.g: right_ladder_top_agent_space.npy')
         parser.add_argument("--start_state_pos", type=str, default=None,
                             help='a path to the file that saved the starting state position. e.g: right_ladder_top_pos.txt')
         return parser
@@ -130,7 +128,7 @@ class SingleOptionTrial(BaseTrial):
             goal: None or (x, y)
         """
         from skills.wrappers.monte_agent_space_wrapper import MonteAgentSpace
-        from skills.wrappers.monte_agent_space_forwarding_wrapper import MonteAgentSpaceForwarding
+        from skills.wrappers.monte_agent_space_forwarding_wrapper import MonteForwarding
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.new_goal_wrapper import MonteNewGoalWrapper
@@ -167,16 +165,15 @@ class SingleOptionTrial(BaseTrial):
         # prunning actions
         if not self.params['suppress_action_prunning']:
             env = MontePrunedActions(env)
-        # make the agent start in another place if needed
-        if self.params['start_state'] is not None and self.params['start_state_pos'] is not None:
-            start_state_path = self.params['info_dir'].joinpath(self.params['start_state'])
-            start_state_pos_path = self.params['info_dir'].joinpath(self.params['start_state_pos'])
-            env = MonteAgentSpaceForwarding(env, start_state_path, start_state_pos_path)
         # set new goal if needed
         if goal is not None:
             env = MonteNewGoalWrapper(env, goal)
         # episodic life
         env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
+        # make the agent start in another place if needed
+        if self.params['start_state_pos'] is not None:
+            start_state_pos_path = self.params['info_dir'].joinpath(self.params['start_state_pos'])
+            env = MonteForwarding(env, start_state_pos_path)
         logging.info(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)

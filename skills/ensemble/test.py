@@ -87,18 +87,35 @@ class TestTrial(SingleOptionTrial):
         parser.set_defaults(experiment_name="visualize")
         parser.add_argument("--tag", type=str, required=True,
                             help="the experiment_name of the trained agent so we know where to look for loading it")
+        
+        # testing params
+        parser.add_argument("--episodes", type=int, default=10,
+                            help="number of episodes to test")
+        parser.add_argument("--steps", type=int, default=50,
+                            help="max number of steps per episode")
 
         # goal state
-        parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
-                            help="a file in info_dir that stores the image of the agent in goal state")
         parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
                             help="a file in info_dir that store the x, y coordinates of goal state")
+        
+        # shortcuts
+        parser.add_argument("--right_ladder", action="store_true", default=False,
+                            help="use the right ladder. This sets the goal state and the start state")
+        parser.add_argument("--left_ladder", action="store_true", default=False,
+                            help="use the left ladder. This sets the goal state and the start state")
 
         args = self.parse_common_args(parser)
         return args
 
     def check_params_validity(self):
-        pass
+        if self.params["left_ladder"]:
+            print("using left ladder: setting start and goal state")
+            self.params["start_state_pos"] = "left_ladder_top_pos.txt"
+            self.params["goal_state_pos"] = "left_ladder_bottom_pos.txt"
+        if self.params["right_ladder"]:
+            print("using right ladder: setting start and goal state")
+            self.params["start_state_pos"] = "right_ladder_top_pos.txt"
+            self.params["goal_state_pos"] = "right_ladder_bottom_pos.txt"
 
     def setup(self):
         self.check_params_validity()
@@ -116,20 +133,22 @@ class TestTrial(SingleOptionTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # env
-        goal_state_pos_path = self.params['info_dir'].joinpath(saved_params['goal_state_pos'])
-        saved_params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
-        print(f"aiming for goal location {saved_params['goal_state_position']}")
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'], goal=saved_params['goal_state_position'])
+        goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
+        self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
+        print(f"aiming for goal location {self.params['goal_state_position']}")
+        self.env = self.make_env(saved_params['environment'], saved_params['seed'], goal=self.params['goal_state_position'])
 
         # agent
         agent_file = Path(self.params['results_dir']) / self.params['tag'] / 'agent.pkl'
         self.agent = EnsembleAgent.load(agent_file)
     
-    def run(self, num_episodes=10, max_steps_per_episode=50):
+    def run(self):
         """
         test the loaded agent
         """
-        test_ensemble_agent(self.agent, self.env, self.saving_dir, num_episodes, max_steps_per_episode)
+        test_ensemble_agent(self.agent, self.env, self.saving_dir, 
+                            num_episodes=self.params['episodes'], 
+                            max_steps_per_episode=self.params['steps'])
 
 
 def main():
