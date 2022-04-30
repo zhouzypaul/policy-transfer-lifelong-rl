@@ -167,7 +167,7 @@ class SingleOptionTrial(BaseTrial):
             env = MontePrunedActions(env)
         # set new goal if needed
         if goal is not None:
-            env = MonteNewGoalWrapper(env, goal)
+            env = MonteNewGoalWrapper(env, goal, epsilon_tol=self.params['goal_epsilon_tol'])
         # episodic life
         env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         # make the agent start in another place if needed
