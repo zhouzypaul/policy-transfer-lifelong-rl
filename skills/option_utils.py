@@ -116,9 +116,13 @@ class SingleOptionTrial(BaseTrial):
         # start state
         parser.add_argument("--info_dir", type=Path, default="resources/monte_info",
                             help="where the goal state files are stored")
+        parser.add_argument("--ram_dir", type=Path, default="resources/monte_ram",
+                            help="where the monte ram (encoded) files are stored")
 
-        parser.add_argument("--start_state_pos", type=str, default=None,
-                            help='a path to the file that saved the starting state position. e.g: right_ladder_top_pos.txt')
+        parser.add_argument("--start_state", type=str, default=None,
+                            help="""filename that saved the starting state RAM. 
+                                    This should not include the whole path or the .npy extension.
+                                    e.g: room1_right_ladder_top""")
         return parser
 
     def make_env(self, env_name, env_seed, goal=None):
@@ -128,7 +132,7 @@ class SingleOptionTrial(BaseTrial):
             goal: None or (x, y)
         """
         from skills.wrappers.monte_agent_space_wrapper import MonteAgentSpace
-        from skills.wrappers.monte_agent_space_forwarding_wrapper import MonteForwarding
+        from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.new_goal_wrapper import MonteNewGoalWrapper
@@ -171,9 +175,9 @@ class SingleOptionTrial(BaseTrial):
         # episodic life
         env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         # make the agent start in another place if needed
-        if self.params['start_state_pos'] is not None:
-            start_state_pos_path = self.params['info_dir'].joinpath(self.params['start_state_pos'])
-            env = MonteForwarding(env, start_state_pos_path)
+        if self.params['start_state'] is not None:
+            start_state_path = self.params['ram_dir'].joinpath(self.params['start_state'] + '.npy')
+            env = MonteForwarding(env, start_state_path)
         logging.info(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
@@ -239,6 +243,20 @@ def set_player_position(env, x, y):
     env.unwrapped.ale.restoreState(new_state_ref)
     env.unwrapped.ale.deleteState(new_state_ref)
     env.step(0)  # NO-OP action to update the RAM state
+
+
+def set_player_ram(env, ram_state):
+    """
+    completely override the ram with a saved ram state
+    """
+    state_ref = env.unwrapped.ale.cloneState()
+    env.unwrapped.ale.deleteState(state_ref)
+
+    new_state_ref = env.unwrapped.ale.decodeState(ram_state)
+    env.unwrapped.ale.restoreState(new_state_ref)
+    env.unwrapped.ale.deleteState(new_state_ref)
+    obs, _, _, _ = env.step(0)  # NO-OP action to update the RAM state
+    return obs
 
 
 def extract(input, idx, idx_dim, batch_dim=0):

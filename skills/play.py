@@ -4,7 +4,6 @@ import os
 import seeding
 import numpy as np
 
-from skills import utils
 from skills.option_utils import get_player_position, SingleOptionTrial
 
 
@@ -35,10 +34,6 @@ class PlayGame(SingleOptionTrial):
 		# setting random seeds
 		seeding.seed(self.params['seed'], np)
 
-		# saving
-		self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])
-		utils.create_log_dir(self.saving_dir, remove_existing=True)
-
 		# make env
 		self.env = self.make_env(self.params['environment'], self.params['seed'])
 
@@ -61,17 +56,24 @@ class PlayGame(SingleOptionTrial):
 			action_input = input() 
 			if action_input == 'save':
 				if self.params['agent_space']:
-					save_path = os.path.join(self.saving_dir, 'agent_space_goal_state.npy')
+					save_path = os.path.join(self.params['info_dir'], 'agent_space_goal_state.npy')
 				else:
-					save_path = os.path.join(self.saving_dir, 'goal_state.npy')
+					save_path = os.path.join(self.params['info_dir'], 'goal_state.npy')
 				np.save(file=save_path, arr=state)
 				print(f'saved numpy array {state} of shape {np.array(state).shape} to {save_path}')
 				action_input = input()
 			if action_input == 'save_position':
 				assert self.params['get_player_position']
-				save_path = os.path.join(self.saving_dir, "goal_state_pos.txt")
+				save_path = os.path.join(self.params['info_dir'], "goal_state_pos.txt")
 				np.savetxt(fname=save_path, X=pos)
 				print(f"saved numpy array {pos} to {save_path}")
+				action_input = input()
+			if action_input == 'save_ram':
+				state_ref = self.env.unwrapped.ale.cloneState()
+				state = self.env.unwrapped.ale.encodeState(state_ref)
+				save_path = os.path.join(self.params['ram_dir'], "goal_state_ram.npy")
+				np.save(file=save_path, arr=state)
+				print(f"saved RAM state {state} to {save_path}")
 				action_input = input()
 
 			# parse action

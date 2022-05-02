@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from gym import Wrapper
 
-from skills.option_utils import set_player_position
+from skills.option_utils import set_player_ram
 
 
 class MonteForwarding(Wrapper):
@@ -11,18 +11,17 @@ class MonteForwarding(Wrapper):
 	forwards the agent to another state when the agent starts
 	this just overrides the reset method and make it start in another position
 	"""
-	def __init__(self, env, forwarding_target_pos: Path):
+	def __init__(self, env, forwarding_target: Path):
 		"""
 		forward the agent to start in state `forwarding_target`
 		Args:
-			forwarding_target_pos: a previously saved .txt file that contains the start state position
+			forwarding_target: a previously saved .npy file that contains the encoded start state ram
 		"""
 		super().__init__(env)
 		self.env = env
-		self.target_pos = np.loadtxt(forwarding_target_pos)
+		self.target_ram = np.load(forwarding_target)
 	
 	def reset(self):
 		self.env.reset()
-		set_player_position(self.env, *self.target_pos)
-		target_state, _, _, _ = self.env.step(0)  # take fake NOOP to get the state
-		return target_state
+		obs = set_player_ram(self.env, self.target_ram)
+		return obs

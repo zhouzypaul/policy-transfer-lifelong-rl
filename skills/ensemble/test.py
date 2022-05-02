@@ -110,11 +110,11 @@ class TestTrial(SingleOptionTrial):
     def check_params_validity(self):
         if self.params["left_ladder"]:
             print("using left ladder: setting start and goal state")
-            self.params["start_state_pos"] = "left_ladder_top_pos.txt"
+            self.params["start_state"] = "room1_left_ladder_top"
             self.params["goal_state_pos"] = "left_ladder_bottom_pos.txt"
         if self.params["right_ladder"]:
             print("using right ladder: setting start and goal state")
-            self.params["start_state_pos"] = "right_ladder_top_pos.txt"
+            self.params["start_state"] = "room1_right_ladder_top"
             self.params["goal_state_pos"] = "right_ladder_bottom_pos.txt"
 
     def setup(self):

@@ -8,7 +8,7 @@ from collections import defaultdict
 from distutils.util import strtobool
 
 
-def create_log_dir(dir_path, remove_existing=True):
+def create_log_dir(dir_path, remove_existing=True, log_git=True):
     """
     Prepare a directory for outputting training results.
     Then the following infomation is saved into the directory:
@@ -28,20 +28,22 @@ def create_log_dir(dir_path, remove_existing=True):
             print(f"Removed existing directory {outdir}")
     # create log dir
     try:
-        os.makedirs(outdir, exist_ok=False)
+        os.makedirs(outdir, exist_ok=not remove_existing)
     except OSError:
         print(f"Creation of the directory {outdir} failed")
     else:
         print(f"Successfully created the directory {outdir}")
 
-    # log the command used
-    with open(os.path.join(outdir, "command.txt"), "w") as f:
-        f.write(" ".join(sys.argv))
+    if log_git:
+        # log the command used
+        with open(os.path.join(outdir, "command.txt"), "w") as f:
+            f.write(" ".join(sys.argv))
 
-    # log git stuff
-    from pfrl.experiments.prepare_output_dir import is_under_git_control, save_git_information
-    if is_under_git_control():
-        save_git_information(outdir)
+        # log git stuff
+        from pfrl.experiments.prepare_output_dir import is_under_git_control, save_git_information
+        if is_under_git_control():
+            save_git_information(outdir)
+        
     return outdir
 
 
