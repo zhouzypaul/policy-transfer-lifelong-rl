@@ -135,7 +135,7 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
-        from skills.wrappers.new_goal_wrapper import MonteNewGoalWrapper
+        from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
 
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
 
@@ -171,7 +171,7 @@ class SingleOptionTrial(BaseTrial):
             env = MontePrunedActions(env)
         # set new goal if needed
         if goal is not None:
-            env = MonteNewGoalWrapper(env, goal, epsilon_tol=self.params['goal_epsilon_tol'])
+            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
         # episodic life
         env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         # make the agent start in another place if needed
@@ -207,21 +207,28 @@ def warp_frames(state):
     )
     return warped.reshape(observation_space.low.shape)
 
+def _getIndex(address):
+    """
+    helper function for parsing ram address
+    get the index of the ram address using teh row and column format
+    """
+    assert type(address) == str and len(address) == 2
+    row, col = tuple(address)
+    row = int(row, 16) - 8
+    col = int(col, 16)
+    return row * 16 + col
+
+
+def getByte(ram, address):
+    """Return the byte at the specified emulator RAM location"""
+    idx = _getIndex(address)
+    return ram[idx]
+
 
 def get_player_position(ram):
     """
     given the ram state, get the position of the player
     """
-    def _getIndex(address):
-        assert type(address) == str and len(address) == 2
-        row, col = tuple(address)
-        row = int(row, 16) - 8
-        col = int(col, 16)
-        return row * 16 + col
-    def getByte(ram, address):
-        # Return the byte at the specified emulator RAM location
-        idx = _getIndex(address)
-        return ram[idx]
     # return the player position at a particular state
     x = int(getByte(ram, 'aa'))
     y = int(getByte(ram, 'ab'))
@@ -243,6 +250,13 @@ def set_player_position(env, x, y):
     env.unwrapped.ale.restoreState(new_state_ref)
     env.unwrapped.ale.deleteState(new_state_ref)
     env.step(0)  # NO-OP action to update the RAM state
+
+
+def get_player_room_number(ram):
+    """
+    given the ram state, get the room number of the player
+    """
+    return int(getByte(ram, '83'))
 
 
 def set_player_ram(env, ram_state):
