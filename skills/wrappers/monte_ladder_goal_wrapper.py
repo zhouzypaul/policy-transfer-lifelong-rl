@@ -48,7 +48,7 @@ room_to_goals = {
         'left_ladder_bottom_pos.txt',
     ]),
     2: GoalsCollection(2, [
-        # TODO:
+        'room2_ladder_bottom_pos.txt'
     ]),
 }
 
