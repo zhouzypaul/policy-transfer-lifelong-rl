@@ -20,6 +20,8 @@ class MonteForwarding(Wrapper):
 		super().__init__(env)
 		self.env = env
 		self.target_ram = np.load(forwarding_target)
+		self.reset()  # reset from init so that the agent starts in the correct position
+		# the monte ladder goal wrapper depends on agent being in the right room when env is created
 	
 	def reset(self):
 		self.env.reset()

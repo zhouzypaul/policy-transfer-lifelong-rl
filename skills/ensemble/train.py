@@ -36,9 +36,6 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             parents=[self.get_common_arg_parser()]
         )
-        # hyperparams
-        parser.set_defaults(hyperparams='hyperparams/atari.csv')
-
         # agent
         parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'], default='ensemble',
                             help="the type of agent to train")
@@ -104,7 +101,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
         self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
         print(f"aiming for goal location {self.params['goal_state_position']}")
-        self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'])
 
         # set up ensemble
         def phi(x):  # Feature extractor

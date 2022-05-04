@@ -79,7 +79,7 @@ class MonteLadderGoalWrapper(Wrapper):
         """
         next_state, reward, done, info = self.env.step(action)
         ram = self.env.unwrapped.ale.getRAM()
-        player_pos = get_player_position(ram)
+        player_pos = np.array(get_player_position(ram))
         room = get_player_room_number(ram)
         if self.goal_regions.is_within_goal_position(room, player_pos, self.epsilon_tol):
             reward = 1

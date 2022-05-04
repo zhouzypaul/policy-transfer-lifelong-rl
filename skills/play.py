@@ -96,7 +96,8 @@ class PlayGame(SingleOptionTrial):
 			state = next_state
 			if self.params['get_player_position']:  # get position
 				pos = get_player_position(self.env.unwrapped.ale.getRAM())
-				print(f"current position is {pos}")
+				room = get_player_room_number(self.env.unwrapped.ale.getRAM())
+				print(f"current position is {pos} in room {room}")
 			if done:
 				break
 

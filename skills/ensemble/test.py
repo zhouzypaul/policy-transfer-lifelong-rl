@@ -126,7 +126,6 @@ class TestTrial(SingleOptionTrial):
         # get the hyperparams
         hyperparams_file = Path(self.params['results_dir']) / self.params['tag'] / 'hyperparams.csv'
         saved_params = utils.load_hyperparams(hyperparams_file)
-        self.params['goal_epsilon_tol'] = saved_params['goal_epsilon_tol']  # hack 
 
         # create the saving directories
         self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name'])
@@ -137,7 +136,7 @@ class TestTrial(SingleOptionTrial):
         goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
         self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
         print(f"aiming for goal location {self.params['goal_state_position']}")
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'], goal=self.params['goal_state_position'])
+        self.env = self.make_env(saved_params['environment'], saved_params['seed'])
 
         # agent
         agent_file = Path(self.params['results_dir']) / self.params['tag'] / 'agent.pkl'

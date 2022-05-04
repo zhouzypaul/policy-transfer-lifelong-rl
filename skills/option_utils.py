@@ -103,7 +103,7 @@ class SingleOptionTrial(BaseTrial):
         # defaults
         parser.set_defaults(experiment_name='monte', 
                             environment='MontezumaRevengeNoFrameskip-v4', 
-                            hyperparams='hyperparams/monte.csv')
+                            hyperparams='hyperparams/atari.csv')
     
         # environments
         parser.add_argument("--render", action='store_true', default=False, 
@@ -125,7 +125,7 @@ class SingleOptionTrial(BaseTrial):
                                     e.g: room1_right_ladder_top""")
         return parser
 
-    def make_env(self, env_name, env_seed, goal=None):
+    def make_env(self, env_name, env_seed):
         """
         Make a monte environemnt for training skills
         Args:
@@ -169,15 +169,16 @@ class SingleOptionTrial(BaseTrial):
         # prunning actions
         if not self.params['suppress_action_prunning']:
             env = MontePrunedActions(env)
-        # set new goal if needed
-        if goal is not None:
-            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-        # episodic life
-        env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         # make the agent start in another place if needed
         if self.params['start_state'] is not None:
             start_state_path = self.params['ram_dir'].joinpath(self.params['start_state'] + '.npy')
             env = MonteForwarding(env, start_state_path)
+        # ladder goals
+        # should go after the forwarding wrappers, because the goals depend on the position of 
+        # the agent in the starting state
+        env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+        # episodic life
+        env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         logging.info(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
