@@ -136,16 +136,14 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
+        from skills.wrappers.episodic_life import EpisodicLifeEnv
 
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
 
         if self.params['use_deepmind_wrappers']:
             # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
             env = pfrl.wrappers.atari_wrappers.make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
-            # deepmind wrappers without EpisodicLife
-            # EpisodicLife needs to after MonteNewGoalWrapper because that wrapper determines done
-            # any wrappers after EpisodicLife should NOT change how `done` is determined, 
-            # because EpisodicLife will not treat it as real terminal and only reset with a noop action
+            # deepmind wrappers without EpisodicLife, use the custom one
             env = pfrl.wrappers.atari_wrappers.wrap_deepmind(
                 env,
                 episode_life=False,
@@ -156,6 +154,8 @@ class SingleOptionTrial(BaseTrial):
                 channel_order="chw",
                 flicker=False,
             )
+            # episodic life
+            env = EpisodicLifeEnv(env)
             # make agent space
             if self.params['agent_space']:
                 env = MonteDeepMindAgentSpace(env)
@@ -172,13 +172,13 @@ class SingleOptionTrial(BaseTrial):
         # make the agent start in another place if needed
         if self.params['start_state'] is not None:
             start_state_path = self.params['ram_dir'].joinpath(self.params['start_state'] + '.npy')
+            # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
+            # this does not need to be enforced once test uses the timeout wrapper
             env = MonteForwarding(env, start_state_path)
         # ladder goals
         # should go after the forwarding wrappers, because the goals depend on the position of 
         # the agent in the starting state
         env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-        # episodic life
-        env = pfrl.wrappers.atari_wrappers.EpisodicLifeEnv(env)
         logging.info(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)

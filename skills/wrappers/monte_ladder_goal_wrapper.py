@@ -86,4 +86,6 @@ class MonteLadderGoalWrapper(Wrapper):
             done = True
         else:
             reward = 0  # override reward, such as when got key
+        # override needs_real_reset for EpisodicLifeEnv
+        self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
         return next_state, reward, done, info
