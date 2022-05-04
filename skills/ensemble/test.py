@@ -126,6 +126,7 @@ class TestTrial(SingleOptionTrial):
         # get the hyperparams
         hyperparams_file = Path(self.params['results_dir']) / self.params['tag'] / 'hyperparams.csv'
         saved_params = utils.load_hyperparams(hyperparams_file)
+        self.params['goal_epsilon_tol'] = saved_params['goal_epsilon_tol']  # hack 
 
         # create the saving directories
         self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name'])
