@@ -71,6 +71,7 @@ class ValueEnsemble():
         """
         self.embedding.train()
         self.q_networks.train()
+        self.recurrent_memory.flatten_parameters()
 
         batch_states = batch['state']
         batch_actions = batch['action']
@@ -138,6 +139,7 @@ class ValueEnsemble():
         self.q_networks.eval()
         with torch.no_grad():
             embeddings = self.embedding(state, return_attention_mask=False).detach()
+            self.recurrent_memory.flatten_parameters()
             embeddings, _ = self.recurrent_memory(embeddings)
 
             actions = np.zeros(self.num_modules, dtype=np.int)
