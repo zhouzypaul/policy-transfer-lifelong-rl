@@ -1,6 +1,18 @@
 # skills
 portable skills in Reinforcement Learning
 
+## using the ensemble agent
+```bash
+python3 -m skills.ensemble.train --experiment_name debug [--options]  # train
+python3 -m skills.ensemble.test --tag experiment_name_to_load [--options]  # test
+python3 -m skills.ensemble.transfer --experiment_name debug --load experiment_to_loa --start_state room2_ladder  # transfer and meta learn
+```
+
+## getting baseline performance (DQN)
+```bash
+python3 -m skills.baseline.train --experiment_name debug --agent dqn --env MontezumaRevengeNoFrameskip-v4 [--options]  # train  
+```
+
 ## training a skill
 ```shell
 python3 -m skills.train [--options]
@@ -19,9 +31,4 @@ python3 -m skills.play [--options]
 ## control an agent to generate trajectories
 ```shell
 python3 -m skills.generate_traj [--options]
-```
-
-## traing a skill with ensemble
-```shell
-python3 -m skills.ensemble.train [--options]
 ```

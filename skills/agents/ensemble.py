@@ -44,7 +44,6 @@ class EnsembleAgent(Agent):
         self.action_selection_strategy = action_selection_strategy
         print(f"using action selection strategy: {self.action_selection_strategy}")
         self.warmup_steps = warmup_steps
-        self.num_data_for_update = warmup_steps
         self.batch_size = batch_size
         self.q_target_update_interval = q_target_update_interval
         self.update_interval = update_interval
@@ -194,6 +193,16 @@ class EnsembleAgent(Agent):
             dill.dump(self, f)
 
     @classmethod
-    def load(cls, load_path):
+    def load(cls, load_path, plot_dir=None, reset=False):
         with open(load_path, 'rb') as f:
-            return dill.load(f)
+            agent = dill.load(f)
+        # hack to change the plot_dir of the agent
+        agent.value_ensemble.embedding.plot_dir = plot_dir
+        # reset the agent for retraining
+        if reset:
+            agent.step_number = 0
+            agent.episode_number = 0
+            # TODO:
+            # what to do with explorer
+            # what to do with replay buffer
+        return agent

@@ -94,32 +94,10 @@ class TestTrial(SingleOptionTrial):
         parser.add_argument("--steps", type=int, default=50,
                             help="max number of steps per episode")
 
-        # goal state
-        parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
-                            help="a file in info_dir that store the x, y coordinates of goal state")
-        
-        # shortcuts
-        parser.add_argument("--right_ladder", action="store_true", default=False,
-                            help="use the right ladder. This sets the goal state and the start state")
-        parser.add_argument("--left_ladder", action="store_true", default=False,
-                            help="use the left ladder. This sets the goal state and the start state")
-
         args = self.parse_common_args(parser)
         return args
 
-    def check_params_validity(self):
-        if self.params["left_ladder"]:
-            print("using left ladder: setting start and goal state")
-            self.params["start_state"] = "room1_left_ladder_top"
-            self.params["goal_state_pos"] = "left_ladder_bottom_pos.txt"
-        if self.params["right_ladder"]:
-            print("using right ladder: setting start and goal state")
-            self.params["start_state"] = "room1_right_ladder_top"
-            self.params["goal_state_pos"] = "right_ladder_bottom_pos.txt"
-
     def setup(self):
-        self.check_params_validity()
-
         # setting random seeds
         pfrl.utils.set_random_seed(self.params['seed'])
 
@@ -133,10 +111,7 @@ class TestTrial(SingleOptionTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # env
-        goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
-        self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
-        print(f"aiming for goal location {self.params['goal_state_position']}")
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'])
+        self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000)
 
         # agent
         agent_file = Path(self.params['results_dir']) / self.params['tag'] / 'agent.pkl'
