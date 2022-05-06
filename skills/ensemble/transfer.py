@@ -64,7 +64,7 @@ class TransferTrial(SingleOptionTrial):
 
         # agent
         agent_file = Path(self.params['results_dir']) / self.params['load'] / 'agent.pkl'
-        self.agent = EnsembleAgent.load(agent_file, plot_dir=self.params['plots_dir'], reset=True)
+        self.agent = EnsembleAgent.load(agent_file, plot_dir=self.params['plots_dir'])
     
     def run(self):
         """

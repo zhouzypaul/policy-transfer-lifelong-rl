@@ -193,16 +193,9 @@ class EnsembleAgent(Agent):
             dill.dump(self, f)
 
     @classmethod
-    def load(cls, load_path, plot_dir=None, reset=False):
+    def load(cls, load_path, plot_dir=None):
         with open(load_path, 'rb') as f:
             agent = dill.load(f)
         # hack to change the plot_dir of the agent
         agent.value_ensemble.embedding.plot_dir = plot_dir
-        # reset the agent for retraining
-        if reset:
-            agent.step_number = 0
-            agent.episode_number = 0
-            # TODO:
-            # what to do with explorer
-            # what to do with replay buffer
         return agent
