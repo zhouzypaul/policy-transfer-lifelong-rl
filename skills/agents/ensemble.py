@@ -1,9 +1,10 @@
 import os
 import dill
 
+import torch
 import numpy as np
 from pfrl import explorers
-from pfrl.replay_buffers import ReplayBuffer
+from pfrl import replay_buffers
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
@@ -25,6 +26,7 @@ class EnsembleAgent(Agent):
                 batch_size,
                 phi,
                 action_selection_strategy,
+                prioritized_replay_anneal_steps,
                 buffer_length=100000,
                 update_interval=4,
                 q_target_update_interval=40,
@@ -77,8 +79,16 @@ class EnsembleAgent(Agent):
             lambda: np.random.randint(num_output_classes),
         )
 
-        # replay buffer
-        self.replay_buffer = ReplayBuffer(capacity=buffer_length)
+        # Prioritized Replay
+        # Anneal beta from beta0 to 1 throughout training
+        # taken from https://github.com/pfnet/pfrl/blob/master/examples/atari/reproduction/rainbow/train_rainbow.py
+        self.replay_buffer = replay_buffers.PrioritizedReplayBuffer(
+            capacity=buffer_length,
+            alpha=0.5,  # Exponent of errors to compute probabilities to sample
+            beta0=0.4,  # Initial value of beta
+            betasteps=prioritized_replay_anneal_steps,  # Steps to anneal beta to 1
+            normalize_by_max="memory",  # method to normalize the weight
+        )
         self.replay_updater = ReplayUpdater(
             replay_buffer=self.replay_buffer,
             update_func=self.update,
@@ -132,7 +142,7 @@ class EnsembleAgent(Agent):
                     print(probability.sum())
                     raise
 
-    def update(self, experiences):
+    def update(self, experiences, errors_out=None):
         """
         update the model
         accepts as argument a list of transition dicts
@@ -146,8 +156,11 @@ class EnsembleAgent(Agent):
                   - next_state (object): Next state
                   - weight (float, optional): Weight coefficient. It can be
                     used for importance sampling.
+            errors_out (list or None): If set to a list, then TD-errors
+                computed from the given experiences are appended to the list.
         """
         if self.training:
+            has_weight = "weight" in experiences[0][0]
             exp_batch = batch_experiences(
                 experiences,
                 device=self.device,
@@ -155,8 +168,22 @@ class EnsembleAgent(Agent):
                 gamma=self.discount_rate,
                 batch_states=batch_states,
             )
+            # get weights for prioritized experience replay
+            if has_weight:
+                exp_batch["weights"] = torch.tensor(
+                    [elem[0]["weight"] for elem in experiences],
+                    device=self.device,
+                    dtype=torch.float32,
+                )
+                if errors_out is None:
+                    errors_out = []
+            # actual update
             update_target_net =  self.step_number % self.q_target_update_interval == 0
-            self.value_ensemble.train(exp_batch, update_target_net, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
+            self.value_ensemble.train(exp_batch, errors_out, update_target_net, plot_embedding=(self.step_number % self.embedding_plot_freq == 0))
+            # update prioritiy
+            if has_weight:
+                assert isinstance(self.replay_buffer, replay_buffers.PrioritizedReplayBuffer)
+                self.replay_buffer.update_errors(errors_out)
 
     def act(self, obs, return_ensemble_info=False):
         """

@@ -33,7 +33,7 @@ class TransferTrial(SingleOptionTrial):
                             help="the experiment_name of the trained agent so we know where to look for loading it")
         
         # testing params
-        parser.add_argument("--steps", type=int, default=1000000,
+        parser.add_argument("--steps", type=int, default=500000,
                             help="max number of steps to train the agent for")
 
         args = self.parse_common_args(parser)
@@ -78,7 +78,6 @@ class TransferTrial(SingleOptionTrial):
             success_rate_save_freq=self.params['success_rate_save_freq'],
             reward_save_freq=self.params['reward_logging_freq'],
             agent_save_freq=self.params['saving_freq'],
-            success_threshold_for_stopping=self.params['success_threshold_for_stopping'],
         )
 
 

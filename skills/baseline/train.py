@@ -128,6 +128,7 @@ class TrainAgent(BaseTrial):
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
                 buffer_length=self.params['buffer_length'],
+                prioritized_replay_anneal_steps=self.params['steps'] / self.params['update_interval'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
                 num_modules=self.params['num_policies'],

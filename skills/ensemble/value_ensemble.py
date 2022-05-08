@@ -8,7 +8,7 @@ import numpy as np
 
 from skills.ensemble.criterion import batched_L_divergence
 from skills.ensemble.attention import Attention
-from skills.models.q_function import LinearQFunction, compute_value_loss
+from skills.models.q_function import LinearQFunction, compute_q_learning_loss
 
 
 class ValueEnsemble():
@@ -64,7 +64,7 @@ class ValueEnsemble():
         self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt')))
         self.q_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
 
-    def train(self, batch, update_target_network=False, plot_embedding=False):
+    def train(self, exp_batch, errors_out=None, update_target_network=False, plot_embedding=False):
         """
         update both the embedding network and the value network by backproping
         the sumed divergence and q learning loss
@@ -73,11 +73,11 @@ class ValueEnsemble():
         self.q_networks.train()
         self.recurrent_memory.flatten_parameters()
 
-        batch_states = batch['state']
-        batch_actions = batch['action']
-        batch_rewards = batch['reward']
-        batch_next_states = batch['next_state']
-        batch_dones = batch['is_state_terminal']
+        batch_states = exp_batch['state']
+        batch_actions = exp_batch['action']
+        batch_rewards = exp_batch['reward']
+        batch_next_states = exp_batch['next_state']
+        batch_dones = exp_batch['is_state_terminal']
 
         loss = 0
 
@@ -107,7 +107,7 @@ class ValueEnsemble():
                 batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
             
             # loss
-            td_loss = compute_value_loss(batch_pred_q, batch_q_target, clip_delta=True, batch_accumulator="mean")
+            td_loss = compute_q_learning_loss(exp_batch, batch_pred_q, batch_q_target, errors_out=errors_out)  # TODO
             loss += td_loss
             if self.verbose: td_losses[idx] = td_loss.item()
     

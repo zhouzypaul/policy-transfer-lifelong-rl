@@ -19,8 +19,7 @@ from skills.ensemble.test import test_ensemble_agent
 
 
 def train_ensemble_agent(agent, env, max_steps, saving_dir, 
-                        success_rate_save_freq, reward_save_freq, agent_save_freq, 
-                        success_threshold_for_stopping):
+                        success_rate_save_freq, reward_save_freq, agent_save_freq):
     """
     run the actual experiment to train one option
     """
@@ -44,9 +43,6 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
         if done:
             success_rates.append(done and reward ==1)
             save_success_rate(success_rates, episode_number, saving_dir, save_every=success_rate_save_freq)
-            if is_well_trained(success_rates, success_threshold_for_stopping):  # stop training if done
-                print(f"finished training early at step {step_number}")
-                break
             episode_number += 1
             state = env.reset()
         
@@ -64,6 +60,9 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
 
 def is_well_trained(success_rates, success_threshold_for_stopping):
     """
+    currently not used because prioritized replay need a fixed step number to anneal 
+    beta to 1.
+
     determine if the agent is well trained enough for the current particular skill
     args:
         success_threshold_for_stopping: float between 0 and 1, the threshold for success rate to stop training
@@ -171,7 +170,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                             help="the action selection strategy when using ensemble agent")
         
         # training
-        parser.add_argument("--steps", type=int, default=2000000,
+        parser.add_argument("--steps", type=int, default=500000,
                             help="number of training steps")
         
         parser.add_argument("--verbose", action="store_true", default=False,
@@ -239,6 +238,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 action_selection_strategy=self.params['action_selection_strat'],
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
+                prioritized_replay_anneal_steps=self.params['steps'] / self.params['update_interval'],
                 buffer_length=self.params['buffer_length'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
@@ -257,7 +257,6 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             success_rate_save_freq=self.params['success_rate_save_freq'],
             reward_save_freq=self.params['reward_logging_freq'],
             agent_save_freq=self.params['saving_freq'],
-            success_threshold_for_stopping=self.params['success_threshold_for_stopping'],
         )
 
 
