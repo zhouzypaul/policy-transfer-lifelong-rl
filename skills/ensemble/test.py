@@ -111,7 +111,7 @@ class TestTrial(SingleOptionTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # env
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000)
+        self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000, self.params['start_state'])
 
         # agent
         agent_file = Path(self.params['results_dir']) / self.params['tag'] / 'agent.pkl'

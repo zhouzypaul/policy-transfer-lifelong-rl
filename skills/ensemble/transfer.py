@@ -29,18 +29,41 @@ class TransferTrial(SingleOptionTrial):
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             parents=[self.get_common_arg_parser()]
         )
-        parser.add_argument("--load", type=str, required=True,
+        parser.add_argument("--load", "-l", type=str, required=True,
                             help="the experiment_name of the trained agent so we know where to look for loading it")
+        parser.add_argument("--target", "-t", type=str, required=True, 
+                            nargs='+', default=[],
+                            help="a list of target start_state to transfer to")
         
         # testing params
-        parser.add_argument("--steps", type=int, default=500000,
+        parser.add_argument("--steps", type=int, default=50000,
                             help="max number of steps to train the agent for")
 
         args = self.parse_common_args(parser)
         return args
+
+    def _set_experiment_name(self):
+        """
+        the experiment name shall the the combination of the loading state as well as all the transfer targets
+        """
+        connector = '->'
+        exp_name = self.params['load']
+        for target in self.params['target']:
+            exp_name += connector + target
+        self.params['experiment_name'] = exp_name
     
     def check_params_validity(self):
-        assert self.params['start_state'] is not None
+        # check that all the target start_states are valid
+        for target_path in self.params['target']:
+            start_state_path = self.params['ram_dir'].joinpath(target_path + '.npy')
+            if not os.path.exists(start_state_path):
+                raise FileNotFoundError(f"{target_path} does not exist")
+        print(f"Targetting {len(self.params['target'])} transfer targets: {self.params['target']}")
+        # set experiment name
+        self._set_experiment_name()
+        # log more frequently because it takes less time to train
+        self.params['reward_logging_freq'] = 100
+        self.params['success_rate_save_freq'] = max(1, int(self.params['steps'] / 200))
 
     def setup(self):
         self.check_params_validity()
@@ -50,35 +73,51 @@ class TransferTrial(SingleOptionTrial):
 
         # get the hyperparams
         hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / 'hyperparams.csv'
-        saved_params = utils.load_hyperparams(hyperparams_file)
+        self.saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
         self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name'])
         utils.create_log_dir(self.saving_dir, remove_existing=True)
-        self.params['plots_dir'] = os.path.join(self.saving_dir, 'plots')
-        os.mkdir(self.params['plots_dir'])
         self.params['saving_dir'] = self.saving_dir
-
-        # env
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'])
-
-        # agent
-        agent_file = Path(self.params['results_dir']) / self.params['load'] / 'agent.pkl'
-        self.agent = EnsembleAgent.load(agent_file, plot_dir=self.params['plots_dir'])
     
     def run(self):
         """
-        test the loaded agent
+        sequentially train the agent on each of the targets
+        loaded agent -> first target state
+        first target state trained -> second target state
+        second target state trained -> third target state
+        ...
         """
-        train_ensemble_agent(
-            self.agent,
-            self.env,
-            max_steps=self.params['steps'],
-            saving_dir=self.saving_dir,
-            success_rate_save_freq=self.params['success_rate_save_freq'],
-            reward_save_freq=self.params['reward_logging_freq'],
-            agent_save_freq=self.params['saving_freq'],
-        )
+        trained = self.params['load']
+        for target in self.params['target']:
+            print(f"Training {trained} -> {target}")
+            # make env
+            env = self.make_env(self.saved_params['environment'], self.saved_params['seed'], start_state=target)
+            # find loaded agent
+            if trained == self.params['load']:
+                agent_file = Path(self.params['results_dir']) / self.params['load'] / 'agent.pkl'
+            else:
+                agent_file = sub_saving_dir / 'agent.pkl'
+            # make saving dir
+            exp_name = trained + '->' + target
+            sub_saving_dir = self.saving_dir.joinpath(exp_name)
+            sub_saving_dir.mkdir()
+            # make agent
+            plots_dir = sub_saving_dir / 'plots'
+            plots_dir.mkdir()
+            agent = EnsembleAgent.load(agent_file, plot_dir=plots_dir)
+            # train
+            train_ensemble_agent(
+                agent,
+                env,
+                max_steps=self.params['steps'],
+                saving_dir=sub_saving_dir,
+                success_rate_save_freq=self.params['success_rate_save_freq'],
+                reward_save_freq=self.params['reward_logging_freq'],
+                agent_save_freq=self.params['saving_freq'],
+            )
+            # advance to next target
+            trained = target
 
 
 def main():

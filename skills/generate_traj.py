@@ -51,7 +51,7 @@ class GenerateTrajectory(SingleOptionTrial):
         utils.create_log_dir(self.saving_dir, remove_existing=True)
 
         # make env
-        self.env = self.make_env(self.params['environment'], self.params['seed'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
     
     def generate_traj(self):
         """

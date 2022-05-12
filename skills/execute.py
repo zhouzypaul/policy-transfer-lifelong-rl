@@ -47,7 +47,7 @@ class ExecuteOptionTrial(SingleOptionTrial):
         seeding.seed(self.params['seed'], random, np, torch)
 
         # set up env and the forwarding target
-        self.env = self.make_env(self.params['environment'], self.params['seed'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
 
         # create the saving directories
         self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])

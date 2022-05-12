@@ -125,7 +125,7 @@ class SingleOptionTrial(BaseTrial):
                                     e.g: room1_right_ladder_top""")
         return parser
 
-    def make_env(self, env_name, env_seed):
+    def make_env(self, env_name, env_seed, start_state=None):
         """
         Make a monte environemnt for training skills
         Args:
@@ -170,8 +170,8 @@ class SingleOptionTrial(BaseTrial):
         if not self.params['suppress_action_prunning']:
             env = MontePrunedActions(env)
         # make the agent start in another place if needed
-        if self.params['start_state'] is not None:
-            start_state_path = self.params['ram_dir'].joinpath(self.params['start_state'] + '.npy')
+        if start_state is not None:
+            start_state_path = self.params['ram_dir'].joinpath(start_state + '.npy')
             # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
             # this does not need to be enforced once test uses the timeout wrapper
             env = MonteForwarding(env, start_state_path)

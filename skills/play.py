@@ -35,7 +35,7 @@ class PlayGame(SingleOptionTrial):
 		seeding.seed(self.params['seed'], np)
 
 		# make env
-		self.env = self.make_env(self.params['environment'], self.params['seed'])
+		self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
 
 	def play(self):
 		"""

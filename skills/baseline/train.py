@@ -102,7 +102,7 @@ class TrainAgent(BaseTrial):
         # self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
         # print(f"aiming for goal location {self.params['goal_state_position']}")
         # self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
-        self.env = self.make_env(self.params['environment'], self.params['seed'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
 
         # set up agent
         def phi(x):  # Feature extractor

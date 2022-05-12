@@ -73,7 +73,7 @@ class TrainOptionTrial(SingleOptionTrial):
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
         # set up env and its goal
-        self.env = self.make_env(self.params['environment'], self.params['seed'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
         if self.params['agent_space']:
             goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state_agent_space'])
         else:
