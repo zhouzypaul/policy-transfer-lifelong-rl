@@ -4,7 +4,7 @@ import os
 import seeding
 import numpy as np
 
-from skills.option_utils import get_player_position, SingleOptionTrial
+from skills.option_utils import get_player_position, get_player_room_number, SingleOptionTrial
 
 
 class PlayGame(SingleOptionTrial):
@@ -98,8 +98,6 @@ class PlayGame(SingleOptionTrial):
 				pos = get_player_position(self.env.unwrapped.ale.getRAM())
 				room = get_player_room_number(self.env.unwrapped.ale.getRAM())
 				print(f"current position is {pos} in room {room}")
-			if done:
-				break
 
 
 def main():

@@ -50,6 +50,18 @@ room_to_goals = {
     2: GoalsCollection(2, [
         'room2_ladder_bottom_pos.txt'
     ]),
+    6: GoalsCollection(6, [
+        'room6_ladder_bottom_pos.txt'
+    ]),
+    7: GoalsCollection(7, [
+        'room7_ladder_bottom_pos.txt'
+    ]),
+    13: GoalsCollection(13, [
+        'room13_bottom_ladder_bottom_pos.txt'
+    ]),
+    14: GoalsCollection(14, [
+        'room14_ladder_bottom_pos.txt'
+    ]),
 }
 
 
