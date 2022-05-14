@@ -92,6 +92,9 @@ class ValueEnsemble():
         next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
         next_state_embeddings, _ = self.recurrent_memory(next_state_embeddings)
 
+        # keep track of all error out for each module 
+        all_errors_out = np.zeros((self.num_modules, len(batch_states)))
+
         for idx in range(self.num_modules):
 
             # predicted q values
@@ -107,9 +110,16 @@ class ValueEnsemble():
                 batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
             
             # loss
-            td_loss = compute_q_learning_loss(exp_batch, batch_pred_q, batch_q_target, errors_out=errors_out)  # TODO
+            td_loss = compute_q_learning_loss(exp_batch, batch_pred_q, batch_q_target, errors_out=errors_out)
+            all_errors_out[idx] = errors_out
             loss += td_loss
             if self.verbose: td_losses[idx] = td_loss.item()
+
+        # update errors_out, so it accounts for all modules in ensemble
+        del errors_out[:]
+        avg_errors_out = np.mean(all_errors_out, axis=0)
+        for e in avg_errors_out:
+            errors_out.append(e)
     
         # update
         self.optimizer.zero_grad()
