@@ -42,6 +42,9 @@ class GoalsCollection:
 
 
 room_to_goals = {
+    0: GoalsCollection(0, [
+        'room0_ladder_bottom_pos.txt'
+    ]),
     1: GoalsCollection(1, [
         'middle_ladder_bottom_pos.txt',
         'right_ladder_bottom_pos.txt',
@@ -50,11 +53,23 @@ room_to_goals = {
     2: GoalsCollection(2, [
         'room2_ladder_bottom_pos.txt'
     ]),
+    4: GoalsCollection(4, [
+        'room4_bottom_ladder_bottom_pos.txt'
+    ]),
+    5: GoalsCollection(5, [
+        'room5_ladder_bottom_pos.txt'
+    ]),
     6: GoalsCollection(6, [
         'room6_ladder_bottom_pos.txt'
     ]),
     7: GoalsCollection(7, [
         'room7_ladder_bottom_pos.txt'
+    ]),
+    10: GoalsCollection(10, [
+        'room10_ladder_bottom_pos.txt'
+    ]),
+    11: GoalsCollection(11, [
+        'room11_bottom_ladder_bottom_pos.txt'
     ]),
     13: GoalsCollection(13, [
         'room13_bottom_ladder_bottom_pos.txt'
