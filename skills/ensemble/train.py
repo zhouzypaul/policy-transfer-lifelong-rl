@@ -19,7 +19,9 @@ from skills.ensemble.test import test_ensemble_agent
 
 
 def train_ensemble_agent(agent, env, max_steps, saving_dir, 
-                        success_rate_save_freq, reward_save_freq, agent_save_freq):
+                        success_rate_save_freq, reward_save_freq, agent_save_freq,
+                        success_queue_size=50,
+                        success_threshold_for_well_trained=0.9,):
     """
     run the actual experiment to train one option
     """
@@ -29,7 +31,9 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
     step_number = 0
     episode_number = 0
     total_reward = 0
-    success_rates = deque(maxlen=25)
+    success_rates = deque(maxlen=success_queue_size)
+    step_when_well_trained = None
+    episode_when_well_trained = None
     state = env.reset()
     while step_number < max_steps:
         # action selection: epsilon greedy
@@ -41,8 +45,15 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
         total_reward += reward
         state = next_state
         if done:
+            # success rate
             success_rates.append(done and reward ==1)
             save_success_rate(success_rates, episode_number, saving_dir, save_every=success_rate_save_freq)
+            # if well trained
+            well_trained = len(success_rates) >= 20 and get_success_rate(success_rates) > success_threshold_for_well_trained
+            if step_when_well_trained is None and well_trained:
+                save_is_well_trained(saving_dir, step_number, episode_number)
+                step_when_well_trained, episode_when_well_trained = step_number, episode_number
+            # advance to next
             episode_number += 1
             state = env.reset()
         
@@ -56,6 +67,8 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
     end_time = time.time()
 
     print("Time taken: ", end_time - start_time)
+
+    return step_when_well_trained, episode_when_well_trained
 
 
 def is_well_trained(success_rates, success_threshold_for_stopping):
@@ -129,6 +142,18 @@ def save_total_reward(total_reward, step_number, saving_dir, save_every=50):
             plt.ylabel("total reward")
             plt.savefig(img_file)
             plt.close()
+
+
+def save_is_well_trained(saving_dir, steps, episode):
+    """
+    save the time when training is finised: the success rate is above some threshold 
+    """
+    print(f"well trained at episode {episode} and step {steps}")
+    time_file = os.path.join(saving_dir, "finish_training_time.csv")
+    with open(time_file, 'w') as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow(["episode", "step"])
+        csv_writer.writerow([episode, steps])
 
 
 def save_agent(agent, step_number, saving_dir, saving_freq):
