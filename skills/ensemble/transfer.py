@@ -36,6 +36,8 @@ class TransferTrial(SingleOptionTrial):
         parser.add_argument("--target", "-t", type=str, required=True, 
                             nargs='+', default=[],
                             help="a list of target start_state to transfer to")
+        parser.add_argument("--plot", "-p", action='store_true',
+                            help="only do the plotting. Use this after the agent has been trained on transfer tasks.")
         
         # testing params
         parser.add_argument("--steps", type=int, default=50000,
@@ -79,10 +81,20 @@ class TransferTrial(SingleOptionTrial):
 
         # create the saving directories
         self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name'])
-        utils.create_log_dir(self.saving_dir, remove_existing=True)
+        if self.params['plot']:
+            utils.create_log_dir(self.saving_dir, remove_existing=False)
+        else:
+            utils.create_log_dir(self.saving_dir, remove_existing=True)
         self.params['saving_dir'] = self.saving_dir
+
+    def plot_results(self):
+        """
+        just plot the results after the agent has been trained on transfer tasks
+        """
+        plot_when_well_trained(self.params['target'], self.saving_dir)
+        plot_average_success_rate(self.params['target'], self.saving_dir)
     
-    def run(self):
+    def transfer(self):
         """
         sequentially train the agent on each of the targets
         loaded agent -> first target state
@@ -90,10 +102,6 @@ class TransferTrial(SingleOptionTrial):
         second target state trained -> third target state
         ...
         """
-        # statistics
-        steps_when_well_trained = np.zeros(len(self.params['target']))
-        episode_when_well_trained = np.zeros(len(self.params['target']))
-
         # training
         trained = self.params['load']
         for i, target in enumerate(self.params['target']):
@@ -114,7 +122,7 @@ class TransferTrial(SingleOptionTrial):
             plots_dir.mkdir()
             agent = EnsembleAgent.load(agent_file, plot_dir=plots_dir)
             # train
-            step, episode = train_ensemble_agent(
+            train_ensemble_agent(
                 agent,
                 env,
                 max_steps=self.params['steps'],
@@ -123,19 +131,36 @@ class TransferTrial(SingleOptionTrial):
                 reward_save_freq=self.params['reward_logging_freq'],
                 agent_save_freq=self.params['saving_freq'],
             )
-            # logging
-            steps_when_well_trained[i] = step
-            episode_when_well_trained[i] = episode
             # advance to next target
             trained = target
         
         # meta learning statistics
-        plot_when_well_trained(self.params['target'], steps_when_well_trained, episode_when_well_trained, self.saving_dir)
-        plot_average_success_rate(self.params['target'], self.saving_dir)
+        self.plot_results()
+    
+    def run(self):
+        if self.params['plot']:
+            self.plot_results()
+        else:
+            self.transfer()
 
 
-def plot_when_well_trained(targets, steps_when_well_trained, episode_when_well_trained, saving_dir):
-    assert len(targets) == len(steps_when_well_trained) == len(episode_when_well_trained)
+def plot_when_well_trained(targets, saving_dir):
+    steps_when_well_trained = np.zeros(len(targets))
+    episode_when_well_trained = np.zeros(len(targets))
+
+    # descend into the sub saving dirs to find the well_trained csv file
+    for subdir in os.listdir(saving_dir):
+        if not os.path.isdir(saving_dir.joinpath(subdir)):
+            continue
+        well_trained_file = saving_dir / subdir / 'finish_training_time.csv'
+        with open(well_trained_file, 'r') as f:
+            csv_reader = csv.reader(f)
+            data = list(csv_reader)[-1]
+            episode = int(data[0])
+            step = int(data[1])
+            target = subdir.split('->')[1]
+            steps_when_well_trained[targets.index(target)] = step
+            episode_when_well_trained[targets.index(target)] = episode
 
     steps_file = saving_dir / 'steps_when_well_trained.png'
     plt.plot(steps_when_well_trained)
@@ -158,7 +183,7 @@ def plot_average_success_rate(targets, saving_dir):
     average_success_rates = np.zeros(len(targets))
     # descend into the sub saving dirs to find the success rates file
     for subdir in os.listdir(saving_dir):
-        if not os.path.isdir(subdir):
+        if not os.path.isdir(saving_dir.joinpath(subdir)):
             continue
         success_rates_file = Path(saving_dir) / subdir / 'success_rate.csv'
         with open(success_rates_file, 'r') as f:
