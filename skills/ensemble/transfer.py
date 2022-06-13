@@ -153,14 +153,19 @@ def plot_when_well_trained(targets, saving_dir):
         if not os.path.isdir(saving_dir.joinpath(subdir)):
             continue
         well_trained_file = saving_dir / subdir / 'finish_training_time.csv'
-        with open(well_trained_file, 'r') as f:
-            csv_reader = csv.reader(f)
-            data = list(csv_reader)[-1]
-            episode = int(data[0])
-            step = int(data[1])
-            target = subdir.split('->')[1]
-            steps_when_well_trained[targets.index(target)] = step
-            episode_when_well_trained[targets.index(target)] = episode
+        try:
+            with open(well_trained_file, 'r') as f:
+                csv_reader = csv.reader(f)
+                data = list(csv_reader)[-1]
+                episode = int(data[0])
+                step = int(data[1])
+                target = subdir.split('->')[1]
+        except FileNotFoundError:
+            # the file is not logged because the agent was not well trained.
+            step = np.inf
+            episode = np.inf
+        steps_when_well_trained[targets.index(target)] = step
+        episode_when_well_trained[targets.index(target)] = episode
 
     steps_file = saving_dir / 'steps_when_well_trained.png'
     plt.plot(steps_when_well_trained)
