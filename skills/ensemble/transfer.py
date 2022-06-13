@@ -11,6 +11,7 @@ from skills import utils
 from skills.option_utils import SingleOptionTrial
 from skills.ensemble.train import train_ensemble_agent
 from skills.agents.ensemble import EnsembleAgent
+from skills.agents.dqn import DoubleDQN
 
 
 class TransferTrial(SingleOptionTrial):
@@ -38,6 +39,8 @@ class TransferTrial(SingleOptionTrial):
                             help="a list of target start_state to transfer to")
         parser.add_argument("--plot", "-p", action='store_true',
                             help="only do the plotting. Use this after the agent has been trained on transfer tasks.")
+        parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'], default='ensemble',
+                            help="the type of agent to transfer on")
         
         # testing params
         parser.add_argument("--steps", type=int, default=50000,
@@ -76,11 +79,11 @@ class TransferTrial(SingleOptionTrial):
         pfrl.utils.set_random_seed(self.params['seed'])
 
         # get the hyperparams
-        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / 'hyperparams.csv'
+        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / self.params['agent'] / 'hyperparams.csv'
         self.saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
-        self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name'])
+        self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(self.params['agent'])
         if self.params['plot']:
             utils.create_log_dir(self.saving_dir, remove_existing=False)
         else:
@@ -110,7 +113,7 @@ class TransferTrial(SingleOptionTrial):
             env = self.make_env(self.saved_params['environment'], self.saved_params['seed'], start_state=target)
             # find loaded agent
             if trained == self.params['load']:
-                agent_file = Path(self.params['results_dir']) / self.params['load'] / 'agent.pkl'
+                agent_file = Path(self.params['results_dir']) / self.params['load'] / self.params['agent'] / 'agent.pkl'
             else:
                 agent_file = sub_saving_dir / 'agent.pkl'
             # make saving dir
@@ -120,7 +123,10 @@ class TransferTrial(SingleOptionTrial):
             # make agent
             plots_dir = sub_saving_dir / 'plots'
             plots_dir.mkdir()
-            agent = EnsembleAgent.load(agent_file, plot_dir=plots_dir)
+            if self.params['agent'] == 'dqn':
+                agent = DoubleDQN.load(agent_file)
+            elif self.params['agent'] == 'ensemble':
+                agent = EnsembleAgent.load(agent_file, plot_dir=plots_dir)
             # train
             train_ensemble_agent(
                 agent,
@@ -159,11 +165,11 @@ def plot_when_well_trained(targets, saving_dir):
                 data = list(csv_reader)[-1]
                 episode = int(data[0])
                 step = int(data[1])
-                target = subdir.split('->')[1]
         except FileNotFoundError:
             # the file is not logged because the agent was not well trained.
             step = np.inf
             episode = np.inf
+        target = subdir.split('->')[1]
         steps_when_well_trained[targets.index(target)] = step
         episode_when_well_trained[targets.index(target)] = episode
 

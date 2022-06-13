@@ -1,7 +1,9 @@
+import os
+import dill
+
 import numpy as np
 import torch
 import torch.nn as nn
-
 import pfrl
 from pfrl import agents, explorers
 from pfrl import nn as pnn
@@ -11,9 +13,10 @@ from pfrl.initializers import init_chainer_default
 from pfrl.q_functions import DiscreteActionValueHead, DuelingDQN
 
 from skills.models.small_cnn import SmallCNN
+from skills.agents.abstract_agent import Agent
 
 
-class DoubleDQN(agents.DoubleDQN):
+class DoubleDQN(agents.DoubleDQN, Agent):
     """
     a customr DQN
     such that the observe() method takes in actions as well
@@ -79,6 +82,17 @@ class DoubleDQN(agents.DoubleDQN):
             cnn = self.model[0]
             batch_xs = self.batch_states([state], self.device, self.phi)
             return cnn(batch_xs).cpu().numpy().flatten()
+    
+    def save(self, save_dir):
+        path = os.path.join(save_dir, "agent.pkl")
+        with open(path, 'wb') as f:
+            dill.dump(self, f)
+
+    @classmethod
+    def load(cls, load_path):
+        with open(load_path, 'rb') as f:
+            agent = dill.load(f)
+        return agent
 
 
 class SingleSharedBias(nn.Module):

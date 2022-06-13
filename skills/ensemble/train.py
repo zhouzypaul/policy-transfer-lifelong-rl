@@ -229,7 +229,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         torch.backends.cudnn.benchmark = True
 
         # create the saving directories
-        self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])
+        self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'], self.params['agent'])
         utils.create_log_dir(self.saving_dir, remove_existing=True)
         self.params['saving_dir'] = self.saving_dir
         self.params['plots_dir'] = os.path.join(self.saving_dir, 'plots')
@@ -241,7 +241,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         # set up env
         self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
 
-        # set up ensemble
+        # set up agent
         def phi(x):  # Feature extractor
             return np.asarray(x, dtype=np.float32) / 255
         if self.params['agent'] == 'dqn':
