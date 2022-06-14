@@ -1,7 +1,7 @@
-import argparse
 import os
-import logging
+import argparse
 from pathlib import Path
+from collections import defaultdict
 
 import gym
 import numpy as np
@@ -29,7 +29,7 @@ class BaseTrial:
         )
         # common args
         # system 
-        parser.add_argument("--experiment_name", type=str,
+        parser.add_argument("--experiment_name", "-e", type=str,
                             help="Experiment Name, also used as the directory name to save results")
         parser.add_argument("--results_dir", type=str, default='results',
                             help='the name of the directory used to store results')
@@ -84,7 +84,7 @@ class BaseTrial:
             )
         else:
             env = gym.make(env_name)
-        logging.info(f'making environment {env_name}')
+        print(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
         return env
@@ -112,6 +112,10 @@ class SingleOptionTrial(BaseTrial):
                             help="train with the agent space")
         parser.add_argument("--suppress_action_prunning", action='store_true', default=True,
                             help='do not prune the action space of monte')
+        
+        # skill type
+        parser.add_argument("--skill_type", "-s", type=str, default="skull", choices=['skull', 'ladder'], 
+                            help="the type of skill to train")
 
         # start state
         parser.add_argument("--info_dir", type=Path, default="resources/monte_info",
@@ -136,6 +140,7 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
+        from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
         from skills.wrappers.episodic_life import EpisodicLifeEnv
 
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
@@ -171,15 +176,20 @@ class SingleOptionTrial(BaseTrial):
             env = MontePrunedActions(env)
         # make the agent start in another place if needed
         if start_state is not None:
-            start_state_path = self.params['ram_dir'].joinpath(start_state + '.npy')
+            start_state_path = self.params['ram_dir'].joinpath(self.params['skill_type']).joinpath(start_state + '.npy')
             # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
             # this does not need to be enforced once test uses the timeout wrapper
             env = MonteForwarding(env, start_state_path)
-        # ladder goals
-        # should go after the forwarding wrappers, because the goals depend on the position of 
-        # the agent in the starting state
-        env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-        logging.info(f'making environment {env_name}')
+        if self.params['skill_type'] == 'ladder':
+            # ladder goals
+            # should go after the forwarding wrappers, because the goals depend on the position of 
+            # the agent in the starting state
+            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+            print('pursuing ladder skills')
+        elif self.params['skill_type'] == 'skull':
+            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+            print('pursuing skull skills')
+        print(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
         return env
@@ -234,6 +244,28 @@ def get_player_position(ram):
     x = int(getByte(ram, 'aa'))
     y = int(getByte(ram, 'ab'))
     return x, y
+
+
+def get_skull_position(ram):
+    """
+    given the ram state, get the x position of the skull
+    """
+    x = int(getByte(ram, 'af'))
+    level = 1
+    screen = get_player_room_number(ram)
+    skull_offset = defaultdict(lambda: 33, {
+        18: [22,23,12][level],
+    })[screen]
+    # Note: up to some rounding, player dies when |player_x - skull_x| <= 6
+    return x + skull_offset
+
+
+def get_in_air(ram):
+    # jump: 255 is on the ground, when initiating jump, turns to 16, 12, 8, 4, 0, 255, ...
+    jump = getByte(ram, 'd6')
+    # fall: 0 is on the groud, even positive numbers are falling (jumping is not included)
+    fall = getByte(ram, 'd8')
+    return jump != 255, fall > 0
 
 
 def set_player_position(env, x, y):

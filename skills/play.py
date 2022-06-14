@@ -4,7 +4,8 @@ import os
 import seeding
 import numpy as np
 
-from skills.option_utils import get_player_position, get_player_room_number, SingleOptionTrial
+from skills.option_utils import get_player_position, get_player_room_number, \
+	get_skull_position, get_in_air, SingleOptionTrial
 
 
 class PlayGame(SingleOptionTrial):
@@ -45,9 +46,7 @@ class PlayGame(SingleOptionTrial):
 		meaning_to_action = {meaning.lower(): i for i, meaning in enumerate(self.env.unwrapped.get_action_meanings())}
 		
 		state = self.env.reset()
-		if self.params['get_player_position']:  # get position
-			pos = get_player_position(self.env.unwrapped.ale.getRAM())
-			print(f"current position is {pos}")
+		self._log_position()
 		while True:
 			# render env
 			self.env.unwrapped.render()
@@ -62,16 +61,19 @@ class PlayGame(SingleOptionTrial):
 				np.save(file=save_path, arr=state)
 				print(f'saved numpy array {state} of shape {np.array(state).shape} to {save_path}')
 				action_input = input()
+
 			if action_input == 'save_position':
 				assert self.params['get_player_position']
 				save_path = os.path.join(self.params['info_dir'], "goal_state_pos.txt")
+				pos = get_player_position(self.env.unwrapped.ale.getRAM())
 				np.savetxt(fname=save_path, X=pos)
 				print(f"saved numpy array {pos} to {save_path}")
 				action_input = input()
+
 			if action_input == 'save_ram':
 				state_ref = self.env.unwrapped.ale.cloneState()
 				state = self.env.unwrapped.ale.encodeState(state_ref)
-				save_path = os.path.join(self.params['ram_dir'], "goal_state_ram.npy")
+				save_path = os.path.join(self.params['ram_dir'], self.params['skill_type'], "goal_state_ram.npy")
 				np.save(file=save_path, arr=state)
 				print(f"saved RAM state {state} to {save_path}")
 				action_input = input()
@@ -94,10 +96,15 @@ class PlayGame(SingleOptionTrial):
 			next_state, r, done, info = self.env.step(action)
 			print(f'taking action {action} and got reward {r}')
 			state = next_state
-			if self.params['get_player_position']:  # get position
-				pos = get_player_position(self.env.unwrapped.ale.getRAM())
-				room = get_player_room_number(self.env.unwrapped.ale.getRAM())
-				print(f"current position is {pos} in room {room}")
+			self._log_position()
+
+	def _log_position(self):
+		if self.params['get_player_position']:  # get position
+			ram = self.env.unwrapped.ale.getRAM()
+			pos = get_player_position(ram)
+			room = get_player_room_number(ram)
+			skull_pos = get_skull_position(ram)
+			print(f"monte: {pos} in room {room}, skull: {skull_pos}")
 
 
 def main():

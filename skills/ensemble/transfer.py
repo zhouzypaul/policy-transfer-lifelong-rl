@@ -62,7 +62,7 @@ class TransferTrial(SingleOptionTrial):
     def check_params_validity(self):
         # check that all the target start_states are valid
         for target_path in self.params['target']:
-            start_state_path = self.params['ram_dir'].joinpath(target_path + '.npy')
+            start_state_path = self.params['ram_dir'].joinpath(self.params['skill_type']).joinpath(target_path + '.npy')
             if not os.path.exists(start_state_path):
                 raise FileNotFoundError(f"{target_path} does not exist")
         print(f"Targetting {len(self.params['target'])} transfer targets: {self.params['target']}")
