@@ -3,10 +3,10 @@ portable skills in Reinforcement Learning
 
 ## using the ensemble agent
 ```bash
-python3 -m skills.ensemble.train --experiment_name debug [--options]  # train
+python3 -m skills.ensemble.train --experiment_name debug -s skill_type [--options]  # train
 python3 -m skills.ensemble.test --tag experiment_name_to_load [--options]  # test
-python3 -m skills.ensemble.transfer --load experiment_name_to_load --target a_list_of_targets  # transfer and meta learn
-python3 -m skills.ensemble.transfer --plot -t a_list_of_targets  # plot after transfer experiment
+python3 -m skills.ensemble.transfer --load experiment_name_to_load --target a_list_of_targets -s skill_type  # transfer and meta learn
+python3 -m skills.ensemble.transfer --plot -l load -t a_list_of_targets -s skill_type  # plot after transfer experiment
 ```
 
 ## getting baseline performance (DQN)

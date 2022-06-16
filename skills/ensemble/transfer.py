@@ -188,7 +188,8 @@ def plot_when_well_trained(targets, saving_dir):
     # grab data
     agent_to_data = {}
     for agent_dir in os.listdir(saving_dir):
-        assert os.path.isdir(saving_dir / agent_dir)
+        if not os.path.isdir(saving_dir / agent_dir):
+            continue
         steps_when_well_trained, episode_when_well_trained = _grab_when_well_trained_data(targets, saving_dir / agent_dir)
         agent_to_data[agent_dir] = {
             'steps': steps_when_well_trained,
@@ -242,7 +243,8 @@ def plot_average_success_rate(targets, saving_dir):
     # grab data
     agent_to_data = {}
     for agent_dir in os.listdir(saving_dir):
-        assert os.path.isdir(saving_dir / agent_dir)
+        if not os.path.isdir(saving_dir / agent_dir):
+            continue
         average_success_rates = _grab_average_success_rate_data(targets, saving_dir / agent_dir)
         agent_to_data[agent_dir] = average_success_rates
 
