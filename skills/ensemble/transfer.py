@@ -64,7 +64,7 @@ class TransferTrial(SingleOptionTrial):
         for target_path in self.params['target']:
             start_state_path = self.params['ram_dir'].joinpath(self.params['skill_type']).joinpath(target_path + '.npy')
             if not os.path.exists(start_state_path):
-                raise FileNotFoundError(f"{target_path} does not exist")
+                raise FileNotFoundError(f"{start_state_path} does not exist")
         print(f"Targetting {len(self.params['target'])} transfer targets: {self.params['target']}")
         # set experiment name
         self._set_experiment_name()
@@ -94,8 +94,9 @@ class TransferTrial(SingleOptionTrial):
         """
         just plot the results after the agent has been trained on transfer tasks
         """
-        plot_when_well_trained(self.params['target'], self.saving_dir)
-        plot_average_success_rate(self.params['target'], self.saving_dir)
+        plotting_dir = Path(self.params['results_dir']) / self.params['experiment_name']
+        plot_when_well_trained(self.params['target'], plotting_dir)
+        plot_average_success_rate(self.params['target'], plotting_dir)
     
     def transfer(self):
         """
@@ -150,15 +151,18 @@ class TransferTrial(SingleOptionTrial):
             self.transfer()
 
 
-def plot_when_well_trained(targets, saving_dir):
+def _grab_when_well_trained_data(targets, dir):
+    """
+    given a dir, find all the well_trained csv files and put the data into two arrays
+    """
     steps_when_well_trained = np.zeros(len(targets))
     episode_when_well_trained = np.zeros(len(targets))
 
     # descend into the sub saving dirs to find the well_trained csv file
-    for subdir in os.listdir(saving_dir):
-        if not os.path.isdir(saving_dir.joinpath(subdir)):
+    for subdir in os.listdir(dir):
+        if not os.path.isdir(dir / subdir):
             continue
-        well_trained_file = saving_dir / subdir / 'finish_training_time.csv'
+        well_trained_file = dir / subdir / 'finish_training_time.csv'
         try:
             with open(well_trained_file, 'r') as f:
                 csv_reader = csv.reader(f)
@@ -172,42 +176,83 @@ def plot_when_well_trained(targets, saving_dir):
         target = subdir.split('->')[1]
         steps_when_well_trained[targets.index(target)] = step
         episode_when_well_trained[targets.index(target)] = episode
+    
+    return steps_when_well_trained, episode_when_well_trained
 
+
+def plot_when_well_trained(targets, saving_dir):
+    """
+    given the saving_dir/results_dir, find all the agent_dir within it and plot the 
+    when_well_trained data on one graph, comparing all the agents
+    """
+    # grab data
+    agent_to_data = {}
+    for agent_dir in os.listdir(saving_dir):
+        assert os.path.isdir(saving_dir / agent_dir)
+        steps_when_well_trained, episode_when_well_trained = _grab_when_well_trained_data(targets, saving_dir / agent_dir)
+        agent_to_data[agent_dir] = {
+            'steps': steps_when_well_trained,
+            'episodes': episode_when_well_trained,
+        }
+    
+    # plot steps when well trained
     steps_file = saving_dir / 'steps_when_well_trained.png'
-    plt.plot(steps_when_well_trained)
+    for agent in agent_to_data:
+        plt.plot(agent_to_data[agent]['steps'], label=agent)
     plt.xticks(range(len(targets)), targets)
     plt.xlabel('target')
     plt.ylabel('steps till skill is well trained')
+    plt.legend()
     plt.savefig(steps_file)
     plt.close()
 
+    # plot episodes when well trained
     episode_file = saving_dir / 'episode_when_well_trained.png'
+    for agent in agent_to_data:
+        plt.plot(agent_to_data[agent]['episodes'], label=agent)
     plt.plot(episode_when_well_trained)
     plt.xticks(range(len(targets)), targets)
     plt.xlabel('target')
     plt.ylabel('episode till skill is well trained')
+    plt.legend()
     plt.savefig(episode_file)
     plt.close()
 
 
-def plot_average_success_rate(targets, saving_dir):
+def _grab_average_success_rate_data(targets, dir):
+    """
+    given a dir, find all the average_success_rate csv files and put the data into two arrays
+    """
     average_success_rates = np.zeros(len(targets))
     # descend into the sub saving dirs to find the success rates file
-    for subdir in os.listdir(saving_dir):
-        if not os.path.isdir(saving_dir.joinpath(subdir)):
+    for subdir in os.listdir(dir):
+        if not os.path.isdir(dir.joinpath(subdir)):
             continue
-        success_rates_file = Path(saving_dir) / subdir / 'success_rate.csv'
+        success_rates_file = Path(dir) / subdir / 'success_rate.csv'
         with open(success_rates_file, 'r') as f:
             csv_reader = csv.reader(f)
             success_rates = [float(row[1]) for row in csv_reader]
             avg_success_rate = np.mean(success_rates)
             target = subdir.split('->')[-1]
             average_success_rates[targets.index(target)] = avg_success_rate
+    return average_success_rates
+
+
+def plot_average_success_rate(targets, saving_dir):
+    # grab data
+    agent_to_data = {}
+    for agent_dir in os.listdir(saving_dir):
+        assert os.path.isdir(saving_dir / agent_dir)
+        average_success_rates = _grab_average_success_rate_data(targets, saving_dir / agent_dir)
+        agent_to_data[agent_dir] = average_success_rates
+
     # plot
-    plt.plot(average_success_rates)
+    for agent in agent_to_data:
+        plt.plot(agent_to_data[agent], label=agent)
     plt.xticks(range(len(targets)), targets)
     plt.xlabel('target')
     plt.ylabel('average success rate')
+    plt.legend()
     plt.savefig(saving_dir / 'average_success_rate.png')
     plt.close()
 
