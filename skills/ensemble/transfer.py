@@ -211,7 +211,6 @@ def plot_when_well_trained(targets, saving_dir):
     episode_file = saving_dir / 'episode_when_well_trained.png'
     for agent in agent_to_data:
         plt.plot(agent_to_data[agent]['episodes'], label=agent)
-    plt.plot(episode_when_well_trained)
     plt.xticks(range(len(targets)), targets)
     plt.xlabel('target')
     plt.ylabel('episode till skill is well trained')
