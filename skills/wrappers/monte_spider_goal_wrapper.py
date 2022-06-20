@@ -27,8 +27,8 @@ class MonteSpiderGoalWrapper(Wrapper):
         super().__init__(env)
         self.env = env
         self.epsilon_tol = epsilon_tol
-        room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
-        self.y = room_to_y[room_number]
+        self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
+        self.y = room_to_y[self.room_number]
     
     def step(self, action):
         """
@@ -36,6 +36,7 @@ class MonteSpiderGoalWrapper(Wrapper):
         """
         next_state, reward, done, info = self.env.step(action)
         ram = self.env.unwrapped.ale.getRAM()
+        room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         spider_x, spider_y = get_object_position(ram)
         if player_y == self.y and player_x < spider_x - self.epsilon_tol:
@@ -43,6 +44,9 @@ class MonteSpiderGoalWrapper(Wrapper):
             reward = 1
         else:
             reward = 0  # override reward, such as when got key
+        # terminate if agent enters another room
+        if room != self.room_number:
+            done = True
         # override needs_real_reset for EpisodicLifeEnv
         self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
         return next_state, reward, done, info

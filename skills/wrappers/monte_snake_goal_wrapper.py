@@ -43,6 +43,7 @@ class MonteSnakeGoalWrapper(Wrapper):
         """
         next_state, reward, done, info = self.env.step(action)
         ram = self.env.unwrapped.ale.getRAM()
+        room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         snake_x = room_to_snake_x[self.room_number]
         if player_y == self.y and player_x < snake_x - self.epsilon_tol:
@@ -50,6 +51,9 @@ class MonteSnakeGoalWrapper(Wrapper):
             reward = 1
         else:
             reward = 0  # override reward, such as when got key
+        # terminate if agent enters another room
+        if room != self.room_number:
+            done = True
         # override needs_real_reset for EpisodicLifeEnv
         self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
         return next_state, reward, done, info
