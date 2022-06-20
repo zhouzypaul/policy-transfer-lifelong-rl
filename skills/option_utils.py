@@ -251,13 +251,17 @@ def get_skull_position(ram):
     given the ram state, get the x position of the skull
     """
     x = int(getByte(ram, 'af'))
-    level = 1
+    level = 0
     screen = get_player_room_number(ram)
     skull_offset = defaultdict(lambda: 33, {
-        18: [22,23,12][level],
+        18: [1,23,12][level],
     })[screen]
     # Note: up to some rounding, player dies when |player_x - skull_x| <= 6
     return x + skull_offset
+
+
+def get_level(ram):
+    return int(getByte(ram, 'b9'))
 
 
 def get_in_air(ram):
