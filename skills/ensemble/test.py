@@ -87,8 +87,6 @@ class TestTrial(SingleOptionTrial):
         parser.set_defaults(experiment_name="visualize")
         parser.add_argument("--load", "-l", type=str, required=True,
                             help="the experiment_name of the trained agent to load")
-        parser.add_argument("--agent", "-a", type=str, default="ensemble", choices=["dqn", "ensemble"],
-                            help="the agent to use")
         
         # testing params
         parser.add_argument("--episodes", type=int, default=10,
@@ -104,7 +102,7 @@ class TestTrial(SingleOptionTrial):
         pfrl.utils.set_random_seed(self.params['seed'])
 
         # get the hyperparams
-        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / self.params['agent'] / 'hyperparams.csv'
+        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / 'hyperparams.csv'
         saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
@@ -116,7 +114,7 @@ class TestTrial(SingleOptionTrial):
         self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000, self.params['start_state'])
 
         # agent
-        agent_file = Path(self.params['results_dir']) / self.params['load'] / self.params['agent'] / 'agent.pkl'
+        agent_file = Path(self.params['results_dir']) / self.params['load'] / 'agent.pkl'
         self.agent = EnsembleAgent.load(agent_file)
     
     def run(self):

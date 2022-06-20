@@ -88,6 +88,9 @@ class TransferTrial(SingleOptionTrial):
             utils.create_log_dir(self.saving_dir, remove_existing=True)
         self.params['saving_dir'] = self.saving_dir
 
+        # save the hyperparams
+        utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
+
     def plot_results(self):
         """
         just plot the results after the agent has been trained on transfer tasks
