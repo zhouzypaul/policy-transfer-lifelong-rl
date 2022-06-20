@@ -114,7 +114,8 @@ class SingleOptionTrial(BaseTrial):
                             help='do not prune the action space of monte')
         
         # skill type
-        parser.add_argument("--skill_type", "-s", type=str, default="skull", choices=['skull', 'ladder', 'finish_game'], 
+        parser.add_argument("--skill_type", "-s", type=str, default="skull", 
+                            choices=['skull', 'snake', 'spider', 'enemy', 'ladder', 'finish_game'], 
                             help="the type of skill to train")
 
         # start state
@@ -128,6 +129,36 @@ class SingleOptionTrial(BaseTrial):
                                     This should not include the whole path or the .npy extension.
                                     e.g: room1_right_ladder_top""")
         return parser
+    
+    def find_start_state_ram_file(self, start_state):
+        """
+        given the start state string, find the corresponding RAM file in ram_dir
+        when the skill type is enemey, look through all the enemies directories
+        """
+        real_skill_type = self._get_real_skill_type(start_state)
+        start_state_path = self.params['ram_dir'] / real_skill_type / f'{start_state}.npy'
+        if not start_state_path.exists():
+            raise FileNotFoundError(f'{start_state_path} does not exist')
+        return start_state_path
+    
+    def _get_real_skill_type(self, saved_ram_file):
+        """
+        when the entered skill type is enemy, the real skil type is the actual enemy type
+        """
+        if self.params['skill_type'] == 'enemy':
+            enemies = ['skull', 'snake', 'spider']
+            for enemy in enemies:
+                saved_ram_path = self.params['ram_dir'] / f'{enemy}' / f'{saved_ram_file}.npy'
+                if saved_ram_path.exists():
+                    real_skill = enemy
+            try:
+                real_skill
+            except NameError:
+                raise RuntimeError(f"Could not find real skill type for {saved_ram_file} and entered skill {self.params['skill_type']}")
+        else:
+            real_skill = self.params['skill_type']
+        self.real_skill_type = real_skill
+        return real_skill
 
     def make_env(self, env_name, env_seed, start_state=None):
         """
@@ -141,6 +172,8 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
         from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
+        from skills.wrappers.monte_spider_goal_wrapper import MonteSpiderGoalWrapper
+        from skills.wrappers.monte_snake_goal_wrapper import MonteSnakeGoalWrapper
         from skills.wrappers.episodic_life import EpisodicLifeEnv
 
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
@@ -176,19 +209,26 @@ class SingleOptionTrial(BaseTrial):
             env = MontePrunedActions(env)
         # make the agent start in another place if needed
         if start_state is not None:
-            start_state_path = self.params['ram_dir'].joinpath(self.params['skill_type']).joinpath(start_state + '.npy')
+            start_state_path = self.find_start_state_ram_file(start_state)
             # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
             # this does not need to be enforced once test uses the timeout wrapper
             env = MonteForwarding(env, start_state_path)
-        if self.params['skill_type'] == 'ladder':
+        self._get_real_skill_type(start_state)
+        if self.real_skill_type == 'ladder':
             # ladder goals
             # should go after the forwarding wrappers, because the goals depend on the position of 
             # the agent in the starting state
             env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
             print('pursuing ladder skills')
-        elif self.params['skill_type'] == 'skull':
+        elif self.real_skill_type == 'skull':
             env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
             print('pursuing skull skills')
+        elif self.real_skill_type == 'spider':
+            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+            print('pursuing spider skills')
+        elif self.real_skill_type == 'snake':
+            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+            print('pursuing snake skills')
         print(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
@@ -262,6 +302,12 @@ def get_skull_position(ram):
 
 def get_level(ram):
     return int(getByte(ram, 'b9'))
+
+
+def get_object_position(ram):
+    x = int(getByte(ram, 'ac'))
+    y = int(getByte(ram, 'ad'))
+    return x, y
 
 
 def get_in_air(ram):

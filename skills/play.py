@@ -5,7 +5,7 @@ import seeding
 import numpy as np
 
 from skills.option_utils import get_player_position, get_player_room_number, \
-    get_skull_position, get_in_air, get_level, SingleOptionTrial
+    get_skull_position, get_in_air, get_level, get_object_position, SingleOptionTrial
 
 
 class PlayGame(SingleOptionTrial):
@@ -104,7 +104,8 @@ class PlayGame(SingleOptionTrial):
             pos = get_player_position(ram)
             room = get_player_room_number(ram)
             skull_pos = get_skull_position(ram)
-            print(f"monte: {pos} in room {room}, skull: {skull_pos}")
+            obj_pos = get_object_position(ram)
+            print(f"monte: {pos} in room {room}, skull: {skull_pos}, object: {obj_pos}")
 
 
 def main():
