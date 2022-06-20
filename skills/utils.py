@@ -3,6 +3,7 @@ import csv
 import sys
 import shutil
 import logging
+import datetime
 from pydoc import locate
 from collections import defaultdict
 from distutils.util import strtobool
@@ -13,6 +14,7 @@ def create_log_dir(dir_path, remove_existing=True, log_git=True):
     Prepare a directory for outputting training results.
     Then the following infomation is saved into the directory:
         command.txt: command itself
+        start_time.txt: start time of the running script
     Additionally, if the current directory is under git control, the following
     information is saved:
         git-head.txt: result of `git rev-parse HEAD`
@@ -34,12 +36,17 @@ def create_log_dir(dir_path, remove_existing=True, log_git=True):
     else:
         print(f"Successfully created the directory {outdir}")
 
-    if log_git:
-        # log the command used
-        with open(os.path.join(outdir, "command.txt"), "w") as f:
-            f.write(" ".join(sys.argv))
+    # log the command used
+    with open(os.path.join(outdir, "command.txt"), "w") as f:
+        f.write(" ".join(sys.argv))
 
-        # log git stuff
+    # log the start time
+    with open(os.path.join(outdir, "start_time.txt"), "w") as f:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(timestamp)
+
+    # log git stuff
+    if log_git:
         from pfrl.experiments.prepare_output_dir import is_under_git_control, save_git_information
         if is_under_git_control():
             save_git_information(outdir)
