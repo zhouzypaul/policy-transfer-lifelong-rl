@@ -46,7 +46,7 @@ class MonteSnakeGoalWrapper(Wrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         snake_x = room_to_snake_x[self.room_number]
-        if player_y == self.y and player_x < snake_x - self.epsilon_tol:
+        if player_y == self.y and player_x < snake_x - self.epsilon_tol and room == self.room_number:
             done = True
             reward = 1
         else:

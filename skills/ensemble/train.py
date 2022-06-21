@@ -62,7 +62,7 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
         step_number += 1
 
     # testing
-    test_ensemble_agent(agent, env, saving_dir, num_episodes=5, max_steps_per_episode=50)
+    test_ensemble_agent(agent, env, saving_dir, num_episodes=2, max_steps_per_episode=50)
 
     end_time = time.time()
 
