@@ -1,4 +1,5 @@
 import os
+import lzma
 import dill
 
 import torch
@@ -216,12 +217,12 @@ class EnsembleAgent(Agent):
 
     def save(self, save_dir):
         path = os.path.join(save_dir, "agent.pkl")
-        with open(path, 'wb') as f:
+        with lzma.open(path, 'wb') as f:
             dill.dump(self, f)
 
     @classmethod
     def load(cls, load_path, plot_dir=None):
-        with open(load_path, 'rb') as f:
+        with lzma.open(load_path, 'rb') as f:
             agent = dill.load(f)
         # hack to change the plot_dir of the agent
         agent.value_ensemble.embedding.plot_dir = plot_dir

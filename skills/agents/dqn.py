@@ -1,5 +1,6 @@
 import os
 import dill
+import lzma
 
 import numpy as np
 import torch
@@ -85,12 +86,12 @@ class DoubleDQN(agents.DoubleDQN, Agent):
     
     def save(self, save_dir):
         path = os.path.join(save_dir, "agent.pkl")
-        with open(path, 'wb') as f:
+        with lzma.open(path, 'wb') as f:
             dill.dump(self, f)
 
     @classmethod
     def load(cls, load_path):
-        with open(load_path, 'rb') as f:
+        with lzma.open(load_path, 'rb') as f:
             agent = dill.load(f)
         return agent
 
