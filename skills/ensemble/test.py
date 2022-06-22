@@ -63,6 +63,16 @@ def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_e
                 step += 1
                 obs = next_obs
             print(f"episode {i} reward: {total_reward}")
+            save_total_reward_info(total_reward, saving_dir)
+
+
+def save_total_reward_info(reward, save_dir):
+    """
+    save the total reawrd obtained at the end of a testing episode to disk
+    """
+    file = os.path.join(save_dir, "total_reward.txt")
+    with open(file, "w") as f:
+        f.write(str(reward))
 
 
 class TestTrial(SingleOptionTrial):
