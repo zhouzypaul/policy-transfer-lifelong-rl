@@ -67,7 +67,7 @@ def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_e
                 step += 1
                 obs = next_obs
             print(f"episode {i} reward: {total_reward}")
-            save_total_reward_info(total_reward, saving_dir)
+            save_total_reward_info(total_reward, visualization_dir)
 
 
 def save_total_reward_info(reward, save_dir):
