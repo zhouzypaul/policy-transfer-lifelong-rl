@@ -31,14 +31,7 @@ class MonteSkullGoalWrapper(MonteObjectGoalWrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         skull_x = get_skull_position(ram)
-        if self.finished_skill(player_x, player_y, skull_x, room):
-            done = True
-            reward = 1
-        else:
-            reward = 0  # override reward, such as when got key
-        # terminate if agent enters another room
-        if room != self.room_number:
-            done = True
+        done, reward = self.finished_skill(player_x, player_y, skull_x, room)
         # override needs_real_reset for EpisodicLifeEnv
         self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
         return next_state, reward, done, info

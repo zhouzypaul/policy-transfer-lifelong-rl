@@ -31,9 +31,19 @@ class MonteObjectGoalWrapper(Wrapper):
             - not too far away from the object
             - on the ground
             - in the same room
+        return reward, done
         """
         on_ground = player_y == self.y
         to_the_left = player_x < object_x and abs(player_x - object_x) < self.epsilon_tol
         in_same_room = room_number == self.room_number
-        return on_ground and to_the_left and in_same_room
+        if on_ground and to_the_left and in_same_room:
+            done = True
+            reward = 1
+        else:
+            done = False
+            reward = 0  # override reward, such as when got key
+            # terminate if agent enters another room
+            if not in_same_room:
+                done = True
+        return reward, done
     

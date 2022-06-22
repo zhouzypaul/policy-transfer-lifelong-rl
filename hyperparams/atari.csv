@@ -8,4 +8,4 @@ update_interval,4,int
 ensemble_target_update_interval,10,int
 target_update_interval,1000,int
 success_rate_save_freq,20,int
-goal_epsilon_tol,4,int
+goal_epsilon_tol,20,int
