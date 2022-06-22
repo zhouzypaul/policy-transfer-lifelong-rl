@@ -114,7 +114,7 @@ class SingleOptionTrial(BaseTrial):
                             help='do not prune the action space of monte')
         
         # skill type
-        parser.add_argument("--skill_type", "-s", type=str, default="skull", 
+        parser.add_argument("--skill_type", "-s", type=str, default="enemy", 
                             choices=['skull', 'snake', 'spider', 'enemy', 'ladder', 'finish_game'], 
                             help="the type of skill to train")
 
