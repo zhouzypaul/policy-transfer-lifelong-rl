@@ -1,5 +1,4 @@
-from gym import Wrapper
-
+from skills.wrappers.monte_object_goal_wrapper import MonteObjectGoalWrapper
 from skills.option_utils import get_player_position, get_object_position, get_player_room_number
 
 
@@ -11,7 +10,7 @@ room_to_y = {
 }
 
 
-class MonteSpiderGoalWrapper(Wrapper):
+class MonteSpiderGoalWrapper(MonteObjectGoalWrapper):
     """
     for training a "jump over spider" skill.
     The agent finishes the skill if its y pos aligns with the floor of the spider and 
@@ -19,15 +18,8 @@ class MonteSpiderGoalWrapper(Wrapper):
 
     currently, default to the player starts on the right side of the spider, and try to jump to the left of it
     """
-    def __init__(self, env, epsilon_tol=6):
-        """
-        Args:
-            epsilon_tol: the agent dies within 6 of the spider
-        """
-        super().__init__(env)
-        self.env = env
-        self.epsilon_tol = epsilon_tol
-        self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
+    def __init__(self, env, epsilon_tol=8):
+        super().__init__(env, epsilon_tol)
         self.y = room_to_y[self.room_number]
     
     def step(self, action):
@@ -38,8 +30,8 @@ class MonteSpiderGoalWrapper(Wrapper):
         ram = self.env.unwrapped.ale.getRAM()
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
-        spider_x, spider_y = get_object_position(ram)
-        if player_y == self.y and player_x < spider_x - self.epsilon_tol and room == self.room_number:
+        spider_x, _ = get_object_position(ram)
+        if self.finished_skill(player_x, player_y, spider_x, room):
             done = True
             reward = 1
         else:

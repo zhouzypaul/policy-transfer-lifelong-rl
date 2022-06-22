@@ -1,5 +1,4 @@
-from gym import Wrapper
-
+from skills.wrappers.monte_object_goal_wrapper import MonteObjectGoalWrapper
 from skills.option_utils import get_player_position, get_player_room_number
 
 
@@ -18,7 +17,7 @@ room_to_snake_x = {
 }
 
 
-class MonteSnakeGoalWrapper(Wrapper):
+class MonteSnakeGoalWrapper(MonteObjectGoalWrapper):
     """
     for training a "jump over snake" skill.
     The agent finishes the skill if its y pos aligns with the floor of the snake and 
@@ -26,15 +25,8 @@ class MonteSnakeGoalWrapper(Wrapper):
 
     currently, default to the player starts on the right side of the snake, and try to jump to the left of it
     """
-    def __init__(self, env, epsilon_tol=6):
-        """
-        Args:
-            epsilon_tol: the agent dies within 6 of the snake
-        """
-        super().__init__(env)
-        self.env = env
-        self.epsilon_tol = epsilon_tol
-        self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
+    def __init__(self, env, epsilon_tol=8):
+        super().__init__(env, epsilon_tol)
         self.y = room_to_y[self.room_number]
     
     def step(self, action):
@@ -46,7 +38,7 @@ class MonteSnakeGoalWrapper(Wrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         snake_x = room_to_snake_x[self.room_number]
-        if player_y == self.y and player_x < snake_x - self.epsilon_tol and room == self.room_number:
+        if self.finished_skill(player_x, player_y, snake_x, room):
             done = True
             reward = 1
         else:

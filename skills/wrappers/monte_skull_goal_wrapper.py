@@ -1,6 +1,6 @@
-from gym import Wrapper
-
+from skills.wrappers.monte_object_goal_wrapper import MonteObjectGoalWrapper
 from skills.option_utils import get_player_position, get_player_room_number, get_skull_position
+
 
 
 room_to_skull_y = {
@@ -10,7 +10,7 @@ room_to_skull_y = {
 }
 
 
-class MonteSkullGoalWrapper(Wrapper):
+class MonteSkullGoalWrapper(MonteObjectGoalWrapper):
     """
     for training a "jump over skull" skill.
     The agent finishes the skill if its y pos aligns with the floor of the skull and 
@@ -18,15 +18,8 @@ class MonteSkullGoalWrapper(Wrapper):
 
     currently, default to the player starts on the right side of the skull, and try to jump to the left of it
     """
-    def __init__(self, env, epsilon_tol=6):
-        """
-        Args:
-            epsilon_tol: the agent dies within 6 of the skull (according to pix2sim)
-        """
-        super().__init__(env)
-        self.env = env
-        self.epsilon_tol = epsilon_tol
-        self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
+    def __init__(self, env, epsilon_tol=8):
+        super().__init__(env, epsilon_tol)
         self.y = room_to_skull_y[self.room_number]
     
     def step(self, action):
@@ -38,7 +31,7 @@ class MonteSkullGoalWrapper(Wrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         skull_x = get_skull_position(ram)
-        if player_y == self.y and player_x < skull_x - self.epsilon_tol and room == self.room_number:
+        if self.finished_skill(player_x, player_y, skull_x, room):
             done = True
             reward = 1
         else:
