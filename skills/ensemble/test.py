@@ -22,6 +22,10 @@ def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_e
     with evaluating(agent):
         action_meanings = env.unwrapped.get_action_meanings()
         for i in range(num_episodes):
+            # set random seed for each run
+            env.seed(i+1000)
+            env.action_space.seed(i+1000)
+
             # set up save dir
             visualization_dir = os.path.join(saving_dir, f"trained_agent_episode_{i}")
             os.mkdir(visualization_dir)
