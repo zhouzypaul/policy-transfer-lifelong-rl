@@ -31,7 +31,5 @@ class MonteSpiderGoalWrapper(MonteObjectGoalWrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         spider_x, _ = get_object_position(ram)
-        reward, done = self.finished_skill(player_x, player_y, spider_x, room)
-        # override needs_real_reset for EpisodicLifeEnv
-        self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
+        reward, done = self.finished_skill(player_x, player_y, spider_x, room, done, info)
         return next_state, reward, done, info
