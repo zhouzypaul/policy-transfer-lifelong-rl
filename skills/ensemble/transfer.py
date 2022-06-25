@@ -152,6 +152,14 @@ class TransferTrial(SingleOptionTrial):
             self.transfer()
 
 
+def _rotate_xticks():
+    """
+    rotate the xticks and make it a small font so that they don't overlap each other
+    """
+    ax = plt.gca()
+    plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right', fontsize='x-small')
+
+
 def _grab_when_well_trained_data(targets, dir):
     """
     given a dir, find all the well_trained csv files and put the data into two arrays
@@ -205,6 +213,7 @@ def plot_when_well_trained(targets, saving_dir):
     plt.xlabel('target')
     plt.ylabel('steps till skill is well trained')
     plt.legend()
+    _rotate_xticks()
     plt.savefig(steps_file)
     plt.close()
 
@@ -216,6 +225,7 @@ def plot_when_well_trained(targets, saving_dir):
     plt.xlabel('target')
     plt.ylabel('episode till skill is well trained')
     plt.legend()
+    _rotate_xticks()
     plt.savefig(episode_file)
     plt.close()
 
@@ -255,6 +265,7 @@ def plot_average_success_rate(targets, saving_dir):
     plt.xlabel('target')
     plt.ylabel('average success rate')
     plt.legend()
+    _rotate_xticks()
     plt.savefig(saving_dir / 'average_success_rate.png')
     plt.close()
 
