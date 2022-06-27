@@ -31,7 +31,7 @@ class Attention(nn.Module):
         self.conv2 = nn.Conv2d(in_channels=self.attention_depth, out_channels=64, kernel_size=3, stride=2)
         self.pool2 = nn.MaxPool2d(2)
 
-        self.linear = nn.Linear(6400, self.out_dim)
+        self.linear = nn.LazyLinear(self.out_dim)
 
         self.plot_dir = plot_dir
 

@@ -51,7 +51,7 @@ def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_fr
 	visualize whether embedding of each attention is getting more and more diverse
 	"""
 	assert len(embedding) == num_attentions
-	assert embedding[0][0, :, :, :].shape == (64, 10, 10), embedding[0].shape
+	# assert embedding[0][0, :, :, :].shape == (64, 10, 10), embedding[0].shape
 	for i in range(num_attentions):
 		plt.subplot(2, 4, i+1)
 		plt.imshow(np.mean(embedding[i].cpu().detach().numpy(), axis=(0, 1)))
