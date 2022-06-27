@@ -166,24 +166,28 @@ class SingleOptionTrial(BaseTrial):
         Args:
             goal: None or (x, y)
         """
-        from skills.wrappers.monte_agent_space_wrapper import MonteAgentSpace
+        from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
+        from skills.wrappers.agent_wrapper import MonteAgentWrapper
         from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
-        from skills.wrappers.monte_dm_agent_space import MonteDeepMindAgentSpace
         from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
         from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
         from skills.wrappers.monte_spider_goal_wrapper import MonteSpiderGoalWrapper
         from skills.wrappers.monte_snake_goal_wrapper import MonteSnakeGoalWrapper
-        from skills.wrappers.episodic_life import EpisodicLifeEnv
 
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
 
+        # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
+        env = make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
+        # make agent space
+        if self.params['agent_space']:
+            env = MonteAgentWrapper(env)
+            print('using the agent space to train the option right now')
         if self.params['use_deepmind_wrappers']:
-            # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
-            env = pfrl.wrappers.atari_wrappers.make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
             # deepmind wrappers without EpisodicLife, use the custom one
-            env = pfrl.wrappers.atari_wrappers.wrap_deepmind(
+            env = wrap_deepmind(
                 env,
+                warp_frames=not self.params['agent_space'],
                 episode_life=False,
                 clip_rewards=True,
                 frame_stack=True,
@@ -192,18 +196,6 @@ class SingleOptionTrial(BaseTrial):
                 channel_order="chw",
                 flicker=False,
             )
-            # episodic life
-            env = EpisodicLifeEnv(env)
-            # make agent space
-            if self.params['agent_space']:
-                env = MonteDeepMindAgentSpace(env)
-                print('using the agent space to train the optin right now')
-        else:
-            env = gym.make(env_name)
-            # make agent space
-            if self.params['agent_space']:
-                env = MonteAgentSpace(env)
-                print('using the agent space to train the option right now')
         # prunning actions
         if not self.params['suppress_action_prunning']:
             env = MontePrunedActions(env)

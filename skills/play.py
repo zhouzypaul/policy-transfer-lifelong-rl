@@ -49,7 +49,7 @@ class PlayGame(SingleOptionTrial):
         self._log_position()
         while True:
             # render env
-            self.env.unwrapped.render()
+            self.env.render()
             # print(f"state shape is {np.array(state).shape}")
             # user input an action to take
             action_input = input() 
