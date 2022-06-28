@@ -5,6 +5,7 @@ from skills.option_utils import get_player_position, get_player_room_number, get
 
 room_to_skull_y = {
     1: 148,
+    3: 235,
     5: 198,
     18: 235,
 }
