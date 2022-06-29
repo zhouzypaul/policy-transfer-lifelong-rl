@@ -81,7 +81,7 @@ class TransferTrial(SingleOptionTrial):
         self.saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
-        self.saving_dir = Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(self.params['agent'])
+        self.saving_dir = self._set_saving_dir()
         if self.params['plot']:
             utils.create_log_dir(self.saving_dir, remove_existing=False)
         else:

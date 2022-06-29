@@ -165,6 +165,16 @@ class SingleOptionTrial(BaseTrial):
             real_skill = self.params['skill_type']
         self.real_skill_type = real_skill
         return real_skill
+    
+    def _set_saving_dir(self):
+        agent = self.params['agent']
+        if self.params['agent_space']:
+            agent += '-agent-space'
+        if self.params['termination_clf']:
+            agent += '-termination-clf'
+        if self.params['confidence_based_reward']:
+            agent += '-cbr'
+        return Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(agent)
 
     def make_env(self, env_name, env_seed, start_state=None):
         """
