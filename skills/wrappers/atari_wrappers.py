@@ -161,8 +161,12 @@ class EpisodicLifeEnv(gym.Wrapper):
 
 class WarpFrame(gym.ObservationWrapper):
     def __init__(self, env, channel_order="hwc"):
-        """Warp frames to 84x84 as done in the Nature paper and later work.
+        """
+        Warp frames to 84x84 as done in the Nature paper and later work.
         To use this wrapper, OpenCV-Python is required.
+
+        this is almost the same as the pfrl version, except that in observation() it saves the
+        original frame to the unwrapped env, so that FrameStack can access it
         """
         if not _is_cv2_available:
             raise RuntimeError(
@@ -181,6 +185,7 @@ class WarpFrame(gym.ObservationWrapper):
         )
 
     def observation(self, frame):
+        self.env.unwrapped.original_frame = frame
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         frame = cv2.resize(
             frame, (self.width, self.height), interpolation=cv2.INTER_AREA
@@ -195,10 +200,14 @@ class FrameStack(gym.Wrapper):
         See Also
         --------
         baselines.common.atari_wrappers.LazyFrames
+
+        the same as pfrl's, except adding code to keep track of self.env.unwrapped.original_stacked_frames
+        this is so that we also have access to the original frame in the unwrapped env
         """
         gym.Wrapper.__init__(self, env)
         self.k = k
         self.frames = deque([], maxlen=k)
+        self.env.unwrapped.original_stacked_frames = deque([], maxlen=k)  # (k, 210, 160, 3)
         self.stack_axis = {"hwc": 2, "chw": 0}[channel_order]
         orig_obs_space = env.observation_space
         low = np.repeat(orig_obs_space.low, k, axis=self.stack_axis)
@@ -211,11 +220,13 @@ class FrameStack(gym.Wrapper):
         ob = self.env.reset()
         for _ in range(self.k):
             self.frames.append(ob)
+            self.env.unwrapped.original_stacked_frames.append(self.env.unwrapped.original_frame)
         return self._get_ob()
 
     def step(self, action):
         ob, reward, done, info = self.env.step(action)
         self.frames.append(ob)
+        self.env.unwrapped.original_stacked_frames.append(self.env.unwrapped.original_frame)
         return self._get_ob(), reward, done, info
 
     def _get_ob(self):

@@ -188,8 +188,8 @@ class SingleOptionTrial(BaseTrial):
         env = make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
         # make agent space
         if self.params['agent_space']:
-            env = MonteAgentWrapper(env)
             print('using the agent space to train the option right now')
+        env = MonteAgentWrapper(env, agent_space=self.params['agent_space'])
         if self.params['use_deepmind_wrappers']:
             env = wrap_deepmind(
                 env,
