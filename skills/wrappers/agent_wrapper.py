@@ -50,7 +50,7 @@ class MonteAgentWrapper(gym.Wrapper):
         self.episode_rewards = self.added_rewards.copy()
         self._elapsed_steps = 0
         
-        s0 = self.get_pixels_around_player(trim_direction=actions.NOOP)
+        s0 = self.get_pixels_around_player()
         s0 = cv2.cvtColor(s0, cv2.COLOR_BGR2GRAY)
         s0 = np.expand_dims(s0, axis=0)  # add channel dimension
         return s0
@@ -72,7 +72,7 @@ class MonteAgentWrapper(gym.Wrapper):
         if self._max_episode_steps <= self._elapsed_steps:
             info["needs_reset"] = True
 
-        obs = self.get_pixels_around_player(trim_direction=action)
+        obs = self.get_pixels_around_player()
         obs = cv2.cvtColor(obs, cv2.COLOR_BGR2GRAY)
         obs = np.expand_dims(obs, axis=0)  # add channel dimension
         return obs, reward, done, info
