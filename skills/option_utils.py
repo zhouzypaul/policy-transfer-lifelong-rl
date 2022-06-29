@@ -128,6 +128,12 @@ class SingleOptionTrial(BaseTrial):
                             help="""filename that saved the starting state RAM. 
                                     This should not include the whole path or the .npy extension.
                                     e.g: room1_right_ladder_top""")
+        
+        # termination classifiers
+        parser.add_argument("--termination_clf", "-c", action='store_true', default=False,
+                            help="whether to use the trained termination classifier to determine episodic done.")
+        parser.add_argument("--confidence_based_reward", action='store_true', default=False,
+                            help="whether to use the confidence based reward when using the trained termination classifer")
         return parser
     
     def find_start_state_ram_file(self, start_state):
@@ -169,6 +175,7 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
         from skills.wrappers.agent_wrapper import MonteAgentWrapper
         from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
+        from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
         from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
@@ -184,7 +191,6 @@ class SingleOptionTrial(BaseTrial):
             env = MonteAgentWrapper(env)
             print('using the agent space to train the option right now')
         if self.params['use_deepmind_wrappers']:
-            # deepmind wrappers without EpisodicLife, use the custom one
             env = wrap_deepmind(
                 env,
                 warp_frames=not self.params['agent_space'],
@@ -199,6 +205,10 @@ class SingleOptionTrial(BaseTrial):
         # prunning actions
         if not self.params['suppress_action_prunning']:
             env = MontePrunedActions(env)
+        # use the termination classifier 
+        if self.params['termination_clf']:
+            env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'])
+            print('using trained termination classifier')
         # make the agent start in another place if needed
         if start_state is not None:
             start_state_path = self.find_start_state_ram_file(start_state)

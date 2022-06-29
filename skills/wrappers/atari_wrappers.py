@@ -123,6 +123,7 @@ class EpisodicLifeEnv(gym.Wrapper):
         this is so that other wrappers can change how `done` is handled, such as MonteNewGoalWrapper
 
         NOTE: any wrapper that changes how done is handled should set self.env.unwrapped.needs_real_reset
+        this is so that those wrapper need not go before this wrapper
         """
         super().__init__(env)
         self.lives = 0
