@@ -215,32 +215,33 @@ class SingleOptionTrial(BaseTrial):
         # prunning actions
         if not self.params['suppress_action_prunning']:
             env = MontePrunedActions(env)
-        # use the termination classifier 
-        if self.params['termination_clf']:
-            env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'])
-            print('using trained termination classifier')
-        # make the agent start in another place if needed
+        # starting state wrappers
         if start_state is not None:
             start_state_path = self.find_start_state_ram_file(start_state)
             # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
             # this does not need to be enforced once test uses the timeout wrapper
             env = MonteForwarding(env, start_state_path)
-        self._get_real_skill_type(start_state)
-        if self.real_skill_type == 'ladder':
-            # ladder goals
-            # should go after the forwarding wrappers, because the goals depend on the position of 
-            # the agent in the starting state
-            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-            print('pursuing ladder skills')
-        elif self.real_skill_type == 'skull':
-            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-            print('pursuing skull skills')
-        elif self.real_skill_type == 'spider':
-            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-            print('pursuing spider skills')
-        elif self.real_skill_type == 'snake':
-            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-            print('pursuing snake skills')
+        # termination wrappers
+        if self.params['termination_clf']:
+            env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'])
+            print('using trained termination classifier')
+        else:
+            self._get_real_skill_type(start_state)
+            if self.real_skill_type == 'ladder':
+                # ladder goals
+                # should go after the forwarding wrappers, because the goals depend on the position of 
+                # the agent in the starting state
+                env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+                print('pursuing ladder skills')
+            elif self.real_skill_type == 'skull':
+                env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+                print('pursuing skull skills')
+            elif self.real_skill_type == 'spider':
+                env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+                print('pursuing spider skills')
+            elif self.real_skill_type == 'snake':
+                env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
+                print('pursuing snake skills')
         print(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)

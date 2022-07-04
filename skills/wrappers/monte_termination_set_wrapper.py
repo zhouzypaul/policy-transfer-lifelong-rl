@@ -26,6 +26,9 @@ class MonteTerminationSetWrapper(Wrapper):
         self.clf.load(clf_path)
 
     def step(self, action):
+        """
+        override done and reward
+        """
         next_state, reward, done, info = self.env.step(action)
         tensor_next_state = torch.from_numpy(np.array(next_state)).float().unsqueeze(0)  # add batch dimension
         try:
@@ -33,6 +36,7 @@ class MonteTerminationSetWrapper(Wrapper):
         except AssertionError:
             # policy is in problem space, get the agent space input here
             # build the frame stack
+            assert tensor_next_state.shape == (1, 4, 84, 84)
             agent_space_next_state = np.zeros((1, 4, 56, 40))
             for i, frame in enumerate(self.env.unwrapped.original_stacked_frames):
                 player_pos = self.env.unwrapped.stacked_agent_position[i]
