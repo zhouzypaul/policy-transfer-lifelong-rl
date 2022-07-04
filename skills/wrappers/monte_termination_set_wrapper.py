@@ -11,7 +11,7 @@ class MonteTerminationSetWrapper(Wrapper):
     """
     a wrapper that uses the portable EnsembleClassifier to determine whether a skill is done or not
     """
-    def __init__(self, env, confidence_based_reward=False):
+    def __init__(self, env, confidence_based_reward=False, device="cuda"):
         """
         when using confidence_based_reward, the reward received when done is exactly the confidence of the 
         termination classifier
@@ -22,7 +22,7 @@ class MonteTerminationSetWrapper(Wrapper):
         self.confidence_based_reward = confidence_based_reward
         # load saved classifier
         clf_path = 'resources/classifiers'  # hard coded for now
-        self.clf = EnsembleClassifier(device='cuda')
+        self.clf = EnsembleClassifier(device=device)
         self.clf.load(clf_path)
 
     def step(self, action):
