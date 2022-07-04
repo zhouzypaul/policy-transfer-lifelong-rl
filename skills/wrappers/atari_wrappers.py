@@ -322,10 +322,12 @@ def wrap_deepmind(
         env = EpisodicLifeEnv(env)
     if fire_reset and "FIRE" in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
-    if warp_frames:
-        env = WarpFrame(env, channel_order=channel_order)
+    # it's important that ScaledFloatFrame goes before WrapFrame and FrameStack
+    # so that the original unwarped frame stack is also scaled
     if scale:
         env = ScaledFloatFrame(env)
+    if warp_frames:
+        env = WarpFrame(env, channel_order=channel_order)
     if clip_rewards:
         env = ClipRewardEnv(env)
     if flicker:
