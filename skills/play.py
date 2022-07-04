@@ -98,6 +98,9 @@ class PlayGame(SingleOptionTrial):
             state = next_state
             self._log_position()
 
+            if done:
+                print("EPISODE DONE")
+
     def _log_position(self):
         if self.params['get_player_position']:  # get position
             ram = self.env.unwrapped.ale.getRAM()
