@@ -319,7 +319,7 @@ def wrap_deepmind(
 ):
     """Configure environment for DeepMind-style Atari."""
     if episode_life:
-        env = (env)
+        env = EpisodicLifeEnv(env)
     if fire_reset and "FIRE" in env.unwrapped.get_action_meanings():
         env = FireResetEnv(env)
     if warp_frames:

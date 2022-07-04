@@ -204,7 +204,7 @@ class SingleOptionTrial(BaseTrial):
             env = wrap_deepmind(
                 env,
                 warp_frames=not self.params['agent_space'],
-                episode_life=False,
+                episode_life=True,
                 clip_rewards=True,
                 frame_stack=True,
                 scale=False,
