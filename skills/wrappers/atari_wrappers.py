@@ -158,15 +158,23 @@ class EpisodicLifeEnv(gym.Wrapper):
         return obs
 
 
+class SaveOriginalFrame(gym.ObservationWrapper):
+    def __init__(self, env):
+        """
+        does nothing, but just saves the original frame to the unwrapped env, so that FrameStack can access it
+        """
+        gym.ObservationWrapper.__init__(self, env)
+    
+    def observation(self, frame):
+        self.env.unwrapped.original_frame = frame
+        return frame
+
 
 class WarpFrame(gym.ObservationWrapper):
     def __init__(self, env, channel_order="hwc"):
         """
         Warp frames to 84x84 as done in the Nature paper and later work.
         To use this wrapper, OpenCV-Python is required.
-
-        this is almost the same as the pfrl version, except that in observation() it saves the
-        original frame to the unwrapped env, so that FrameStack can access it
         """
         if not _is_cv2_available:
             raise RuntimeError(
@@ -185,7 +193,6 @@ class WarpFrame(gym.ObservationWrapper):
         )
 
     def observation(self, frame):
-        self.env.unwrapped.original_frame = frame
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
         frame = cv2.resize(
             frame, (self.width, self.height), interpolation=cv2.INTER_AREA
@@ -301,6 +308,7 @@ def make_atari(env_id, max_frames=30 * 60 * 60):
     env = env.env
     if max_frames:
         env = pfrl.wrappers.ContinuingTimeLimit(env, max_episode_steps=max_frames)
+    env = SaveOriginalFrame(env)
     env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
     return env
