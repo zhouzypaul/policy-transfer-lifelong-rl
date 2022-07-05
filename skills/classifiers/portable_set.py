@@ -56,8 +56,8 @@ class EnsembleClassifier():
 
         print('Loading from {}'.format(path))
 
-        self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt')))
-        self.classifiers.load_state_dict(torch.load(os.path.join(path, 'classifier.pt')))
+        self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt'), map_location=self.device))
+        self.classifiers.load_state_dict(torch.load(os.path.join(path, 'classifier.pt'), map_location=self.device))
 
     def set_classifiers_train(self):
         for i in range(self.num_modules):
