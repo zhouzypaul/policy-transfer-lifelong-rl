@@ -25,8 +25,8 @@ class MonteSnakeGoalWrapper(MonteObjectGoalWrapper):
 
     currently, default to the player starts on the right side of the snake, and try to jump to the left of it
     """
-    def __init__(self, env, epsilon_tol=8):
-        super().__init__(env, epsilon_tol)
+    def __init__(self, env, epsilon_tol=8, info_only=False):
+        super().__init__(env, epsilon_tol, info_only)
         self.y = room_to_y[self.room_number]
     
     def step(self, action):
@@ -38,5 +38,9 @@ class MonteSnakeGoalWrapper(MonteObjectGoalWrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         snake_x = room_to_snake_x[self.room_number]
-        reward, done = self.finished_skill(player_x, player_y, snake_x, room, done, info)
+        goal_reward, reached_goal = self.finished_skill(player_x, player_y, snake_x, room, done, info)
+        info['reached_goal'] = reached_goal
+        if not self.info_only:
+            reward = goal_reward
+            done = reached_goal
         return next_state, reward, done, info

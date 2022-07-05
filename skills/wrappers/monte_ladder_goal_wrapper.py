@@ -91,17 +91,39 @@ class MonteLadderGoalWrapper(Wrapper):
     when the goal is hit, done will be true and the reward will be 1. The other
     default rewards, such as getting a key, are overwritten to be 0.
     """
-    def __init__(self, env, epsilon_tol=4):
+    def __init__(self, env, epsilon_tol=4, info_only=False):
         """
         Args:
             epsilon_tol: tolerance of nearness to goal, count as within goal 
                             if inside this epsilon ball to the goal
+            info_only: if true, don't override the reward and done from the environment, 
+                        but only add a field `reached_goal` to the info dict
         """
         super().__init__(env)
         self.env = env
         self.epsilon_tol = epsilon_tol
+        self.info_only = info_only
         self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
         self.goal_regions = room_to_goals[self.room_number]
+
+    def finished_skill(self, player_pos, room_number, done, info):
+        """
+        determine if the monte agent has finished the skill
+        return reward, done
+        """
+        in_same_room = room_number == self.room_number
+        reached_goal = self.goal_regions.is_within_goal_position(room_number, player_pos, self.epsilon_tol)
+        if reached_goal and in_same_room:
+            done = True
+            reward = 1
+        else:
+            reward = 0  # override reward, such as when got key
+        # terminate if agent enters another room
+        if not in_same_room:
+            done = True
+        # override needs_real_reset for EpisodicLifeEnv
+        self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
+        return reward, done
     
     def step(self, action):
         """
@@ -111,14 +133,9 @@ class MonteLadderGoalWrapper(Wrapper):
         ram = self.env.unwrapped.ale.getRAM()
         player_pos = np.array(get_player_position(ram))
         room = get_player_room_number(ram)
-        if self.goal_regions.is_within_goal_position(room, player_pos, self.epsilon_tol):
-            reward = 1
-            done = True
-        else:
-            reward = 0  # override reward, such as when got key
-        # terminate if agent enters another room
-        if room != self.room_number:
-            done = True
-        # override needs_real_reset for EpisodicLifeEnv
-        self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
+        goal_reward, reached_goal = self.finished_skill(player_pos, room, done, info)
+        info['reached_goal'] = reached_goal
+        if not self.info_only:
+            reward = goal_reward
+            done = reached_goal
         return next_state, reward, done, info

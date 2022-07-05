@@ -13,14 +13,17 @@ class MonteObjectGoalWrapper(Wrapper):
         - MonteSpiderGoalWrapper
         - MonteSnakeGoalWrapper
     """
-    def __init__(self, env, epsilon_tol=8):
+    def __init__(self, env, epsilon_tol=8, info_only=False):
         """
         Args:
             epsilon_tol: how close to the object the agent must be to finish the skill
+            info_only: if True, don't override the reward and done from the environment, 
+                        but only add a field `reached_goal` to the info dict
         """
         super().__init__(env)
         self.env = env
         self.epsilon_tol = epsilon_tol
+        self.info_only = info_only
         self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
     
     def finished_skill(self, player_x, player_y, object_x, room_number, done, info):

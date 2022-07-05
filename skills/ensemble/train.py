@@ -46,7 +46,7 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
         state = next_state
         if done:
             # success rate
-            success_rates.append(done and reward ==1)
+            success_rates.append(info.get('success_rate', 0))
             save_success_rate(success_rates, episode_number, saving_dir, save_every=success_rate_save_freq)
             # if well trained
             well_trained = len(success_rates) >= 20 and get_success_rate(success_rates) > success_threshold_for_well_trained

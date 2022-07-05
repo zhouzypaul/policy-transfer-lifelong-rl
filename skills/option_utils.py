@@ -225,23 +225,24 @@ class SingleOptionTrial(BaseTrial):
         if self.params['termination_clf']:
             env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
-        else:
-            self._get_real_skill_type(start_state)
-            if self.real_skill_type == 'ladder':
-                # ladder goals
-                # should go after the forwarding wrappers, because the goals depend on the position of 
-                # the agent in the starting state
-                env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-                print('pursuing ladder skills')
-            elif self.real_skill_type == 'skull':
-                env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-                print('pursuing skull skills')
-            elif self.real_skill_type == 'spider':
-                env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-                print('pursuing spider skills')
-            elif self.real_skill_type == 'snake':
-                env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'])
-                print('pursuing snake skills')
+        # skills and goals
+        self._get_real_skill_type(start_state)
+        info_only = self.params['termination_clf']
+        if self.real_skill_type == 'ladder':
+            # ladder goals
+            # should go after the forwarding wrappers, because the goals depend on the position of 
+            # the agent in the starting state
+            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+            print('pursuing ladder skills')
+        elif self.real_skill_type == 'skull':
+            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+            print('pursuing skull skills')
+        elif self.real_skill_type == 'spider':
+            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+            print('pursuing spider skills')
+        elif self.real_skill_type == 'snake':
+            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+            print('pursuing snake skills')
         print(f'making environment {env_name}')
         env.seed(env_seed)
         env.action_space.seed(env_seed)
