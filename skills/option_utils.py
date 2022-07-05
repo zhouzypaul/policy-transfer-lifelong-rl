@@ -207,7 +207,7 @@ class SingleOptionTrial(BaseTrial):
                 episode_life=True,
                 clip_rewards=True,
                 frame_stack=True,
-                scale=True,
+                scale=False,
                 fire_reset=False,
                 channel_order="chw",
                 flicker=False,

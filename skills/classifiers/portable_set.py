@@ -49,10 +49,10 @@ class EnsembleClassifier():
     def load(self, path):
 
         if not os.path.exists(os.path.join(path, 'embedding.pt')):
-            return
+            raise FileNotFoundError('Embedding file not found')
 
         if not os.path.exists(os.path.join(path, 'classifier.pt')):
-            return
+            raise FileNotFoundError('Classifier file not found')
 
         print('Loading from {}'.format(path))
 

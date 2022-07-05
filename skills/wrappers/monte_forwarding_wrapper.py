@@ -26,4 +26,8 @@ class MonteForwarding(Wrapper):
 	def reset(self):
 		self.env.reset()
 		obs = set_player_ram(self.env, self.target_ram)
+		# because we are calling reset here, self.env.unwrapped.original_frame_stack is recording the first room
+		# extra steps so that the original framestacks of the forwarding room cover up the remnants of the first room
+		for _ in range(4):
+			self.env.step(0)
 		return obs
