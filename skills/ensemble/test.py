@@ -35,15 +35,16 @@ def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_e
             obs = env.reset()  # get the warped frame 
             step = 0
             total_reward = 0
-            done = False
+            reached_goal = False
 
-            while not done and step < max_steps_per_episode:
+            while not reached_goal and step < max_steps_per_episode:
                 # step
                 if type(agent) == EnsembleAgent:
                     a, ensemble_actions, ensemble_q_vals = agent.act(obs, return_ensemble_info=True)
                 else:
                     a = agent.act(obs)  # DQN
                 next_obs, reward, done, info = env.step(a)
+                reached_goal = info.get('reached_goal', False)
                 total_reward += reward
 
                 # visualize
