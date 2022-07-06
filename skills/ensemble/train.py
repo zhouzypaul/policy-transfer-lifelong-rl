@@ -18,14 +18,24 @@ from skills.option_utils import SingleOptionTrial
 from skills.ensemble.test import test_ensemble_agent
 
 
-def train_ensemble_agent(agent, env, max_steps, saving_dir, 
-                        success_rate_save_freq, reward_save_freq, agent_save_freq,
-                        success_queue_size=50,
-                        success_threshold_for_well_trained=0.9,):
+def train_ensemble_agent_with_eval(
+    agent, 
+    env, 
+    max_steps, 
+    saving_dir, 
+    success_rate_save_freq, 
+    reward_save_freq, 
+    agent_save_freq,
+    eval_env=None,
+    eval_freq=None,
+    success_queue_size=50,
+    success_threshold_for_well_trained=0.9
+):
     """
-    run the actual experiment to train one option
+    run the actual experiment to train one option, and periodically evaluate
     """
     start_time = time.time()
+    assert (eval_env is None) == (eval_freq is None)
 
     # train loop
     step_number = 0
@@ -34,6 +44,8 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
     success_rates = deque(maxlen=success_queue_size)
     step_when_well_trained = None
     episode_when_well_trained = None
+    step_when_eval_well_trained = None
+    episode_when_eval_well_trained = None
     state = env.reset()
     while step_number < max_steps:
         # action selection: epsilon greedy
@@ -46,23 +58,34 @@ def train_ensemble_agent(agent, env, max_steps, saving_dir,
         state = next_state
         if done:
             # success rate
-            success_rates.append(info.get('success_rate', 0))
-            save_success_rate(success_rates, episode_number, saving_dir, save_every=success_rate_save_freq)
+            success_rates.append(info.get('reached_goal', 0))
+            save_training_success_rate(success_rates, episode_number, saving_dir, save_every=success_rate_save_freq)
             # if well trained
-            well_trained = len(success_rates) >= 20 and get_success_rate(success_rates) > success_threshold_for_well_trained
+            well_trained = len(success_rates) >= 20 and get_success_rate(success_rates) >= success_threshold_for_well_trained
             if step_when_well_trained is None and well_trained:
-                save_is_well_trained(saving_dir, step_number, episode_number)
+                save_is_well_trained(saving_dir, step_number, episode_number, file_name='training_well_trained_time.csv')
                 step_when_well_trained, episode_when_well_trained = step_number, episode_number
             # advance to next
             episode_number += 1
             state = env.reset()
+
+        # periodically eval
+        if eval_freq and step_number % eval_freq == 0:
+            # success rates
+            eval_success_rate = test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10, max_steps_per_episode=50)
+            save_testing_success_rate(eval_success_rate, episode_number, saving_dir)
+            # if well trained 
+            eval_well_trained = eval_success_rate >= success_threshold_for_well_trained
+            if step_when_eval_well_trained is None and eval_well_trained:
+                save_is_well_trained(saving_dir, step_number, episode_number, file_name='eval_well_trained_time.csv')
+                step_when_eval_well_trained, episode_when_eval_well_trained = step_number, episode_number
         
         save_total_reward(total_reward, step_number, saving_dir, reward_save_freq)
         save_agent(agent, step_number, saving_dir, agent_save_freq)
         step_number += 1
 
-    # testing
-    test_ensemble_agent(agent, env, saving_dir, num_episodes=2, max_steps_per_episode=50)
+    # testing at the end
+    test_ensemble_agent(agent, env, saving_dir, visualize=True, num_episodes=1, max_steps_per_episode=50)
 
     end_time = time.time()
 
@@ -91,13 +114,13 @@ def get_success_rate(success_rates):
     return np.mean(success_rates)
 
 
-def save_success_rate(success_rates, episode_number, saving_dir, save_every=1):
+def save_training_success_rate(success_rates, episode_number, saving_dir, save_every=1):
     """
     log the average success rate during training every 5 episodes
     the success rate at every episode is the average success rate over the last 10 episodes
     """
-    save_file = os.path.join(saving_dir, "success_rate.csv")
-    img_file = os.path.join(saving_dir, "success_rate.png")
+    save_file = os.path.join(saving_dir, "training_success_rate.csv")
+    img_file = os.path.join(saving_dir, "training_success_rate.png")
     if episode_number % save_every == 0:
         # write to csv
         open_mode = 'w' if episode_number == 0 else 'a'
@@ -111,11 +134,37 @@ def save_success_rate(success_rates, episode_number, saving_dir, save_every=1):
             epsidoes = data[:, 0].astype(int)
             rates = data[:, 1].astype(np.float32)
             plt.plot(epsidoes, rates)
-            plt.title("Success rate")
+            plt.title("Training Success rate")
             plt.xlabel("Episode")
             plt.ylabel("Success rate")
             plt.savefig(img_file)
             plt.close()
+
+
+def save_testing_success_rate(success_rate, episode_number, saving_dir):
+    """
+    log the average success rate during training every 5 episodes
+    the success rate at every episode is the average success rate over the last 10 episodes
+    """
+    save_file = os.path.join(saving_dir, "eval_success_rate.csv")
+    img_file = os.path.join(saving_dir, "eval_success_rate.png")
+    # write to csv
+    open_mode = 'w' if episode_number == 0 else 'a'
+    with open(save_file, open_mode) as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow([episode_number, success_rate])
+    # plot it as well
+    with open(save_file, 'r') as f:
+        reader = csv.reader(f)
+        data = np.array([row for row in reader])
+        epsidoes = data[:, 0].astype(int)
+        rates = data[:, 1].astype(np.float32)
+        plt.plot(epsidoes, rates)
+        plt.title("Tesging Success rate")
+        plt.xlabel("Episode")
+        plt.ylabel("Success rate")
+        plt.savefig(img_file)
+        plt.close()
 
 
 def save_total_reward(total_reward, step_number, saving_dir, save_every=50):
@@ -144,12 +193,12 @@ def save_total_reward(total_reward, step_number, saving_dir, save_every=50):
             plt.close()
 
 
-def save_is_well_trained(saving_dir, steps, episode):
+def save_is_well_trained(saving_dir, steps, episode, file_name):
     """
     save the time when training is finised: the success rate is above some threshold 
     """
     print(f"well trained at episode {episode} and step {steps}")
-    time_file = os.path.join(saving_dir, "finish_training_time.csv")
+    time_file = os.path.join(saving_dir, file_name)
     with open(time_file, 'w') as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(["episode", "step"])
@@ -241,6 +290,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
 
         # set up env
         self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
+        self.eval_env = self.make_env(self.params['environment'], self.params['seed']+1000, self.params['start_state'])
 
         # set up agent
         def phi(x):  # Feature extractor
@@ -275,7 +325,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             )
     
     def train_option(self):
-        train_ensemble_agent(
+        train_ensemble_agent_with_eval(
             self.agent,
             self.env,
             max_steps=self.params['steps'],
@@ -283,6 +333,9 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             success_rate_save_freq=self.params['success_rate_save_freq'],
             reward_save_freq=self.params['reward_logging_freq'],
             agent_save_freq=self.params['saving_freq'],
+            eval_env=self.eval_env,
+            eval_freq=self.params['eval_freq'],
+            success_threshold_for_well_trained=self.params['success_threshold_for_well_trained'],
         )
 
 

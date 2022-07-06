@@ -13,26 +13,28 @@ from skills.ensemble.ensemble_utils import visualize_state_with_ensemble_actions
     visualize_state_with_action
 
 
-def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_episode=50):
+def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10, max_steps_per_episode=50):
     """
-    test the ensemble agent manually by running the agent on a specific environment
-    for a number of episodes
-    visualize the trajectory and also keep track of the total reward
+    test the ensemble agent:
+        - success rate
+        - visualize the trajectory and keep track of epsodic reward (if visualize=True)
     """
     with evaluating(agent):
         action_meanings = env.unwrapped.get_action_meanings()
+        success_rates = np.zeros(num_episodes)
         for i in range(num_episodes):
             # set random seed for each run
             env.seed(i+1000)
             env.action_space.seed(i+1000)
 
             # set up save dir
-            visualization_dir = os.path.join(saving_dir, f"trained_agent_episode_{i}")
-            os.mkdir(visualization_dir)
+            if visualize:
+                visualization_dir = os.path.join(saving_dir, f"eval_episode_{i}")
+                os.mkdir(visualization_dir)
 
             # init
             env.unwrapped.reset()  # real reset, or else EpisodicLife just takes Noop
-            obs = env.reset()  # get the warped frame 
+            obs = env.reset()  # reset all other wrappers
             step = 0
             total_reward = 0
             reached_goal = False
@@ -48,27 +50,38 @@ def test_ensemble_agent(agent, env, saving_dir, num_episodes=10, max_steps_per_e
                 total_reward += reward
 
                 # visualize
-                save_path = os.path.join(visualization_dir, f"{step}.png")
-                if type(agent) == EnsembleAgent:
-                    meaningful_actions = [action_meanings[i] for i in ensemble_actions]
-                    meaningful_q_vals = [str(round(q, 2)) for q in ensemble_q_vals]
-                    action_taken = str(action_meanings[a])
-                    visualize_state_with_ensemble_actions(
-                        obs,
-                        meaningful_actions,
-                        meaningful_q_vals,
-                        action_taken,
-                        save_path,
-                    )
-                else:
-                    # DQN
-                    visualize_state_with_action(obs, str(action_meanings[a]), save_path)
+                if visualize:
+                    save_path = os.path.join(visualization_dir, f"{step}.png")
+                    if type(agent) == EnsembleAgent:
+                        meaningful_actions = [action_meanings[i] for i in ensemble_actions]
+                        meaningful_q_vals = [str(round(q, 2)) for q in ensemble_q_vals]
+                        action_taken = str(action_meanings[a])
+                        visualize_state_with_ensemble_actions(
+                            obs,
+                            meaningful_actions,
+                            meaningful_q_vals,
+                            action_taken,
+                            save_path,
+                        )
+                    else:
+                        # DQN
+                        visualize_state_with_action(obs, str(action_meanings[a]), save_path)
 
                 # advance
                 step += 1
                 obs = next_obs
-            print(f"episode {i} reward: {total_reward}")
-            save_total_reward_info(total_reward, visualization_dir)
+            
+            # epsidoe end
+            success_rates[i] = 1 if reached_goal else 0
+            if visualize:
+                print(f"episode {i} reward: {total_reward}")
+                save_total_reward_info(total_reward, visualization_dir)
+    
+    # end of eval
+    eval_success_rate = np.mean(success_rates)
+    if visualize:
+        print(f"eval success rate: {eval_success_rate}")
+    return eval_success_rate
 
 
 def save_total_reward_info(reward, save_dir):
@@ -118,7 +131,7 @@ class TestTrial(SingleOptionTrial):
         pfrl.utils.set_random_seed(self.params['seed'])
 
         # get the hyperparams
-        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / 'hyperparams.csv'
+        hyperparams_file = Path(self.params['load']) / 'hyperparams.csv'
         saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
@@ -130,16 +143,21 @@ class TestTrial(SingleOptionTrial):
         self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000, self.params['start_state'])
 
         # agent
-        agent_file = Path(self.params['results_dir']) / self.params['load'] / 'agent.pkl'
+        agent_file = Path(self.params['load']) / 'agent.pkl'
         self.agent = EnsembleAgent.load(agent_file)
     
     def run(self):
         """
         test the loaded agent
         """
-        test_ensemble_agent(self.agent, self.env, self.saving_dir, 
-                            num_episodes=self.params['episodes'], 
-                            max_steps_per_episode=self.params['steps'])
+        test_ensemble_agent(
+            self.agent, 
+            self.env, 
+            self.saving_dir,
+            visualize=True,
+            num_episodes=self.params['episodes'], 
+            max_steps_per_episode=self.params['steps']
+        )
 
 
 def main():

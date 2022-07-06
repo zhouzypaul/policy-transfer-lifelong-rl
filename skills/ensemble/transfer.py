@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 
 from skills import utils
 from skills.option_utils import SingleOptionTrial
-from skills.ensemble.train import train_ensemble_agent
+from skills.ensemble.train import train_ensemble_agent_with_eval
 from skills.agents.ensemble import EnsembleAgent
 from skills.agents.dqn import DoubleDQN
 
@@ -114,6 +114,7 @@ class TransferTrial(SingleOptionTrial):
             print(f"Training {trained} -> {target}")
             # make env
             env = self.make_env(self.saved_params['environment'], self.saved_params['seed'], start_state=target)
+            eval_env = self.make_env(self.saved_params['environment'], self.saved_params['seed']+1000, start_state=target)
             # find loaded agent
             if trained == self.params['load']:
                 agent_file = Path(self.params['results_dir']) / self.params['load'] / self.expanded_agent_name / 'agent.pkl'
@@ -131,7 +132,7 @@ class TransferTrial(SingleOptionTrial):
             elif self.params['agent'] == 'ensemble':
                 agent = EnsembleAgent.load(agent_file, plot_dir=plots_dir)
             # train
-            train_ensemble_agent(
+            train_ensemble_agent_with_eval(
                 agent,
                 env,
                 max_steps=self.params['steps'],
@@ -139,6 +140,9 @@ class TransferTrial(SingleOptionTrial):
                 success_rate_save_freq=self.params['success_rate_save_freq'],
                 reward_save_freq=self.params['reward_logging_freq'],
                 agent_save_freq=self.params['saving_freq'],
+                eval_env=eval_env,
+                eval_freq=self.params['eval_freq'],
+                success_threshold_for_well_trained=self.params['success_threshold_for_well_trained'],
             )
             # advance to next target
             trained = target
@@ -172,7 +176,7 @@ def _grab_when_well_trained_data(targets, dir):
     for subdir in os.listdir(dir):
         if not os.path.isdir(dir / subdir):
             continue
-        well_trained_file = dir / subdir / 'finish_training_time.csv'
+        well_trained_file = dir / subdir / 'eval_well_trained_time.csv'
         try:
             with open(well_trained_file, 'r') as f:
                 csv_reader = csv.reader(f)
@@ -240,7 +244,7 @@ def _grab_average_success_rate_data(targets, dir):
     for subdir in os.listdir(dir):
         if not os.path.isdir(dir.joinpath(subdir)):
             continue
-        success_rates_file = Path(dir) / subdir / 'success_rate.csv'
+        success_rates_file = Path(dir) / subdir / 'eval_success_rate.csv'
         with open(success_rates_file, 'r') as f:
             csv_reader = csv.reader(f)
             success_rates = [float(row[1]) for row in csv_reader]
