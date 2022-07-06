@@ -77,8 +77,16 @@ class TransferTrial(SingleOptionTrial):
         # setting random seeds
         pfrl.utils.set_random_seed(self.params['seed'])
 
+        # find loading dir
+        self.loading_dir = Path(self.params['results_dir']) / self.params['load'] / self.expanded_agent_name
+        try: 
+            assert self.loading_dir.exists()
+        except AssertionError:
+            # for termination-clf agents etc, there is no such dir in the pre-training dir
+            self.loading_dir = Path(self.params['results_dir']) / self.params['load'] / self.params['agent']
+
         # get the hyperparams
-        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / self.expanded_agent_name / 'hyperparams.csv'
+        hyperparams_file = self.loading_dir / 'hyperparams.csv'
         self.saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
@@ -117,7 +125,7 @@ class TransferTrial(SingleOptionTrial):
             eval_env = self.make_env(self.saved_params['environment'], self.saved_params['seed']+1000, start_state=target)
             # find loaded agent
             if trained == self.params['load']:
-                agent_file = Path(self.params['results_dir']) / self.params['load'] / self.expanded_agent_name / 'agent.pkl'
+                agent_file = self.loading_dir / 'agent.pkl'
             else:
                 agent_file = sub_saving_dir / 'agent.pkl'
             # make saving dir
