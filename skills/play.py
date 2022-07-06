@@ -32,6 +32,7 @@ class PlayGame(SingleOptionTrial):
         return args
     
     def setup(self):
+        super().setup()
         # setting random seeds
         seeding.seed(self.params['seed'], np)
 

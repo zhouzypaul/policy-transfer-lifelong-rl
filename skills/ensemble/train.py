@@ -219,6 +219,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         """
         do set up for the experiment
         """
+        super().setup()
         self.check_params_validity()
 
         # setting random seeds

@@ -112,6 +112,7 @@ class TestTrial(SingleOptionTrial):
         return args
 
     def setup(self):
+        super().setup()
         # setting random seeds
         pfrl.utils.set_random_seed(self.params['seed'])
 

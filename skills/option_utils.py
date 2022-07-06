@@ -96,7 +96,10 @@ class SingleOptionTrial(BaseTrial):
     This class should only be used for training on Montezuma
     """
     def __init__(self):
-        pass
+        super().__init__()
+    
+    def setup(self):
+        self._expand_agent_name()
 
     def get_common_arg_parser(self):
         parser = super().get_common_arg_parser()
@@ -166,7 +169,10 @@ class SingleOptionTrial(BaseTrial):
         self.real_skill_type = real_skill
         return real_skill
     
-    def _set_saving_dir(self):
+    def _expand_agent_name(self):
+        """
+        expand the agent name to include information such as whether using agent space.
+        """
         agent = self.params['agent']
         if self.params['agent_space']:
             agent += '-agent-space'
@@ -174,7 +180,11 @@ class SingleOptionTrial(BaseTrial):
             agent += '-termination-clf'
         if self.params['confidence_based_reward']:
             agent += '-cbr'
-        return Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(agent)
+        self.expanded_agent_name = agent
+    
+    def _set_saving_dir(self):
+        self._expand_agent_name()
+        return Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(self.expanded_agent_name)
 
     def make_env(self, env_name, env_seed, start_state=None):
         """

@@ -71,13 +71,14 @@ class TransferTrial(SingleOptionTrial):
         self.params['success_rate_save_freq'] = max(1, int(self.params['steps'] / 200))
 
     def setup(self):
+        super().setup()
         self.check_params_validity()
         
         # setting random seeds
         pfrl.utils.set_random_seed(self.params['seed'])
 
         # get the hyperparams
-        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / self.params['agent'] / 'hyperparams.csv'
+        hyperparams_file = Path(self.params['results_dir']) / self.params['load'] / self.expanded_agent_name / 'hyperparams.csv'
         self.saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
@@ -115,7 +116,7 @@ class TransferTrial(SingleOptionTrial):
             env = self.make_env(self.saved_params['environment'], self.saved_params['seed'], start_state=target)
             # find loaded agent
             if trained == self.params['load']:
-                agent_file = Path(self.params['results_dir']) / self.params['load'] / self.params['agent'] / 'agent.pkl'
+                agent_file = Path(self.params['results_dir']) / self.params['load'] / self.expanded_agent_name / 'agent.pkl'
             else:
                 agent_file = sub_saving_dir / 'agent.pkl'
             # make saving dir
