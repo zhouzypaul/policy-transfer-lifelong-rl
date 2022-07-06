@@ -45,6 +45,7 @@ class MonteTerminationSetWrapper(Wrapper):
         votes, vote_confs = self.clf.get_votes(tensor_next_state)
         # aggregate the votes, vote yes if one of them is yes
         done = np.sum(votes) > 0  # votes are all either 0 or 1
+        reward = 1 if done else 0
         if self.confidence_based_reward and done:
             reward = vote_confs[np.argmax(votes==1)]
         # override needs_real_reset for EpisodicLifeEnv
