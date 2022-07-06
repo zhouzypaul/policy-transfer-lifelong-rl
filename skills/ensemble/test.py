@@ -37,9 +37,9 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
             obs = env.reset()  # reset all other wrappers
             step = 0
             total_reward = 0
-            reached_goal = False
+            terminal = False
 
-            while not reached_goal and step < max_steps_per_episode:
+            while not terminal and step < max_steps_per_episode:
                 # step
                 if type(agent) == EnsembleAgent:
                     a, ensemble_actions, ensemble_q_vals = agent.act(obs, return_ensemble_info=True)
@@ -47,6 +47,7 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
                     a = agent.act(obs)  # DQN
                 next_obs, reward, done, info = env.step(a)
                 reached_goal = info.get('reached_goal', False)
+                terminal = reached_goal or done
                 total_reward += reward
 
                 # visualize

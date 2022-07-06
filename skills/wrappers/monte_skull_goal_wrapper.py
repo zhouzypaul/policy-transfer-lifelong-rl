@@ -32,9 +32,8 @@ class MonteSkullGoalWrapper(MonteObjectGoalWrapper):
         room = get_player_room_number(ram)
         player_x, player_y = get_player_position(ram)
         skull_x = get_skull_position(ram)
-        goal_reward, reached_goal = self.finished_skill(player_x, player_y, skull_x, room, done, info)
-        info['reached_goal'] = reached_goal
+        goal_reward, terminal, info = self.finished_skill(player_x, player_y, skull_x, room, done, info)
         if not self.info_only:
             reward = goal_reward
-            done = reached_goal
+            done = terminal
         return next_state, reward, done, info

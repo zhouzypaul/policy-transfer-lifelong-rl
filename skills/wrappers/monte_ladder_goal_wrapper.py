@@ -105,25 +105,36 @@ class MonteLadderGoalWrapper(Wrapper):
         self.info_only = info_only
         self.room_number = get_player_room_number(self.env.unwrapped.ale.getRAM())
         self.goal_regions = room_to_goals[self.room_number]
+    
+    def reached_goal(self, player_pos, room_number):
+        """
+        determine if the player has reached the goal
+        """
+        in_same_room = room_number == self.room_number
+        in_goal_region = self.goal_regions.is_within_goal_position(room_number, player_pos, self.epsilon_tol)
+        return in_same_room and in_goal_region
 
     def finished_skill(self, player_pos, room_number, done, info):
         """
         determine if the monte agent has finished the skill
-        return reward, done
+        return reward, terminal, info
         """
-        in_same_room = room_number == self.room_number
-        reached_goal = self.goal_regions.is_within_goal_position(room_number, player_pos, self.epsilon_tol)
-        if reached_goal and in_same_room:
+        # record whether reached goal
+        reached_goal = self.reached_goal(player_pos, room_number)
+        info['reached_goal'] = reached_goal
+        # override
+        if reached_goal:
             done = True
             reward = 1
         else:
             reward = 0  # override reward, such as when got key
         # terminate if agent enters another room
+        in_same_room = room_number == self.room_number
         if not in_same_room:
             done = True
         # override needs_real_reset for EpisodicLifeEnv
         self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
-        return reward, done
+        return reward, done, info
     
     def step(self, action):
         """
@@ -133,9 +144,8 @@ class MonteLadderGoalWrapper(Wrapper):
         ram = self.env.unwrapped.ale.getRAM()
         player_pos = np.array(get_player_position(ram))
         room = get_player_room_number(ram)
-        goal_reward, reached_goal = self.finished_skill(player_pos, room, done, info)
-        info['reached_goal'] = reached_goal
+        goal_reward, terminal, info = self.finished_skill(player_pos, room, done, info)
         if not self.info_only:
             reward = goal_reward
-            done = reached_goal
+            done = terminal
         return next_state, reward, done, info
