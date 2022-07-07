@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 
 import pfrl
+import seeding
 import numpy as np
 
 from skills import utils
@@ -24,6 +25,7 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
         success_rates = np.zeros(num_episodes)
         for i in range(num_episodes):
             # set random seed for each run
+            pfrl.utils.set_random_seed(i+1000)
             env.seed(i+1000)
             env.action_space.seed(i+1000)
 
@@ -127,7 +129,6 @@ class TestTrial(SingleOptionTrial):
         return args
 
     def setup(self):
-        super().setup()
         # setting random seeds
         pfrl.utils.set_random_seed(self.params['seed'])
 
