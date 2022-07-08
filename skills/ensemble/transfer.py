@@ -69,6 +69,7 @@ class TransferTrial(SingleOptionTrial):
         # log more frequently because it takes less time to train
         self.params['reward_logging_freq'] = 100
         self.params['success_rate_save_freq'] = max(1, int(self.params['steps'] / 200))
+        self.params['eval_freq'] = 500
 
     def setup(self):
         super().setup()
