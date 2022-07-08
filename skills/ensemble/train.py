@@ -28,7 +28,7 @@ def train_ensemble_agent_with_eval(
     agent_save_freq,
     eval_env=None,
     eval_freq=None,
-    success_queue_size=50,
+    success_queue_size=10,
     success_threshold_for_well_trained=0.9
 ):
     """
@@ -313,6 +313,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
             eval_env=self.eval_env,
             eval_freq=self.params['eval_freq'],
             success_threshold_for_well_trained=self.params['success_threshold_for_well_trained'],
+            success_queue_size=self.params['success_queue_size']
         )
 
 

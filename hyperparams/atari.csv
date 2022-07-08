@@ -12,3 +12,4 @@ eval_freq,10000,int
 success_threshold_for_well_trained,0.9,float
 goal_epsilon_tol,20,int
 ladder_epsilon_tol,6,int
+success_queue_size,10,int
