@@ -60,6 +60,7 @@ class TransferTrial(SingleOptionTrial):
         self.params['experiment_name'] = exp_name
     
     def check_params_validity(self):
+        super().check_params_validity()
         # check that all the target start_states are valid
         for target in self.params['target']:
             self.find_start_state_ram_file(target)

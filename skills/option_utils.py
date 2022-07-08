@@ -100,6 +100,11 @@ class SingleOptionTrial(BaseTrial):
     
     def setup(self):
         self._expand_agent_name()
+    
+    def check_params_validity(self):
+        if self.params['skill_type'] == 'ladder':
+            print(f"changing epsilon to ladder specific one: {self.params['ladder_epsilon_tol']}")
+            self.params['goal_epsilon_tol'] = self.params['ladder_epsilon_tol']
 
     def get_common_arg_parser(self):
         parser = super().get_common_arg_parser()

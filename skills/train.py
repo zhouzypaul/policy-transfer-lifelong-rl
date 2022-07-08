@@ -49,7 +49,7 @@ class TrainOptionTrial(SingleOptionTrial):
         """
         check whether the params entered by the user is valid
         """
-        pass
+        super().check_params_validity()
     
     def setup(self):
         """

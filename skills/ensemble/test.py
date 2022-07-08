@@ -128,7 +128,11 @@ class TestTrial(SingleOptionTrial):
         args = self.parse_common_args(parser)
         return args
 
+    def check_params_validity(self):
+        return super().check_params_validity()
+
     def setup(self):
+        self.check_params_validity()
         # setting random seeds
         pfrl.utils.set_random_seed(self.params['seed'])
 
