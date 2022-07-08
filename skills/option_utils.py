@@ -179,6 +179,8 @@ class SingleOptionTrial(BaseTrial):
         expand the agent name to include information such as whether using agent space.
         """
         agent = self.params['agent']
+        if agent == 'ensemble':
+            agent += f"-{self.params['num_policies']}"
         if self.params['agent_space']:
             agent += '-agent-space'
         if self.params['termination_clf']:
