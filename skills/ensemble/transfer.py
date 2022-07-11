@@ -41,6 +41,8 @@ class TransferTrial(SingleOptionTrial):
                             help="only do the plotting. Use this after the agent has been trained on transfer tasks.")
         parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'], default='ensemble',
                             help="the type of agent to transfer on")
+        parser.add_argument("--num_policies", type=int, default=3,
+                            help="number of policies in the ensemble")
         
         # testing params
         parser.add_argument("--steps", type=int, default=50000,

@@ -62,7 +62,7 @@ def train_ensemble_agent_with_eval(
             success_rates.append(info.get('reached_goal', 0))
             save_success_rate(success_rates, episode_number, saving_dir, eval=False, save_every=success_rate_save_freq)
             # if well trained
-            well_trained = len(success_rates) >= 20 and get_success_rate(success_rates) >= success_threshold_for_well_trained
+            well_trained = len(success_rates) >= success_queue_size/2 and get_success_rate(success_rates) >= success_threshold_for_well_trained
             if step_when_well_trained is None and well_trained:
                 save_is_well_trained(saving_dir, step_number, episode_number, file_name='training_well_trained_time.csv')
                 step_when_well_trained, episode_when_well_trained = step_number, episode_number
@@ -77,7 +77,7 @@ def train_ensemble_agent_with_eval(
             eval_success_rates.append(eval_success)
             save_success_rate(eval_success_rates, episode_number, saving_dir, eval=True, save_every=1)
             # if well trained 
-            eval_well_trained = len(eval_success_rates) >= 20 and get_success_rate(eval_success_rates) >= success_threshold_for_well_trained
+            eval_well_trained = len(eval_success_rates) >= success_queue_size/2 and get_success_rate(eval_success_rates) >= success_threshold_for_well_trained
             if step_when_eval_well_trained is None and eval_well_trained:
                 save_is_well_trained(saving_dir, step_number, episode_number, file_name='eval_well_trained_time.csv')
                 step_when_eval_well_trained, episode_when_eval_well_trained = step_number, episode_number
