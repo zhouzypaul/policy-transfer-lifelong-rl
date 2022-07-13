@@ -187,6 +187,8 @@ class SingleOptionTrial(BaseTrial):
             agent += '-termination-clf'
         if self.params['confidence_based_reward']:
             agent += '-cbr'
+        if self.params['action_selection_strat'] == 'add_qvals':
+            agent += '-add-qvals'
         self.expanded_agent_name = agent
     
     def _set_saving_dir(self):
