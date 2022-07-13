@@ -21,7 +21,7 @@ class MonteTerminationSetWrapper(Wrapper):
         self.env = env
         self.confidence_based_reward = confidence_based_reward
         # load saved classifier
-        clf_path = 'resources/classifier'  # hard coded for now
+        clf_path = 'resources/classifier/termination'  # hard coded for now
         self.clf = EnsembleClassifier(device=device)
         self.clf.load(clf_path)
 
