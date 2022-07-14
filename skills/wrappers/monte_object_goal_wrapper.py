@@ -1,6 +1,6 @@
 from gym import Wrapper
 
-from skills.option_utils import get_player_room_number
+from skills.ale_utils import get_player_room_number
 
 
 class MonteObjectGoalWrapper(Wrapper):

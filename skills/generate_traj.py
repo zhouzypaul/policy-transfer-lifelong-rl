@@ -8,7 +8,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from skills import utils
-from skills.option_utils import SingleOptionTrial, get_player_position
+from skills.option_utils import SingleOptionTrial
+from skills.ale_utils import get_player_position
 
 
 class GenerateTrajectory(SingleOptionTrial):

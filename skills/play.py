@@ -4,8 +4,9 @@ import os
 import seeding
 import numpy as np
 
-from skills.option_utils import get_player_position, get_player_room_number, \
-    get_skull_position, get_in_air, get_level, get_object_position, SingleOptionTrial
+from skills.option_utils import SingleOptionTrial
+from skills.ale_utils import get_player_position, get_player_room_number, \
+    get_skull_position, get_object_position
 
 
 class PlayGame(SingleOptionTrial):
