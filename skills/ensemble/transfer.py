@@ -87,7 +87,7 @@ class TransferTrial(SingleOptionTrial):
             assert self.loading_dir.exists()
         except AssertionError:
             # for termination-clf agents etc, there is no such dir in the pre-training dir
-            self.loading_dir = Path(self.params['results_dir']) / self.params['load'] / self.params['agent']
+            self.loading_dir = Path(self.params['results_dir']) / self.params['load'] / self.detailed_agent_name
 
         # get the hyperparams
         hyperparams_file = self.loading_dir / 'hyperparams.csv'

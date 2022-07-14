@@ -183,6 +183,9 @@ class SingleOptionTrial(BaseTrial):
             agent += f"-{self.params['num_policies']}"
         if self.params['agent_space']:
             agent += '-agent-space'
+
+        self.detailed_agent_name = agent
+
         if self.params['termination_clf']:
             agent += '-termination-clf'
         if self.params['confidence_based_reward']:
