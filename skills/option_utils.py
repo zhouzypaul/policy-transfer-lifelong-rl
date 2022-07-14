@@ -11,6 +11,16 @@ import torch
 import pfrl
 
 from skills import utils
+from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
+from skills.wrappers.agent_wrapper import MonteAgentWrapper
+from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
+from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
+from skills.wrappers.monte_initiation_set_wrapper import MonteInitiationSetWrapper
+from skills.wrappers.monte_pruned_actions import MontePrunedActions
+from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
+from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
+from skills.wrappers.monte_spider_goal_wrapper import MonteSpiderGoalWrapper
+from skills.wrappers.monte_snake_goal_wrapper import MonteSnakeGoalWrapper
 
 cv2.ocl.setUseOpenCL(False)
 
@@ -206,19 +216,7 @@ class SingleOptionTrial(BaseTrial):
         Args:
             goal: None or (x, y)
         """
-        from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
-        from skills.wrappers.agent_wrapper import MonteAgentWrapper
-        from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
-        from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
-        from skills.wrappers.monte_initiation_set_wrapper import MonteInitiationSetWrapper
-        from skills.wrappers.monte_pruned_actions import MontePrunedActions
-        from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
-        from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
-        from skills.wrappers.monte_spider_goal_wrapper import MonteSpiderGoalWrapper
-        from skills.wrappers.monte_snake_goal_wrapper import MonteSnakeGoalWrapper
-
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
-
         # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
         env = make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
         # make agent space
