@@ -155,7 +155,8 @@ class TransferTrial(SingleOptionTrial):
                 eval_env=eval_env,
                 eval_freq=self.params['eval_freq'],
                 success_threshold_for_well_trained=self.params['success_threshold_for_well_trained'],
-                success_queue_size=self.params['success_queue_size']
+                success_queue_size=self.params['success_queue_size'],
+                start_before_initiation=self.saved_params['initiation_clf']
             )
             # advance to next target
             trained = target

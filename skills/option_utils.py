@@ -137,7 +137,9 @@ class SingleOptionTrial(BaseTrial):
                                     This should not include the whole path or the .npy extension.
                                     e.g: room1_right_ladder_top""")
         
-        # termination classifiers
+        # classifiers
+        parser.add_argument("--initiation_clf", "-i", action="store_true", default=False,
+                            help="whether to use the initiation clf to determine when to train the skill")
         parser.add_argument("--termination_clf", "-c", action='store_true', default=False,
                             help="whether to use the trained termination classifier to determine episodic done.")
         parser.add_argument("--confidence_based_reward", action='store_true', default=False,
@@ -186,6 +188,8 @@ class SingleOptionTrial(BaseTrial):
 
         self.detailed_agent_name = agent
 
+        if self.params['initiation_clf']:
+            agent += '-initiation-clf'
         if self.params['termination_clf']:
             agent += '-termination-clf'
         if self.params['confidence_based_reward']:
@@ -206,6 +210,7 @@ class SingleOptionTrial(BaseTrial):
         from skills.wrappers.agent_wrapper import MonteAgentWrapper
         from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
         from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
+        from skills.wrappers.monte_initiation_set_wrapper import MonteInitiationSetWrapper
         from skills.wrappers.monte_pruned_actions import MontePrunedActions
         from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
         from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
@@ -245,6 +250,10 @@ class SingleOptionTrial(BaseTrial):
         if self.params['termination_clf']:
             env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
+        # initiation wrappers
+        if self.params['initiation_clf']:
+            env = MonteInitiationSetWrapper(env, device=self.params['device'])
+            print('using trained initiation classifier')
         # skills and goals
         self._get_real_skill_type(start_state)
         info_only = self.params['termination_clf']

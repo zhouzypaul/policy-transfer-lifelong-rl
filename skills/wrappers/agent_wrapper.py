@@ -3,8 +3,10 @@ from enum import IntEnum
 
 import cv2
 import gym
+import torch
 import numpy as np
 from gym import spaces
+from skimage import color
 
 
 class actions(IntEnum):
@@ -254,6 +256,24 @@ def crop_agent_space(image, player_position, width=20, height=24, trim_direction
         image_window = np.pad(image_window, ((0,0), (0, (2*width) - image_window.shape[1]), (0,0)))
 
     return image_window
+
+
+def build_agent_space_image_stack(env):
+    """
+    access the stacked original images from env.unwrapped
+    return a (1, 4, 56, 40) array
+    """
+    agent_space_state = np.zeros((1, 4, 56, 40))
+    for i, frame in enumerate(env.unwrapped.original_stacked_frames):
+        player_pos = env.unwrapped.stacked_agent_position[i]
+        obs = crop_agent_space(frame, player_pos)
+        assert obs.shape == (56, 40, 3)
+        obs = color.rgb2gray(obs)  # also concerts to floats
+        obs = np.expand_dims(obs, axis=0)  # add channel dimension, (1, 56, 40)
+        agent_space_state[:, i, :, :] = obs
+    tensor_state = torch.from_numpy(np.array(agent_space_state)).float()
+    assert tensor_state.shape == (1, 4, 56, 40), tensor_state.shape  # make sure it's agent space observation
+    return tensor_state
 
 
 class ReshapeFrame(gym.ObservationWrapper):
