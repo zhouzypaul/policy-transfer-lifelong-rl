@@ -187,6 +187,9 @@ class SingleOptionTrial(BaseTrial):
             agent += '-agent-space'
         if self.params['initiation_clf']:
             agent += '-initiation-clf'
+
+        self.detailed_agent_name = agent
+
         if self.params['termination_clf']:
             agent += '-termination-clf'
         if self.params['confidence_based_reward']:
