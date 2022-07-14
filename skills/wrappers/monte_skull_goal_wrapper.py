@@ -1,5 +1,5 @@
 from skills.wrappers.monte_object_goal_wrapper import MonteObjectGoalWrapper
-from skills.option_utils import get_player_position, get_player_room_number, get_skull_position
+from skills.ale_utils import get_player_position, get_player_room_number, get_skull_position
 
 
 

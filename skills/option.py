@@ -8,8 +8,8 @@ import numpy as np
 from thundersvm import SVC, OneClassSVM
 import matplotlib.pyplot as plt
 
-from skills.option_utils import get_player_position, make_chunked_value_function_plot, \
-        last_in_framestack
+from skills.option_utils import make_chunked_value_function_plot
+from skills.ale_utils import get_player_position, last_in_framestack
 from skills.agents.dqn import make_dqn_agent
 
 

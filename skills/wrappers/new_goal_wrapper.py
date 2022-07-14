@@ -1,7 +1,7 @@
 import numpy as np
 from gym import Wrapper
 
-from skills.option_utils import get_player_position
+from skills.ale_utils import get_player_position
 
 
 class MonteNewGoalWrapper(Wrapper):
