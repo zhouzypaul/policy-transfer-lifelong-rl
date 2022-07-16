@@ -245,7 +245,7 @@ class SingleOptionTrial(BaseTrial):
             env = MonteForwarding(env, start_state_path)
         # termination wrappers
         if self.params['termination_clf']:
-            env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
+            env = MonteTerminationSetWrapper(env, override_done=not self.params['initiation_clf'], confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
         # initiation wrappers
         if self.params['initiation_clf']:
