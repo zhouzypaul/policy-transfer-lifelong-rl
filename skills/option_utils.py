@@ -12,6 +12,7 @@ import pfrl
 from skills import utils
 from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
 from skills.wrappers.agent_wrapper import MonteAgentWrapper
+from skills.wrappers.procgen_wrapper import ProcgenGymWrapper
 from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
 from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
 from skills.wrappers.monte_pruned_actions import MontePrunedActions
@@ -51,8 +52,10 @@ class BaseTrial:
         parser.add_argument("--seed", type=int, default=0,
                             help="Random seed")
         # hyperparams
-        parser.add_argument('--hyperparams', type=str, default='hyperparams/atari.csv',
-                            help='path to the hyperparams file to use')
+        parser.add_argument('--params_dir', type=Path, default='hyperparams',
+                            help='the hyperparams directory')
+        parser.add_argument('--hyperparams', type=str, default='atari',
+                            help='which hyperparams csv file to use')
         return parser
 
     def parse_common_args(self, parser):
@@ -68,10 +71,10 @@ class BaseTrial:
         """
         load the hyper params from args to a params dictionary
         """
-        params = utils.load_hyperparams(args.hyperparams)
+        params = utils.load_hyperparams(args.params_dir.joinpath(args.hyperparams + '.csv'))
         for arg_name, arg_value in vars(args).items():
-            if arg_name == 'hyperparams':
-                continue
+            # if arg_name == 'hyperparams':
+            #     continue
             params[arg_name] = arg_value
         for arg_name, arg_value in args.other_args:
             utils.update_param(params, arg_name, arg_value)
@@ -117,9 +120,9 @@ class SingleOptionTrial(BaseTrial):
     def get_common_arg_parser(self):
         parser = super().get_common_arg_parser()
         # defaults
-        parser.set_defaults(experiment_name='monte', 
-                            environment='MontezumaRevengeNoFrameskip-v4', 
-                            hyperparams='hyperparams/atari.csv')
+        parser.set_defaults(experiment_name='train', 
+                            environment='MontezumaRevenge', 
+                            hyperparams='atari')
     
         # environments
         parser.add_argument("--render", action='store_true', default=False, 
@@ -210,58 +213,80 @@ class SingleOptionTrial(BaseTrial):
         Args:
             goal: None or (x, y)
         """
-        assert env_name == 'MontezumaRevengeNoFrameskip-v4'
-        # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
-        env = make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
-        # make agent space
-        if self.params['agent_space']:
-            print('using the agent space to train the option right now')
-        env = MonteAgentWrapper(env, agent_space=self.params['agent_space'])
-        if self.params['use_deepmind_wrappers']:
-            env = wrap_deepmind(
-                env,
-                warp_frames=not self.params['agent_space'],
-                episode_life=True,
-                clip_rewards=True,
-                frame_stack=True,
-                scale=False,
-                fire_reset=False,
-                channel_order="chw",
-                flicker=False,
+        if env_name == 'MontezumaRevenge':
+            # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
+            env = make_atari(f"{env_name}NoFrameskip-v4", max_frames=30*60*60)  # 30 min with 60 fps
+            # make agent space
+            if self.params['agent_space']:
+                print('using the agent space to train the option right now')
+            env = MonteAgentWrapper(env, agent_space=self.params['agent_space'])
+            if self.params['use_deepmind_wrappers']:
+                env = wrap_deepmind(
+                    env,
+                    warp_frames=not self.params['agent_space'],
+                    episode_life=True,
+                    clip_rewards=True,
+                    frame_stack=True,
+                    scale=False,
+                    fire_reset=False,
+                    channel_order="chw",
+                    flicker=False,
+                )
+            # prunning actions
+            if not self.params['suppress_action_prunning']:
+                env = MontePrunedActions(env)
+            # starting state wrappers
+            if start_state is not None:
+                start_state_path = self.find_start_state_ram_file(start_state)
+                # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
+                # this does not need to be enforced once test uses the timeout wrapper
+                env = MonteForwarding(env, start_state_path)
+            # termination wrappers
+            if self.params['termination_clf']:
+                env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
+                print('using trained termination classifier')
+            # skills and goals
+            self._get_real_skill_type(start_state)
+            info_only = self.params['termination_clf']
+            if self.real_skill_type == 'ladder':
+                # ladder goals
+                # should go after the forwarding wrappers, because the goals depend on the position of 
+                # the agent in the starting state
+                env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+                print('pursuing ladder skills')
+            elif self.real_skill_type == 'skull':
+                env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+                print('pursuing skull skills')
+            elif self.real_skill_type == 'spider':
+                env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+                print('pursuing spider skills')
+            elif self.real_skill_type == 'snake':
+                env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
+                print('pursuing snake skills')
+            env.seed(env_seed)
+        else:
+            # procgen environments 
+            # env = ProcgenEnv(
+            #     num_envs=1,
+            #     env_name='coinrun',
+            #     rand_seed=env_seed,
+            #     num_levels=0,
+            #     start_level=0,
+            #     distribution_mode='easy',
+            #     render_mode='rgb_array',
+            #     center_agent=True,
+            # )
+            env = gym.make(
+                f'procgen:procgen-{env_name}-v0', 
+                rand_seed=env_seed,
+                center_agent=True,
+                num_levels=0,
+                start_level=0,
+                distribution_mode='easy',
+                render_mode='rgb_array',
             )
-        # prunning actions
-        if not self.params['suppress_action_prunning']:
-            env = MontePrunedActions(env)
-        # starting state wrappers
-        if start_state is not None:
-            start_state_path = self.find_start_state_ram_file(start_state)
-            # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
-            # this does not need to be enforced once test uses the timeout wrapper
-            env = MonteForwarding(env, start_state_path)
-        # termination wrappers
-        if self.params['termination_clf']:
-            env = MonteTerminationSetWrapper(env, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
-            print('using trained termination classifier')
-        # skills and goals
-        self._get_real_skill_type(start_state)
-        info_only = self.params['termination_clf']
-        if self.real_skill_type == 'ladder':
-            # ladder goals
-            # should go after the forwarding wrappers, because the goals depend on the position of 
-            # the agent in the starting state
-            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
-            print('pursuing ladder skills')
-        elif self.real_skill_type == 'skull':
-            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
-            print('pursuing skull skills')
-        elif self.real_skill_type == 'spider':
-            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
-            print('pursuing spider skills')
-        elif self.real_skill_type == 'snake':
-            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=info_only)
-            print('pursuing snake skills')
+            env = ProcgenGymWrapper(env, agent_space=self.params['agent_space'])
         print(f'making environment {env_name}')
-        env.seed(env_seed)
         env.action_space.seed(env_seed)
         return env
 

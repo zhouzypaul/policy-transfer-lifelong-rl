@@ -58,7 +58,11 @@ class PlayGame(SingleOptionTrial):
             # print(f"state shape is {np.array(state).shape}")
             # user input an action to take
             action_input = input() 
-            room = get_player_room_number(self.env.unwrapped.ale.getRAM())
+            try:
+                room = get_player_room_number(self.env.unwrapped.ale.getRAM())
+            except AttributeError:
+                # procgen
+                pass
             if action_input == 'save':
                 if self.params['agent_space']:
                     save_path = os.path.join(self.params['info_dir'], f'room{room}_agent_space_goal_state.npy')
@@ -92,6 +96,7 @@ class PlayGame(SingleOptionTrial):
                     act = meaning_to_action[act_input.lower()]
                     print(act)
                 return act
+
             try:
                 action = parse_action(action_input)
             except:
