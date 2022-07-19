@@ -8,7 +8,6 @@ from skills.plot import plot_attention_diversity
 class Attention(nn.Module):
 
     def __init__(self, 
-                stack_size=4, 
                 embedding_size=64, 
                 attention_depth=32, 
                 num_attention_modules=8, 
@@ -18,7 +17,7 @@ class Attention(nn.Module):
         self.out_dim = embedding_size
         self.attention_depth = attention_depth
 
-        self.conv1 = nn.Conv2d(in_channels=stack_size, out_channels=self.attention_depth, kernel_size=3, stride=1)
+        self.conv1 = nn.LazyConv2d(out_channels=self.attention_depth, kernel_size=3, stride=1)
         self.pool1 = nn.MaxPool2d(2)
 
         self.attention_modules = nn.ModuleList(

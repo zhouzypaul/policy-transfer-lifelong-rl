@@ -12,7 +12,7 @@ import pfrl
 from skills import utils
 from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
 from skills.wrappers.agent_wrapper import MonteAgentWrapper
-from skills.wrappers.procgen_wrapper import ProcgenGymWrapper
+from skills.wrappers.procgen_wrapper import ProcgenGymWrapper, GrayscaleWrapper
 from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
 from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
 from skills.wrappers.monte_pruned_actions import MontePrunedActions
@@ -286,6 +286,7 @@ class SingleOptionTrial(BaseTrial):
                 render_mode='rgb_array',
             )
             env = ProcgenGymWrapper(env, agent_space=self.params['agent_space'])
+            env = GrayscaleWrapper(env, grayscale=False, channel_order='chw')
         print(f'making environment {env_name}')
         env.action_space.seed(env_seed)
         return env

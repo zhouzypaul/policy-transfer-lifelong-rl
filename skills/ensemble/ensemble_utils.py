@@ -26,7 +26,12 @@ def visualize_state_with_ensemble_actions(obs, meaningful_actions, meaningful_q_
         action_taken: action taken by the ensemble, as a string
         save_path: path to the png image
     """
-    frame = np.array(obs)[-1]
+    if obs.shape[0] == 4:
+        frame = np.array(obs)[-1]
+    elif obs.shape[0] == 3:
+        frame = np.array(obs).transpose((1, 2, 0))
+    else:
+        raise RuntimeError('something is wrong with shape of observation')
     image = Image.fromarray(frame.astype(np.uint8))
     image = pillow_im_add_margin(image, left=100, bottom=70)
     

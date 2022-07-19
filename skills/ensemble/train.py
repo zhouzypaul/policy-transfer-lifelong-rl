@@ -59,7 +59,7 @@ def train_ensemble_agent_with_eval(
         state = next_state
         if done:
             # success rate
-            success_rates.append(done and not info['dead'])
+            success_rates.append(done and not info.get('dead', False))
             save_success_rate(success_rates, episode_number, saving_dir, eval=False, save_every=success_rate_save_freq)
             # if well trained
             well_trained = len(success_rates) >= success_queue_size/2 and get_success_rate(success_rates) >= success_threshold_for_well_trained
