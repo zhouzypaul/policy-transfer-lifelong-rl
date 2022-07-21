@@ -7,6 +7,7 @@
 
 # results
 results/
+log/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -114,7 +115,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
-*env/
+3090env/
 env/
 venv/
 ENV/

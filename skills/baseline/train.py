@@ -1,242 +1,237 @@
-import time
-import random
+"""
+acknowledgement:
+this code is adapted from 
+https://github.com/lerrytang/train-procgen-pfrl/
+"""
+
 import os
-import csv
+import time
 import argparse
-import shutil
 from collections import deque
 
 import torch
-import seeding
 import numpy as np
-import pfrl
-from matplotlib import pyplot as plt
+from procgen import ProcgenEnv
+from pfrl.agents.ppo import PPO
 
-from skills import utils
-from skills.agents.dqn import make_dqn_agent
-from skills.agents.ensemble import EnsembleAgent
-from skills.option_utils import BaseTrial
+from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize
+from skills.models.impala import ImpalaCNN
+from skills.baseline import logger
 
 
-class TrainAgent(BaseTrial):
-    """
-    train an agent on some Atari game
-    """
-    def __init__(self):
-        super().__init__()
-        args = self.parse_args()
-        self.params = self.load_hyperparams(args)
-        self.setup()
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Process procgen training arguments.')
 
-    def parse_args(self):
-        """
-        parse the inputted argument
-        """
-        parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            parents=[self.get_common_arg_parser()]
+    # Experiment parameters.
+    parser.add_argument(
+        '--distribution-mode', type=str, default='easy',
+        choices=['easy', 'hard', 'exploration', 'memory', 'extreme'])
+    parser.add_argument('--env-name', type=str, default='starpilot')
+    parser.add_argument('--num-envs', type=int, default=64)
+    parser.add_argument('--num-levels', type=int, default=0)
+    parser.add_argument('--start-level', type=int, default=0)
+    parser.add_argument('--num-threads', type=int, default=4)
+    parser.add_argument('--exp-name', type=str, default='trial01')
+    parser.add_argument('--log-dir', type=str, default='./log')
+    parser.add_argument('--model-file', type=str, default=None)
+    parser.add_argument('--method-label', type=str, default='vanilla')
+
+    # PPO parameters.
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--lr', type=float, default=5e-4)
+    parser.add_argument('--ent-coef', type=float, default=0.01)
+    parser.add_argument('--vf-coef', type=float, default=0.5)
+    parser.add_argument('--gamma', type=float, default=0.999)
+    parser.add_argument('--lam', type=float, default=0.95)
+    parser.add_argument('--clip-range', type=float, default=0.2)
+    parser.add_argument('--max-grad-norm', type=float, default=0.5)
+    parser.add_argument('--nsteps', type=int, default=256)
+    parser.add_argument('--batch-size', type=int, default=8)
+    parser.add_argument('--nepochs', type=int, default=3)
+    parser.add_argument('--max-steps', type=int, default=25_000_000)
+    parser.add_argument('--save-interval', type=int, default=100)
+
+    return parser.parse_args()
+
+
+def create_venv(config, is_valid=False):
+    venv = ProcgenEnv(
+        num_envs=config.num_envs,
+        env_name=config.env_name,
+        num_levels=0 if is_valid else config.num_levels,
+        start_level=0 if is_valid else config.start_level,
+        distribution_mode=config.distribution_mode,
+        num_threads=config.num_threads,
+    )
+    venv = VecExtractDictObs(venv, "rgb")
+    venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
+    return VecNormalize(venv=venv, ob=False)
+
+
+def safe_mean(xs):
+    return np.nan if len(xs) == 0 else np.mean(xs)
+
+
+def rollout_one_step(agent, env, obs, steps, env_max_steps=1000):
+
+    # Step once.
+    action = agent.batch_act(obs)
+    new_obs, reward, done, infos = env.step(action)
+    steps += 1
+    reset = steps == env_max_steps
+    steps[done] = 0
+
+    # Save experience.
+    agent.batch_observe(
+        batch_obs=new_obs,
+        batch_reward=reward,
+        batch_done=done,
+        batch_reset=reset,
+    )
+
+    # Get rollout statistics.
+    epinfo = []
+    for info in infos:
+        maybe_epinfo = info.get('episode')
+        if maybe_epinfo:
+            epinfo.append(maybe_epinfo)
+
+    return new_obs, steps, epinfo
+
+
+def train(config, agent, train_env, test_env, model_dir):
+
+    if config.model_file is not None:
+        agent.model.load_from_file(config.model_file)
+        logger.info('Loaded model from {}.'.format(config.model_file))
+    else:
+        logger.info('Train agent from scratch.')
+
+    train_epinfo_buf = deque(maxlen=100)
+    train_obs = train_env.reset()
+    train_steps = np.zeros(config.num_envs, dtype=int)
+
+    test_epinfo_buf = deque(maxlen=100)
+    test_obs = test_env.reset()
+    test_steps = np.zeros(config.num_envs, dtype=int)
+
+    nbatch = config.num_envs * config.nsteps
+    # Due to some bug-like code in baseline.ppo2,
+    # (and I modified PFRL accordingly) the true batch size is
+    # nbatch // config.batch_size.
+    n_ops_per_update = nbatch * config.nepochs / (nbatch // config.batch_size)
+    nupdates = config.max_steps // nbatch
+    max_steps = config.max_steps // config.num_envs
+
+    logger.info('Start training for {} steps (approximately {} updates)'.format(
+        config.max_steps, nupdates))
+
+    tstart = time.perf_counter()
+    for step_cnt in range(max_steps):
+
+        # Roll-out in the training environments.
+        assert agent.training
+        train_obs, train_steps, train_epinfo = rollout_one_step(
+            agent=agent,
+            env=train_env,
+            obs=train_obs,
+            steps=train_steps,
         )
-        # # goal state
-        # parser.add_argument("--goal_state", type=str, default="middle_ladder_bottom.npy",
-        #                     help="a file in info_dir that stores the image of the agent in goal state")
-        # parser.add_argument("--goal_state_pos", type=str, default="middle_ladder_bottom_pos.txt",
-        #                     help="a file in info_dir that store the x, y coordinates of goal state")
-        
-        # agent
-        parser.add_argument("--agent", type=str, choices=['dqn', 'ensemble'],
-                            help="the type of agent to train")
-        parser.add_argument("--num_policies", type=int, default=1,
-                            help="the number of policies to train when using ensemble agent")
-        parser.add_argument("--action_selection_strat", type=str, default="leader",
-                            choices=['vote', 'uniform_leader', 'leader'],
-                            help="the action selection strategy when using ensemble agent")
-        # training
-        parser.add_argument("--steps", type=int, default=10000000,
-                            help="number of training steps")
+        train_epinfo_buf.extend(train_epinfo)
 
-        args = self.parse_common_args(parser)
-        return args
-
-    def check_params_validity(self):
-        """
-        check whether the params entered by the user is valid
-        """
-        if self.params['agent'] == 'ensemble':
-            try:
-                assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
-            except AssertionError:
-                new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
-                print(f"updating target_update_interval to be {new_interval}")
-                self.params['target_update_interval'] = new_interval
-    
-    def setup(self):
-        """
-        do set up for the experiment
-        """
-        self.check_params_validity()
-
-        # setting random seeds
-        seeding.seed(self.params['seed'], random, np)
-        pfrl.utils.set_random_seed(self.params['seed'])
-
-        # torch benchmark
-        torch.backends.cudnn.benchmark = True
-
-        # create the saving directories
-        self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])
-        utils.create_log_dir(self.saving_dir, remove_existing=True)
-        self.params['saving_dir'] = self.saving_dir
-        self.params['plots_dir'] = os.path.join(self.saving_dir, 'plots')
-        os.mkdir(self.params['plots_dir'])
-
-        # save the hyperparams
-        utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
-
-        # set up env and its goal
-        # if self.params['agent_space']:
-        #     goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state_agent_space'])
-        # else:
-        #     goal_state_path = self.params['info_dir'].joinpath(self.params['goal_state'])
-        # goal_state_pos_path = self.params['info_dir'].joinpath(self.params['goal_state_pos'])
-        # self.params['goal_state'] = np.load(goal_state_path)
-        # self.params['goal_state_position'] = tuple(np.loadtxt(goal_state_pos_path))
-        # print(f"aiming for goal location {self.params['goal_state_position']}")
-        # self.env = self.make_env(self.params['environment'], self.params['seed'], goal=self.params['goal_state_position'])
-        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
-
-        # set up agent
-        def phi(x):  # Feature extractor
-            return np.asarray(x, dtype=np.float32) / 255
-        if self.params['agent'] == 'dqn':
-            # DQN
-            self.agent = make_dqn_agent(
-                q_agent_type="DoubleDQN",
-                arch="nature",
-                phi=phi,
-                n_actions=self.env.action_space.n,
-                replay_start_size=self.params['warmup_steps'],
-                buffer_length=self.params['buffer_length'],
-                update_interval=self.params['update_interval'],
-                target_update_interval=self.params['target_update_interval'],
+        # Roll-out in the test environments.
+        with agent.eval_mode():
+            assert not agent.training
+            test_obs, test_steps, test_epinfo = rollout_one_step(
+                agent=agent,
+                env=test_env,
+                obs=test_obs,
+                steps=test_steps,
             )
-        else:
-            # ensemble
-            self.agent = EnsembleAgent(
-                device=self.params['device'],
-                phi=phi,
-                action_selection_strategy=self.params['action_selection_strat'],
-                warmup_steps=self.params['warmup_steps'],
-                batch_size=self.params['batch_size'],
-                buffer_length=self.params['buffer_length'],
-                prioritized_replay_anneal_steps=self.params['steps'] / self.params['update_interval'],
-                update_interval=self.params['update_interval'],
-                q_target_update_interval=self.params['target_update_interval'],
-                num_modules=self.params['num_policies'],
-                num_output_classes=self.env.action_space.n,
-                embedding_plot_freq=self.params['embedding_plot_freq'],
-                plot_dir=self.params['plots_dir'],
-            )
+            test_epinfo_buf.extend(test_epinfo)
 
-        # results
-        self.success_rates = deque(maxlen=20)
+        assert agent.training
+        num_ppo_updates = agent.n_updates // n_ops_per_update
 
-    def train(self):
-        """
-        run the actual experiment to train one option
-        """
-        start_time = time.time()
+        if (step_cnt + 1) % config.nsteps == 0:
+            tnow = time.perf_counter()
+            fps = int(nbatch / (tnow - tstart))
 
-        # train loop
-        step_number = 0
-        episode_total_reward = 0
-        obs = self.env.reset()
-        while step_number < self.params['steps']:
-            action = self.agent.act(obs)
-            next_obs, reward, done, info = self.env.step(action)
-            self.agent.observe(obs, action, reward, next_obs, done)
-            obs = next_obs
-            episode_total_reward += reward
+            logger.logkv('steps', step_cnt + 1)
+            logger.logkv('total_steps', (step_cnt + 1) * config.num_envs)
+            logger.logkv('fps', fps)
+            logger.logkv('num_ppo_update', num_ppo_updates)
+            logger.logkv('eprewmean',
+                         safe_mean([info['r'] for info in train_epinfo_buf]))
+            logger.logkv('eplenmean',
+                         safe_mean([info['l'] for info in train_epinfo_buf]))
+            logger.logkv('eval_eprewmean',
+                         safe_mean([info['r'] for info in test_epinfo_buf]))
+            logger.logkv('eval_eplenmean',
+                         safe_mean([info['l'] for info in test_epinfo_buf]))
+            train_stats = agent.get_statistics()
+            for stats in train_stats:
+                logger.logkv(stats[0], stats[1])
+            logger.dumpkvs()
 
-            self.save_episode_reward(episode_total_reward, step_number, save_every=self.params['reward_logging_freq'])
-            self.save_results(step_number)
+            if num_ppo_updates % config.save_interval == 0:
+                model_path = os.path.join(
+                    model_dir, 'model_{}.pt'.format(num_ppo_updates + 1))
+                agent.model.save_to_file(model_path)
+                logger.info('Model save to {}'.format(model_path))
 
-            if done:
-                # self.save_success_rate(done and reward == 1, episode_number)
-                episode_total_reward = 0
-                obs = self.env.reset()
-            
-            step_number += 1
+            tstart = time.perf_counter()
 
-        end_time = time.time()
-
-        print("Time taken: ", end_time - start_time)
-    
-    def save_success_rate(self, success, episode_number, save_every=1):
-        """
-        log the average success rate during training every 5 episodes
-        the success rate at every episode is the average success rate over the last 10 episodes
-        """
-        save_file = os.path.join(self.saving_dir, "success_rate.csv")
-        img_file = os.path.join(self.saving_dir, "success_rate.png")
-        self.success_rates.append(success)
-        if episode_number % save_every == 0:
-            # write to csv
-            open_mode = 'w' if episode_number == 0 else 'a'
-            with open(save_file, open_mode) as f:
-                csv_writer = csv.writer(f)
-                csv_writer.writerow([episode_number, np.mean(self.success_rates)])
-            # plot it as well
-            with open(save_file, 'r') as f:
-                reader = csv.reader(f)
-                data = np.array([row for row in reader])
-                epsidoes = data[:, 0].astype(int)
-                success_rates = data[:, 1].astype(np.float32)
-                plt.plot(epsidoes, success_rates)
-                plt.title("Success rate")
-                plt.xlabel("Episode")
-                plt.ylabel("Success rate")
-                plt.savefig(img_file)
-                plt.close()
-    
-    def save_episode_reward(self, r, step_number, save_every):
-        """
-        log the episodic reward achieved during training
-        save every 250 steps
-        """
-        save_file = os.path.join(self.saving_dir, "episode_reward.csv")
-        img_file = os.path.join(self.saving_dir, "episode_reward.png")
-        if step_number % save_every == 0:
-            # write to csv
-            open_mode = 'w' if step_number == 0 else 'a'
-            with open(save_file, open_mode) as f:
-                csv_writer = csv.writer(f)
-                csv_writer.writerow([step_number, r])
-            # plot it as well
-            with open(save_file, 'r') as f:
-                csv_reader = csv.reader(f, delimiter=',')
-                data = np.array([row for row in csv_reader])  # (step_number, 2)
-                steps = data[:, 0].astype(int)
-                total_reward = data[:, 1].astype(np.float32)
-                plt.plot(steps, total_reward)
-                plt.title("training reward")
-                plt.xlabel("Steps")
-                plt.ylabel("Episode Reward")
-                plt.savefig(img_file)
-                plt.close()
-    
-    def save_results(self, step_number):
-        """
-        save the trained model
-        """
-        if step_number % self.params['saving_freq'] == 0:
-            self.agent.save(self.saving_dir)
-            print(f"model saved at step {step_number}")
+    # Save the final model.
+    logger.info('Training done.')
+    model_path = os.path.join(model_dir, 'model_final.pt')
+    agent.model.save_to_file(model_path)
+    logger.info('Model save to {}'.format(model_path))
 
 
-def main():
-    trial = TrainAgent()
-    trial.train()
+def run():
+    configs = parse_args()
+
+    # Configure logger.
+    log_dir = os.path.join(
+        configs.log_dir,
+        configs.env_name,
+        'nlev_{}_{}'.format(configs.num_levels, configs.distribution_mode),
+        configs.method_label,
+        configs.exp_name,
+    )
+    logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
+
+    # Create venvs.
+    train_venv = create_venv(configs, is_valid=False)
+    valid_venv = create_venv(configs, is_valid=True)
+
+    # Create policy.
+    policy = ImpalaCNN(
+        obs_space=train_venv.observation_space,
+        num_outputs=train_venv.action_space.n,
+    )
+
+    # Create agent and train.
+    optimizer = torch.optim.Adam(policy.parameters(), lr=configs.lr, eps=1e-5)
+    ppo_agent = PPO(
+        model=policy,
+        optimizer=optimizer,
+        gpu=configs.gpu,
+        gamma=configs.gamma,
+        lambd=configs.lam,
+        value_func_coef=configs.vf_coef,
+        entropy_coef=configs.ent_coef,
+        update_interval=configs.nsteps * configs.num_envs,
+        minibatch_size=configs.batch_size,
+        epochs=configs.nepochs,
+        clip_eps=configs.clip_range,
+        clip_eps_vf=configs.clip_range,
+        max_grad_norm=configs.max_grad_norm,
+    )
+    train(configs, ppo_agent, train_venv, valid_venv, log_dir)
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    run()
