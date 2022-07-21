@@ -48,8 +48,8 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
                 else:
                     a = agent.act(obs)  # DQN
                 next_obs, reward, done, info = env.step(a)
-                reached_goal = info.get('reached_goal', False)
-                terminal = reached_goal or info.get('dead', False)
+                reached_goal = info['reached_goal']
+                terminal = reached_goal or info['dead']
                 total_reward += reward
 
                 # visualize
