@@ -21,6 +21,7 @@ from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
 from skills import utils
+from skills.baseline.plot import plot_reward_curve
 
 
 class ProcgenTrial(BaseTrial):
@@ -158,10 +159,7 @@ class ProcgenTrial(BaseTrial):
             save_interval=self.params['save_interval'],
             model_file=self.params['load'],
         )
-
-
-
-
+        plot_reward_curve(self.saving_dir)
 
 
 def safe_mean(xs):

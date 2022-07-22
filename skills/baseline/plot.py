@@ -10,7 +10,7 @@ def plot_reward_curve(csv_dir):
     """
     csv_path = os.path.join(csv_dir, 'progress.csv')
     df = pandas.read_csv(csv_path, comment='#')
-    steps = df['steps']
+    steps = df['total_steps']
     train_reward = df['ep_reward_mean']
     eval_reward = df['eval_ep_reward_mean']
     plt.plot(steps, train_reward, label='train')
