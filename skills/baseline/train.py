@@ -13,10 +13,10 @@ from collections import deque
 import torch
 import numpy as np
 from procgen import ProcgenEnv
-from pfrl.agents.ppo import PPO
 from pfrl.utils import set_random_seed
 
 from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize
+from skills.agents.ppo import PPO
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
