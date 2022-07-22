@@ -66,6 +66,9 @@ class ProcgenTrial(BaseTrial):
                             help='path to load agent')
         
         args = self.parse_common_args(parser)
+        # auto fill
+        if args.experiment_name is None:
+            args.experiment_name = args.env
         return args
     
     def make_vector_env(self, eval=False):
