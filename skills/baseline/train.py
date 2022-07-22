@@ -7,66 +7,161 @@ https://github.com/lerrytang/train-procgen-pfrl/
 import os
 import time
 import argparse
+from pathlib import Path
 from collections import deque
 
 import torch
 import numpy as np
 from procgen import ProcgenEnv
 from pfrl.agents.ppo import PPO
+from pfrl.utils import set_random_seed
 
 from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize
+from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
+from skills import utils
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description='Process procgen training arguments.')
+class ProcgenTrial(BaseTrial):
+    """
+    trial for training procgen
+    """
+    def __init__(self):
+        super().__init__()
+        args = self.parse_args()
+        self.params = self.load_hyperparams(args)
+        self.setup()
+    
+    def check_params_validity(self):
+        pass
 
-    # Experiment parameters.
-    parser.add_argument(
-        '--distribution-mode', type=str, default='easy',
-        choices=['easy', 'hard', 'exploration', 'memory', 'extreme'])
-    parser.add_argument('--env-name', type=str, default='starpilot')
-    parser.add_argument('--num-envs', type=int, default=64)
-    parser.add_argument('--num-levels', type=int, default=0)
-    parser.add_argument('--start-level', type=int, default=0)
-    parser.add_argument('--num-threads', type=int, default=4)
-    parser.add_argument('--exp-name', type=str, default='trial01')
-    parser.add_argument('--log-dir', type=str, default='./log')
-    parser.add_argument('--model-file', type=str, default=None)
-    parser.add_argument('--method-label', type=str, default='vanilla')
+    def parse_args(self):
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            parents=[self.get_common_arg_parser()]
+        )
+        # defaults
+        parser.set_defaults(hyperparams='procgen_ppo')
 
-    # PPO parameters.
-    parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--lr', type=float, default=5e-4)
-    parser.add_argument('--ent-coef', type=float, default=0.01)
-    parser.add_argument('--vf-coef', type=float, default=0.5)
-    parser.add_argument('--gamma', type=float, default=0.999)
-    parser.add_argument('--lam', type=float, default=0.95)
-    parser.add_argument('--clip-range', type=float, default=0.2)
-    parser.add_argument('--max-grad-norm', type=float, default=0.5)
-    parser.add_argument('--nsteps', type=int, default=256)
-    parser.add_argument('--batch-size', type=int, default=8)
-    parser.add_argument('--nepochs', type=int, default=3)
-    parser.add_argument('--max-steps', type=int, default=25_000_000)
-    parser.add_argument('--save-interval', type=int, default=100)
+        # procgen environment
+        parser.add_argument('--env', type=str, required=True,
+                            help='name of the procgen environment')
+        parser.add_argument('--distribution_mode', '-d', type=str, default='easy',
+                            choices=['easy', 'hard', 'exploration, memeory', 'extreme'],
+                            help='distribution mode of procgen')
+        parser.add_argument('--num_envs', type=int, default=64,
+                            help='number of environments to run in parallel')
+        parser.add_argument('--num-threads', type=int, default=4)
+        parser.add_argument('--num_levels', type=int, default=200,
+                            help='number of different levels to generate during training')
+        parser.add_argument('--start_level', type=int, default=0,
+                            help='seed to start level generation')
+        
+        # agent
+        parser.add_argument('--agent', type=str, default='ppo',
+                            choices=['ppo'])
+        parser.add_argument('--load', '-l', type=str, default=None,
+                            help='path to load agent')
+        
+        args = self.parse_common_args(parser)
+        return args
+    
+    def make_vector_env(self, eval=False):
+        venv = ProcgenEnv(
+            num_envs=self.params['num_envs'],
+            env_name=self.params['env'],
+            num_levels=0 if eval else self.params['num_levels'],
+            start_level=0 if eval else self.params['start_level'],
+            distribution_mode=self.params['distribution_mode'],
+            num_threads=self.params['num_threads'],
+            center_agent=True,
+        )
+        venv = VecExtractDictObs(venv, "rgb")
+        venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
+        return VecNormalize(venv=venv, ob=False)
+    
+    def make_agent(self, env):
+        # Create policy.
+        policy = ImpalaCNN(
+            obs_space=env.observation_space,
+            num_outputs=env.action_space.n,
+        )
 
-    return parser.parse_args()
+        # Create agent and train.
+        optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+        ppo_agent = PPO(
+            model=policy,
+            optimizer=optimizer,
+            gpu=-1 if self.params['device']=='cpu' else 0,
+            gamma=self.params['gamma'],
+            lambd=self.params['lambda'],
+            value_func_coef=self.params['value_function_coef'],
+            entropy_coef=self.params['entropy_coef'],
+            update_interval=self.params['nsteps'] * self.params['num_envs'],
+            minibatch_size=self.params['batch_size'],
+            epochs=self.params['nepochs'],
+            clip_eps=self.params['clip_range'],
+            clip_eps_vf=self.params['clip_range'],
+            max_grad_norm=self.params['max_grad_norm'],
+        )
+        return ppo_agent
+    
+    def _expand_agent_name(self):
+        agent = self.params['agent']
+        if agent == 'ensemble':
+            agent += f"-{self.params['num_policies']}"
+        self.expanded_agent_name = agent
+    
+    def _set_saving_dir(self):
+        self._expand_agent_name()
+        return Path(self.params['results_dir'], self.params['experiment_name'], self.expanded_agent_name)
+
+    def make_logger(self, log_dir):
+        logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
+    
+    def setup(self):
+        set_random_seed(self.params['seed'])
+        torch.backends.cudnn.benchmark = True
+
+        # set up saving dir
+        self.saving_dir = self._set_saving_dir()
+        utils.create_log_dir(self.saving_dir, remove_existing=True)
+        self.params['saving_dir'] = self.saving_dir
+        self.params['plots_dir'] = os.path.join(self.saving_dir, 'plots')
+        os.mkdir(self.params['plots_dir'])
+
+        # save hyperparams
+        utils.save_hyperparams(self.saving_dir.joinpath('hyperparams.csv'), self.params)
+
+        # logger
+        self.logger = self.make_logger(self.saving_dir)
+
+        # env
+        self.train_env = self.make_vector_env(eval=False)
+        self.eval_env = self.make_vector_env(eval=True)
+
+        # agent
+        self.agent = self.make_agent(self.train_env)
+    
+    def train(self):
+        train_with_eval(
+            agent=self.agent,
+            train_env=self.train_env,
+            test_env=self.eval_env,
+            num_envs=self.params['num_envs'],
+            nsteps=self.params['nsteps'],
+            nepochs=self.params['nepochs'],
+            max_steps=self.params['max_steps'],
+            batch_size=self.params['batch_size'],
+            model_dir=self.saving_dir,
+            save_interval=self.params['save_interval'],
+            model_file=self.params['load'],
+        )
 
 
-def create_venv(config, is_valid=False):
-    venv = ProcgenEnv(
-        num_envs=config.num_envs,
-        env_name=config.env_name,
-        num_levels=0 if is_valid else config.num_levels,
-        start_level=0 if is_valid else config.start_level,
-        distribution_mode=config.distribution_mode,
-        num_threads=config.num_threads,
-    )
-    venv = VecExtractDictObs(venv, "rgb")
-    venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
-    return VecNormalize(venv=venv, ob=False)
+
+
 
 
 def safe_mean(xs):
@@ -100,32 +195,44 @@ def rollout_one_step(agent, env, obs, steps, env_max_steps=1000):
     return new_obs, steps, epinfo
 
 
-def train(config, agent, train_env, test_env, model_dir):
+def train_with_eval(
+    agent,
+    train_env, 
+    test_env,
+    num_envs,
+    nsteps,
+    nepochs,
+    max_steps,
+    batch_size,
+    model_dir,
+    save_interval,
+    model_file=None,
+):
 
-    if config.model_file is not None:
-        agent.model.load_from_file(config.model_file)
-        logger.info('Loaded model from {}.'.format(config.model_file))
+    if model_file is not None:
+        agent.model.load_from_file(model_file)
+        logger.info('Loaded model from {}.'.format(model_file))
     else:
         logger.info('Train agent from scratch.')
 
     train_epinfo_buf = deque(maxlen=100)
     train_obs = train_env.reset()
-    train_steps = np.zeros(config.num_envs, dtype=int)
+    train_steps = np.zeros(num_envs, dtype=int)
 
     test_epinfo_buf = deque(maxlen=100)
     test_obs = test_env.reset()
-    test_steps = np.zeros(config.num_envs, dtype=int)
+    test_steps = np.zeros(num_envs, dtype=int)
 
-    nbatch = config.num_envs * config.nsteps
+    nbatch = num_envs * nsteps
     # Due to some bug-like code in baseline.ppo2,
     # (and I modified PFRL accordingly) the true batch size is
-    # nbatch // config.batch_size.
-    n_ops_per_update = nbatch * config.nepochs / (nbatch // config.batch_size)
-    nupdates = config.max_steps // nbatch
-    max_steps = config.max_steps // config.num_envs
+    # nbatch // batch_size.
+    n_ops_per_update = nbatch * nepochs / (nbatch // batch_size)
+    nupdates = max_steps // nbatch
+    max_steps = max_steps // num_envs
 
     logger.info('Start training for {} steps (approximately {} updates)'.format(
-        config.max_steps, nupdates))
+        max_steps, nupdates))
 
     tstart = time.perf_counter()
     for step_cnt in range(max_steps):
@@ -154,30 +261,29 @@ def train(config, agent, train_env, test_env, model_dir):
         assert agent.training
         num_ppo_updates = agent.n_updates // n_ops_per_update
 
-        if (step_cnt + 1) % config.nsteps == 0:
+        if (step_cnt + 1) % nsteps == 0:
             tnow = time.perf_counter()
             fps = int(nbatch / (tnow - tstart))
 
             logger.logkv('steps', step_cnt + 1)
-            logger.logkv('total_steps', (step_cnt + 1) * config.num_envs)
+            logger.logkv('total_steps', (step_cnt + 1) * num_envs)
             logger.logkv('fps', fps)
             logger.logkv('num_ppo_update', num_ppo_updates)
-            logger.logkv('eprewmean',
+            logger.logkv('ep_reward_mean',
                          safe_mean([info['r'] for info in train_epinfo_buf]))
-            logger.logkv('eplenmean',
+            logger.logkv('ep_len_mean',
                          safe_mean([info['l'] for info in train_epinfo_buf]))
-            logger.logkv('eval_eprewmean',
+            logger.logkv('eval_ep_reward_mean',
                          safe_mean([info['r'] for info in test_epinfo_buf]))
-            logger.logkv('eval_eplenmean',
+            logger.logkv('eval_ep_len_mean',
                          safe_mean([info['l'] for info in test_epinfo_buf]))
             train_stats = agent.get_statistics()
             for stats in train_stats:
                 logger.logkv(stats[0], stats[1])
             logger.dumpkvs()
 
-            if num_ppo_updates % config.save_interval == 0:
-                model_path = os.path.join(
-                    model_dir, 'model_{}.pt'.format(num_ppo_updates + 1))
+            if num_ppo_updates % save_interval == 0:
+                model_path = os.path.join(model_dir, 'model.pt')
                 agent.model.save_to_file(model_path)
                 logger.info('Model save to {}'.format(model_path))
 
@@ -185,53 +291,11 @@ def train(config, agent, train_env, test_env, model_dir):
 
     # Save the final model.
     logger.info('Training done.')
-    model_path = os.path.join(model_dir, 'model_final.pt')
+    model_path = os.path.join(model_dir, 'model.pt')
     agent.model.save_to_file(model_path)
     logger.info('Model save to {}'.format(model_path))
 
 
-def run():
-    configs = parse_args()
-
-    # Configure logger.
-    log_dir = os.path.join(
-        configs.log_dir,
-        configs.env_name,
-        'nlev_{}_{}'.format(configs.num_levels, configs.distribution_mode),
-        configs.method_label,
-        configs.exp_name,
-    )
-    logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
-
-    # Create venvs.
-    train_venv = create_venv(configs, is_valid=False)
-    valid_venv = create_venv(configs, is_valid=True)
-
-    # Create policy.
-    policy = ImpalaCNN(
-        obs_space=train_venv.observation_space,
-        num_outputs=train_venv.action_space.n,
-    )
-
-    # Create agent and train.
-    optimizer = torch.optim.Adam(policy.parameters(), lr=configs.lr, eps=1e-5)
-    ppo_agent = PPO(
-        model=policy,
-        optimizer=optimizer,
-        gpu=configs.gpu,
-        gamma=configs.gamma,
-        lambd=configs.lam,
-        value_func_coef=configs.vf_coef,
-        entropy_coef=configs.ent_coef,
-        update_interval=configs.nsteps * configs.num_envs,
-        minibatch_size=configs.batch_size,
-        epochs=configs.nepochs,
-        clip_eps=configs.clip_range,
-        clip_eps_vf=configs.clip_range,
-        max_grad_norm=configs.max_grad_norm,
-    )
-    train(configs, ppo_agent, train_venv, valid_venv, log_dir)
-
-
 if __name__ == '__main__':
-    run()
+    trial = ProcgenTrial()
+    trial.train()

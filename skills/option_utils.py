@@ -48,8 +48,6 @@ class BaseTrial:
         # environments
         parser.add_argument("--environment", type=str,
                             help="name of the gym environment")
-        parser.add_argument("--use_deepmind_wrappers", action='store_true', default=True,
-                            help="use the deepmind wrappers")
         parser.add_argument("--seed", type=int, default=0,
                             help="Random seed")
         # hyperparams
@@ -130,6 +128,8 @@ class SingleOptionTrial(BaseTrial):
                             help="save the images of states while training")
         parser.add_argument("--agent_space", action='store_true', default=False,
                             help="train with the agent space")
+        parser.add_argument("--use_deepmind_wrappers", action='store_true', default=True,
+                            help="use the deepmind wrappers")
         parser.add_argument("--suppress_action_prunning", action='store_true', default=True,
                             help='do not prune the action space of monte')
         
