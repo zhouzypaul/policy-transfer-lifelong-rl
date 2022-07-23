@@ -15,8 +15,8 @@ import numpy as np
 from procgen import ProcgenEnv
 from pfrl.utils import set_random_seed
 
-from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize
-from skills.agents.ppo import PPO
+from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize, VecChannelOrder
+from skills.agents import PPO, EnsembleAgent
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
@@ -33,9 +33,6 @@ class ProcgenTrial(BaseTrial):
         args = self.parse_args()
         self.params = self.load_hyperparams(args)
         self.setup()
-    
-    def check_params_validity(self):
-        pass
 
     def parse_args(self):
         parser = argparse.ArgumentParser(
@@ -61,7 +58,7 @@ class ProcgenTrial(BaseTrial):
         
         # agent
         parser.add_argument('--agent', type=str, default='ppo',
-                            choices=['ppo'])
+                            choices=['ppo', 'ensemble'])
         parser.add_argument('--load', '-l', type=str, default=None,
                             help='path to load agent')
         
@@ -69,7 +66,23 @@ class ProcgenTrial(BaseTrial):
         # auto fill
         if args.experiment_name is None:
             args.experiment_name = args.env
+        if args.agent == 'ppo':
+            args.hyperparams = 'procgen_ppo'
+        elif args.agent == 'ensemble':
+            args.hyperparams = 'procgen_ensemble'
         return args
+
+    def check_params_validity(self):
+        """
+        check whether the params entered by the user is valid
+        """
+        if self.params['agent'] == 'ensemble':
+            try:
+                assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
+            except AssertionError:
+                new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
+                print(f"updating target_update_interval to be {new_interval}")
+                self.params['target_update_interval'] = new_interval
     
     def make_vector_env(self, eval=False):
         venv = ProcgenEnv(
@@ -81,35 +94,57 @@ class ProcgenTrial(BaseTrial):
             num_threads=self.params['num_threads'],
             center_agent=True,
         )
+        venv = VecChannelOrder(venv, channel_order='chw')
         venv = VecExtractDictObs(venv, "rgb")
         venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
-        return VecNormalize(venv=venv, ob=False)
+        venv = VecNormalize(venv=venv, ob=False)
+        return venv
     
     def make_agent(self, env):
-        # Create policy.
-        policy = ImpalaCNN(
-            obs_space=env.observation_space,
-            num_outputs=env.action_space.n,
-        )
+        if self.params['agent'] == 'ppo':
+            # Create policy.
+            policy = ImpalaCNN(
+                obs_space=env.observation_space,
+                num_outputs=env.action_space.n,
+            )
 
-        # Create agent and train.
-        optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
-        ppo_agent = PPO(
-            model=policy,
-            optimizer=optimizer,
-            gpu=-1 if self.params['device']=='cpu' else 0,
-            gamma=self.params['gamma'],
-            lambd=self.params['lambda'],
-            value_func_coef=self.params['value_function_coef'],
-            entropy_coef=self.params['entropy_coef'],
-            update_interval=self.params['nsteps'] * self.params['num_envs'],
-            minibatch_size=self.params['batch_size'],
-            epochs=self.params['nepochs'],
-            clip_eps=self.params['clip_range'],
-            clip_eps_vf=self.params['clip_range'],
-            max_grad_norm=self.params['max_grad_norm'],
-        )
-        return ppo_agent
+            # Create agent and train.
+            optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+            ppo_agent = PPO(
+                model=policy,
+                optimizer=optimizer,
+                gpu=-1 if self.params['device']=='cpu' else 0,
+                gamma=self.params['gamma'],
+                lambd=self.params['lambda'],
+                value_func_coef=self.params['value_function_coef'],
+                entropy_coef=self.params['entropy_coef'],
+                update_interval=self.params['nsteps'] * self.params['num_envs'],
+                minibatch_size=self.params['batch_size'],
+                epochs=self.params['nepochs'],
+                clip_eps=self.params['clip_range'],
+                clip_eps_vf=self.params['clip_range'],
+                max_grad_norm=self.params['max_grad_norm'],
+            )
+            return ppo_agent
+        elif self.params['agent'] == 'ensemble':
+            agent = EnsembleAgent(
+                device=self.params['device'],
+                phi=lambda x: x.astype(np.float32),
+                action_selection_strategy=self.params['action_selection_strat'],
+                warmup_steps=self.params['warmup_steps'],
+                batch_size=self.params['batch_size'],
+                prioritized_replay_anneal_steps=self.params['max_steps'] / self.params['update_interval'],
+                buffer_length=self.params['buffer_length'],
+                update_interval=self.params['update_interval'],
+                q_target_update_interval=self.params['target_update_interval'],
+                num_modules=self.params['num_policies'],
+                num_output_classes=env.action_space.n,
+                plot_dir=self.params['plots_dir'],
+                verbose=False,
+            )
+            return agent
+        else:
+            raise NotImplementedError('Unsupported agent')
     
     def _expand_agent_name(self):
         agent = self.params['agent']
@@ -125,6 +160,7 @@ class ProcgenTrial(BaseTrial):
         logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
     
     def setup(self):
+        self.check_params_validity()
         set_random_seed(self.params['seed'])
         torch.backends.cudnn.benchmark = True
 

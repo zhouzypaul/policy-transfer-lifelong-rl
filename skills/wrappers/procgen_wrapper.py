@@ -57,8 +57,8 @@ class ProcgenGymWrapper(gym.Wrapper):
         pass
 
 
-class GrayscaleWrapper(gym.ObservationWrapper):
-    def __init__(self, env, grayscale=True, channel_order="chw"):
+class ChannelOrderWrapper(gym.ObservationWrapper):
+    def __init__(self, env, grayscale=False, channel_order="chw"):
         """make then images into grayscale and change the channel order of the observation"""
         super().__init__(env)
         self.width = 64

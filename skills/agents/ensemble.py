@@ -9,7 +9,7 @@ from pfrl import replay_buffers
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
-from skills.agents.abstract_agent import Agent
+from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.value_ensemble import ValueEnsemble
 from skills.ensemble.aggregate import choose_most_popular, choose_leader
 
@@ -18,16 +18,14 @@ class EnsembleAgent(Agent):
     """
     an Agent that keeps an ensemble of policies
     an agent needs to support two methods: observe() and act()
-
-    this class currently doesn't support batched observe() and act()
     """
     def __init__(self, 
                 device, 
                 warmup_steps,
                 batch_size,
-                phi,
                 action_selection_strategy,
                 prioritized_replay_anneal_steps,
+                phi=lambda x: x,
                 buffer_length=100000,
                 update_interval=4,
                 q_target_update_interval=40,
@@ -54,8 +52,9 @@ class EnsembleAgent(Agent):
         self.num_modules = num_modules
         self.step_number = 0
         self.episode_number = 0
+        self.n_updates = 0
         self.action_leader = np.random.choice(self.num_modules)
-        self.learner_accumulated_reward = {l: 1 for l in range(self.num_modules)}  # laplace smoothing
+        self.learner_accumulated_reward = np.ones((self.num_modules,))  # laplace smoothing
         self.update_epochs_per_step = 1
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
@@ -100,6 +99,48 @@ class EnsembleAgent(Agent):
             replay_start_size=warmup_steps,
             update_interval=update_interval,
         )
+
+    def batch_observe(self, batch_obs, batch_reward, batch_done, batch_reset):
+        if self.training:
+            return self._batch_observe_train(
+                batch_obs, batch_reward, batch_done, batch_reset
+            )
+        else:
+            return self._batch_observe_eval(
+                batch_obs, batch_reward, batch_done, batch_reset
+            )
+    
+    def _batch_observe_train(self, batch_obs, batch_reward, batch_done, batch_reset):
+        self.step_number += 1
+
+        for i in range(len(batch_obs)):
+            if self.batch_last_obs[i] is not None:
+                assert self.batch_last_action[i] is not None
+                # Add a transition to the replay buffer
+                transition = {
+                    "state": self.batch_last_obs[i],
+                    "action": self.batch_last_action[i],
+                    "reward": batch_reward[i],
+                    "next_state": batch_obs[i],
+                    "next_action": None,
+                    "is_state_terminal": batch_done[i],
+                }
+                self.replay_buffer.append(env_id=i, **transition)
+                if batch_reset[i] or batch_done[i]:
+                    self.batch_last_obs[i] = None
+                    self.batch_last_action[i] = None
+                    self.replay_buffer.stop_current_episode(env_id=i)
+            self.replay_updater.update_if_necessary(self.step_number)
+
+        # action leader
+        self.learner_accumulated_reward[self.action_leader] += batch_reward.sum()
+        if batch_reset.any() or batch_done.any():
+            self.episode_number += 1  # may be buggy 
+            self._choose_new_leader()
+
+    def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_terminal):
+        # need to do stuff if recurrent 
+        pass
     
     def observe(self, obs, action, reward, next_obs, terminal):
         """
@@ -128,20 +169,22 @@ class EnsembleAgent(Agent):
         # new episode
         if terminal:
             self.episode_number += 1
-            # set leader
-            if self.action_selection_strategy == 'uniform_leader':
-                self.action_leader = np.random.choice(self.num_modules)
-            elif self.action_selection_strategy == 'leader':
-                acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
-                try:
-                    normalized_reward = acc_reward - acc_reward.max()
-                    probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
-                    self.action_leader = np.random.choice(self.num_modules, p=probability)
-                except ValueError:
-                    print(f"normalized reward: {normalized_reward}")
-                    print(f"probability: {probability}")
-                    print(probability.sum())
-                    raise
+            self._choose_new_leader()
+    
+    def _choose_new_leader(self):
+        if self.action_selection_strategy == 'uniform_leader':
+            self.action_leader = np.random.choice(self.num_modules)
+        elif self.action_selection_strategy == 'leader':
+            acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
+            try:
+                normalized_reward = acc_reward - acc_reward.max()
+                probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
+                self.action_leader = np.random.choice(self.num_modules, p=probability)
+            except ValueError:
+                print(f"normalized reward: {normalized_reward}")
+                print(f"probability: {probability}")
+                print(probability.sum())
+                raise
 
     def update(self, experiences, errors_out=None):
         """
@@ -185,6 +228,36 @@ class EnsembleAgent(Agent):
             if has_weight:
                 assert isinstance(self.replay_buffer, replay_buffers.PrioritizedReplayBuffer)
                 self.replay_buffer.update_errors(errors_out)
+            
+            self.n_updates += 1
+
+    def batch_act(self, batch_obs):
+        with torch.no_grad(), evaluating(self):
+            batch_xs = batch_states(batch_obs, self.device, self.phi)
+            actions = self.value_ensemble.predict_actions(batch_xs, return_q_values=False)  # (num_envs, num_modules)
+        # action selection strategy
+        if self.action_selection_strategy == 'vote':
+            action_selection_func = choose_most_popular
+        elif self.action_selection_strategy in ['leader', 'uniform_leader']:
+            action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
+        else:
+            raise NotImplementedError("action selection strat not supported")
+        # epsilon-greedy
+        if self.training:
+            batch_action = [
+                self.explorer.select_action(
+                    self.step_number,
+                    greedy_action_func=lambda: action_selection_func(actions[i]),
+                ) for i in range(len(batch_obs))
+            ]
+            self.batch_last_obs = list(batch_obs)
+            self.batch_last_action = list(batch_action)
+        else:
+            batch_action = [
+                action_selection_func(actions[i]) 
+                for i in range(len(batch_obs))
+            ]
+        return np.array(batch_action)
 
     def act(self, obs, return_ensemble_info=False):
         """
@@ -194,8 +267,10 @@ class EnsembleAgent(Agent):
             return_ensemble_info (bool): when set to true, this function returns
                 (action_selected, actions_selected_by_each_learner, q_values_of_each_actions_selected)
         """
-        obs = batch_states([obs], self.device, self.phi)
-        actions, q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
+        with torch.no_grad(), evaluating(self):
+            obs = batch_states([obs], self.device, self.phi)
+            actions, q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
+            actions, q_vals = actions[0], q_vals[0]  # get rid of batch dimension
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = choose_most_popular
@@ -214,6 +289,9 @@ class EnsembleAgent(Agent):
         if return_ensemble_info:
             return a, actions, q_vals
         return a
+    
+    def get_statistics(self):
+        return []
 
     def save(self, save_dir):
         path = os.path.join(save_dir, "agent.pkl")

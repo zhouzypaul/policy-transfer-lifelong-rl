@@ -143,8 +143,12 @@ class ValueEnsemble():
         """
         given a state, each one in the ensemble predicts an action
         args:
+            state: (batch_size, channel, height, width)
             return_q_values: if True, return the predicted q values each learner predicts on the action of their choice.
+        returns:
+            actions: (batch_size, num_modules)
         """
+        nbatch = state.shape[0]
         self.embedding.eval()
         self.q_networks.eval()
         with torch.no_grad():
@@ -152,13 +156,13 @@ class ValueEnsemble():
             self.recurrent_memory.flatten_parameters()
             embeddings, _ = self.recurrent_memory(embeddings)
 
-            actions = np.zeros(self.num_modules, dtype=np.int)
-            q_values = np.zeros(self.num_modules, dtype=np.float)
+            actions = np.zeros((nbatch, self.num_modules), dtype=np.int)
+            q_values = np.zeros((nbatch, self.num_modules), dtype=np.float)
             for idx in range(self.num_modules):
                 attention = embeddings[:,idx,:]
                 q_vals = self.q_networks[idx](attention)
-                actions[idx] = q_vals.greedy_actions
-                q_values[idx] = q_vals.max
+                actions[:, idx] = q_vals.greedy_actions.cpu().numpy()
+                q_values[:, idx] = q_vals.max.cpu().numpy()
 
         if return_q_values:
             return actions, q_values
