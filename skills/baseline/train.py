@@ -11,12 +11,16 @@ from pathlib import Path
 from collections import deque
 
 import torch
+from torch import distributions, nn
 import numpy as np
+import pfrl
+from pfrl.nn.lmbda import Lambda
 from procgen import ProcgenEnv
 from pfrl.utils import set_random_seed
 
 from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize
 from skills.agents.ppo import PPO
+from skills.agents.sac import SAC
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
@@ -61,7 +65,7 @@ class ProcgenTrial(BaseTrial):
         
         # agent
         parser.add_argument('--agent', type=str, default='ppo',
-                            choices=['ppo'])
+                            choices=['ppo', 'sac'])
         parser.add_argument('--load', '-l', type=str, default=None,
                             help='path to load agent')
         
@@ -69,6 +73,10 @@ class ProcgenTrial(BaseTrial):
         # auto fill
         if args.experiment_name is None:
             args.experiment_name = args.env
+        if args.agent == 'ppo':
+            args.hyperparams = 'procgen_ppo'
+        elif args.agent == 'sac':
+            args.hyperparams = 'procgen_sac'
         return args
     
     def make_vector_env(self, eval=False):
@@ -86,30 +94,112 @@ class ProcgenTrial(BaseTrial):
         return VecNormalize(venv=venv, ob=False)
     
     def make_agent(self, env):
-        # Create policy.
-        policy = ImpalaCNN(
-            obs_space=env.observation_space,
-            num_outputs=env.action_space.n,
-        )
+        if self.params['agent'] == 'ppo':
+            # Create policy.
+            policy = ImpalaCNN(
+                obs_space=env.observation_space,
+                num_outputs=env.action_space.n,
+            )
 
-        # Create agent and train.
-        optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
-        ppo_agent = PPO(
-            model=policy,
-            optimizer=optimizer,
-            gpu=-1 if self.params['device']=='cpu' else 0,
-            gamma=self.params['gamma'],
-            lambd=self.params['lambda'],
-            value_func_coef=self.params['value_function_coef'],
-            entropy_coef=self.params['entropy_coef'],
-            update_interval=self.params['nsteps'] * self.params['num_envs'],
-            minibatch_size=self.params['batch_size'],
-            epochs=self.params['nepochs'],
-            clip_eps=self.params['clip_range'],
-            clip_eps_vf=self.params['clip_range'],
-            max_grad_norm=self.params['max_grad_norm'],
-        )
-        return ppo_agent
+            # Create agent and train.
+            optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+            ppo_agent = PPO(
+                model=policy,
+                optimizer=optimizer,
+                gpu=-1 if self.params['device']=='cpu' else 0,
+                gamma=self.params['gamma'],
+                lambd=self.params['lambda'],
+                value_func_coef=self.params['value_function_coef'],
+                entropy_coef=self.params['entropy_coef'],
+                update_interval=self.params['nsteps'] * self.params['num_envs'],
+                minibatch_size=self.params['batch_size'],
+                epochs=self.params['nepochs'],
+                clip_eps=self.params['clip_range'],
+                clip_eps_vf=self.params['clip_range'],
+                max_grad_norm=self.params['max_grad_norm'],
+            )
+            return ppo_agent
+            
+        elif self.params['agent'] == 'sac':
+            action_space = env.action_space
+            obs_space = env.observation_space
+            action_size = action_space.n
+
+            def squashed_diagonal_gaussian_head(x):
+                assert x.shape[-1] == action_size * 2
+                mean, log_scale = torch.chunk(x, 2, dim=1)
+                log_scale = torch.clamp(log_scale, -20.0, 2.0)
+                var = torch.exp(log_scale * 2)
+                base_distribution = distributions.Independent(
+                    distributions.Normal(loc=mean, scale=torch.sqrt(var)), 1
+                )
+                # cache_size=1 is required for numerical stability
+                return distributions.transformed_distribution.TransformedDistribution(
+                    base_distribution, [distributions.transforms.TanhTransform(cache_size=1)]
+                )
+
+            policy = nn.Sequential(
+                nn.Linear(obs_space.low.size, self.params['n_hidden_channels']),
+                nn.ReLU(),
+                nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
+                nn.ReLU(),
+                nn.Linear(self.params['n_hidden_channels'], action_size * 2),
+                Lambda(squashed_diagonal_gaussian_head),
+            )
+            torch.nn.init.xavier_uniform_(policy[0].weight)
+            torch.nn.init.xavier_uniform_(policy[2].weight)
+            torch.nn.init.xavier_uniform_(policy[4].weight)
+            policy_optimizer = torch.optim.Adam(
+                policy.parameters(), lr=self.params['learning_rate'], eps=self.params['adam_eps']
+            )
+
+            def make_q_func_with_optimizer():
+                q_func = nn.Sequential(
+                    pfrl.nn.ConcatObsAndAction(),
+                    nn.Linear(obs_space.low.size + action_size, self.params['n_hidden_channels']),
+                    nn.ReLU(),
+                    nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
+                    nn.ReLU(),
+                    nn.Linear(self.params['n_hidden_channels'], 1),
+                )
+                torch.nn.init.xavier_uniform_(q_func[1].weight)
+                torch.nn.init.xavier_uniform_(q_func[3].weight)
+                torch.nn.init.xavier_uniform_(q_func[5].weight)
+                q_func_optimizer = torch.optim.Adam(
+                    q_func.parameters(), lr=self.params['learning_rate'], eps=self.params['adam_eps']
+                )
+                return q_func, q_func_optimizer
+
+            q_func1, q_func1_optimizer = make_q_func_with_optimizer()
+            q_func2, q_func2_optimizer = make_q_func_with_optimizer()
+
+            rbuf = pfrl.replay_buffers.ReplayBuffer(10**6, num_steps=self.params['n_step_return'])
+
+            def burnin_action_func():
+                """Select random actions until model is updated one or more times."""
+                return action_space.sample()
+
+            # Hyperparameters in http://arxiv.org/abs/1802.09477
+            agent = SAC(
+                policy,
+                q_func1,
+                q_func2,
+                policy_optimizer,
+                q_func1_optimizer,
+                q_func2_optimizer,
+                rbuf,
+                gamma=self.params['discount'],
+                update_interval=self.params['update_interval'],
+                replay_start_size=self.params['replay_start_size'],
+                gpu=-1 if self.params['device']=='cpu' else 0,
+                minibatch_size=self.params['batch_size'],
+                burnin_action_func=burnin_action_func,
+                entropy_target=-action_size,
+                temperature_optimizer_lr=self.params['learning_rate'],
+            )
+            return agent
+        else:
+            raise NotImplementedError('unknown agent')
     
     def _expand_agent_name(self):
         agent = self.params['agent']
@@ -224,7 +314,8 @@ def train_with_eval(
     test_obs = test_env.reset()
     test_steps = np.zeros(num_envs, dtype=int)
 
-    nbatch = num_envs * nsteps
+    # nsteps: how many steps to take till one update
+    nbatch = num_envs * nsteps  # number of experience in a batch
     # Due to some bug-like code in baseline.ppo2,
     # (and I modified PFRL accordingly) the true batch size is
     # nbatch // batch_size.
