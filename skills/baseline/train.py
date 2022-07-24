@@ -247,8 +247,7 @@ def train_with_eval(
 ):
 
     if model_file is not None:
-        agent.model.load_from_file(model_file)
-        logger.info('Loaded model from {}.'.format(model_file))
+        load_agent(agent, model_file, plot_dir=os.path.join(model_dir, 'plots'))
     else:
         logger.info('Train agent from scratch.')
 
@@ -320,17 +319,35 @@ def train_with_eval(
             logger.dumpkvs()
 
             if num_ppo_updates % save_interval == 0:
-                model_path = os.path.join(model_dir, 'model.pt')
-                agent.model.save_to_file(model_path)
-                logger.info('Model save to {}'.format(model_path))
+                save_agent(agent, model_dir)
 
             tstart = time.perf_counter()
 
     # Save the final model.
     logger.info('Training done.')
-    model_path = os.path.join(model_dir, 'model.pt')
-    agent.model.save_to_file(model_path)
-    logger.info('Model save to {}'.format(model_path))
+    save_agent(agent, model_dir)
+
+
+def save_agent(agent, saving_dir):
+    if type(agent) == PPO:
+        model_path = os.path.join(saving_dir, 'model.pt')
+        agent.model.save_to_file(model_path)
+        logger.info(f"Model saved to {model_path}")
+    elif type(agent) == EnsembleAgent:
+        agent.save(saving_dir)
+        logger.info(f"Model saved to {saving_dir}/agent.pkl")
+    else:
+        raise RuntimeError 
+
+
+def load_agent(agent, load_path, plot_dir=None):
+    if type(agent) == PPO:
+        agent.model.load_from_file(load_path)
+        logger.info(f"Model loaded from {load_path}")
+    elif type(agent) == EnsembleAgent:
+        EnsembleAgent.load(load_path, plot_dir=plot_dir)
+    else:
+        raise RuntimeError
 
 
 if __name__ == '__main__':
