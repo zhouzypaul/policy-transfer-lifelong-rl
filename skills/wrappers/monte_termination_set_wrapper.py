@@ -33,13 +33,29 @@ class MonteTerminationSetWrapper(Wrapper):
         # build the frame stack
         tensor_next_state = build_agent_space_image_stack(self.env)
         votes, vote_confs = self.clf.get_votes(tensor_next_state)
-        # aggregate the votes, vote yes if one of them is yes
-        voted_done = np.sum(votes) > 0  # votes are all either 0 or 1
+        # aggregate the votes, use it as termination probability
+        voted_done, termination_prob = get_termination_prob(votes, vote_confs)
         if self.override_done:
             done = voted_done
         reward = 1 if voted_done else 0
-        if self.confidence_based_reward and voted_done:
-            reward = vote_confs[np.argmax(votes==1)]
+        # if self.confidence_based_reward and voted_done:
+        #     reward = vote_confs[np.argmax(votes==1)]
         # override needs_real_reset for EpisodicLifeEnv
         self.env.unwrapped.needs_real_reset = done or info.get("needs_reset", False)
         return next_state, reward, done, info
+
+
+def get_termination_prob(votes, votes_confs):
+    """
+    aggregate the votes and use it as termination prob
+    """
+    yes_conf = np.sum(votes_confs[votes == 1]) / len(votes)
+    no_conf = np.sum(votes_confs[votes == 0]) / len(votes)
+    # normalize
+    sum_conf = yes_conf + no_conf
+    yes_conf /= sum_conf
+    no_conf /= sum_conf
+    # termination
+    termination_prob = yes_conf
+    voted_done = np.random.rand() < termination_prob
+    return voted_done, termination_prob
