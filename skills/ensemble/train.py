@@ -186,7 +186,7 @@ def save_agent(agent, step_number, saving_dir, saving_freq):
     """
     save the trained model
     """
-    if step_number % saving_freq == 0:
+    if (step_number+1) % saving_freq == 0:
         agent.save(saving_dir)
         print(f"model saved at step {step_number}")
 
