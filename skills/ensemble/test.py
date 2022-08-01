@@ -14,7 +14,7 @@ from skills.ensemble.ensemble_utils import visualize_state_with_ensemble_actions
     visualize_state_with_action
 
 
-def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10, max_steps_per_episode=50):
+def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10):
     """
     test the ensemble agent:
         - success rate
@@ -41,7 +41,7 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
             total_reward = 0
             terminal = False
 
-            while not terminal and step < max_steps_per_episode:
+            while not terminal:
                 # step
                 if type(agent) == EnsembleAgent:
                     a, ensemble_actions, ensemble_q_vals = agent.act(obs, return_ensemble_info=True)
@@ -49,7 +49,7 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
                     a = agent.act(obs)  # DQN
                 next_obs, reward, done, info = env.step(a)
                 reached_goal = info.get('reached_goal', False)
-                terminal = reached_goal or info['dead']
+                terminal = reached_goal or info['dead'] or info['needs_reset']
                 total_reward += reward
 
                 # visualize
@@ -146,7 +146,7 @@ class TestTrial(SingleOptionTrial):
         self.params['saving_dir'] = self.saving_dir
 
         # env
-        self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000, self.params['start_state'])
+        self.env = self.make_env(saved_params['environment'], saved_params['seed'] + 1000, eval=True, start_state=self.params['start_state'])
 
         # agent
         agent_file = Path(self.params['load']) / 'agent.pkl'
@@ -162,7 +162,6 @@ class TestTrial(SingleOptionTrial):
             self.saving_dir,
             visualize=True,
             num_episodes=self.params['episodes'], 
-            max_steps_per_episode=self.params['steps']
         )
 
 

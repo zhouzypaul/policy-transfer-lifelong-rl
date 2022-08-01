@@ -57,7 +57,7 @@ def train_ensemble_agent_with_eval(
         agent.observe(state, action, reward, next_state, done)
         total_reward += reward
         state = next_state
-        if done:
+        if done or info['needs_reset']:
             # success rate
             success_rates.append(done and not info['dead'])
             save_success_rate(success_rates, episode_number, saving_dir, eval=False, save_every=success_rate_save_freq)
@@ -73,7 +73,7 @@ def train_ensemble_agent_with_eval(
         # periodically eval
         if eval_freq and step_number % eval_freq == 0:
             # success rates
-            eval_success = test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=1, max_steps_per_episode=50)
+            eval_success = test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=1)
             eval_success_rates.append(eval_success)
             save_success_rate(eval_success_rates, episode_number, saving_dir, eval=True, save_every=1)
             # if well trained 
@@ -87,7 +87,7 @@ def train_ensemble_agent_with_eval(
         step_number += 1
 
     # testing at the end
-    test_ensemble_agent(agent, env, saving_dir, visualize=True, num_episodes=1, max_steps_per_episode=50)
+    test_ensemble_agent(agent, env, saving_dir, visualize=True, num_episodes=1)
 
     end_time = time.time()
 
@@ -266,8 +266,8 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
         # set up env
-        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
-        self.eval_env = self.make_env(self.params['environment'], self.params['seed']+1000, self.params['start_state'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'], eval=False, start_state=self.params['start_state'])
+        self.eval_env = self.make_env(self.params['environment'], self.params['seed']+1000, eval=True, start_state=self.params['start_state'])
 
         # set up agent
         def phi(x):  # Feature extractor

@@ -13,3 +13,5 @@ success_threshold_for_well_trained,0.9,float
 goal_epsilon_tol,20,int
 ladder_epsilon_tol,6,int
 success_queue_size,10,int
+training_max_step_limit,300,int
+eval_max_step_limit,50,int

@@ -125,8 +125,8 @@ class TransferTrial(SingleOptionTrial):
         for i, target in enumerate(self.params['target']):
             print(f"Training {trained} -> {target}")
             # make env
-            env = self.make_env(self.saved_params['environment'], self.saved_params['seed'], start_state=target)
-            eval_env = self.make_env(self.saved_params['environment'], self.saved_params['seed']+1000, start_state=target)
+            env = self.make_env(self.saved_params['environment'], self.saved_params['seed'], eval=False, start_state=target)
+            eval_env = self.make_env(self.saved_params['environment'], self.saved_params['seed']+1000, eval=True, start_state=target)
             # find loaded agent
             if trained == self.params['load']:
                 agent_file = self.loading_dir / 'agent.pkl'

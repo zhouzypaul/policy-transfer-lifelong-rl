@@ -209,7 +209,7 @@ class SingleOptionTrial(BaseTrial):
         self._expand_agent_name()
         return Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(self.expanded_agent_name)
 
-    def make_env(self, env_name, env_seed, start_state=None):
+    def make_env(self, env_name, env_seed, eval=False, start_state=None):
         """
         Make a monte environemnt for training skills
         Args:
@@ -217,11 +217,15 @@ class SingleOptionTrial(BaseTrial):
         """
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
         # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
-        env = make_atari(env_name, max_frames=30*60*60)  # 30 min with 60 fps
+        env = make_atari(env_name, max_frames=self.params['eval_max_step_limit'] if eval else self.params['training_max_step_limit'])
         # make agent space
         if self.params['agent_space']:
             print('using the agent space to train the option right now')
-        env = MonteAgentWrapper(env, agent_space=self.params['agent_space'])
+        env = MonteAgentWrapper(
+            env, 
+            agent_space=self.params['agent_space'],
+            max_steps=self.params['eval_max_step_limit'] if eval else self.params['training_max_step_limit'],
+        )
         if self.params['use_deepmind_wrappers']:
             env = wrap_deepmind(
                 env,
