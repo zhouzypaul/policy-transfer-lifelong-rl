@@ -64,6 +64,7 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
                             meaningful_actions,
                             meaningful_q_vals,
                             action_taken,
+                            reward,
                             save_path,
                         )
                     else:
