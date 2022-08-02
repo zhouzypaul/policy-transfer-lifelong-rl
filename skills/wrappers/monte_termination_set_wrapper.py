@@ -9,7 +9,7 @@ class MonteTerminationSetWrapper(Wrapper):
     """
     a wrapper that uses the portable EnsembleClassifier to determine whether a skill is done or not
     """
-    def __init__(self, env, override_done=True, confidence_based_reward=False, device="cuda"):
+    def __init__(self, env, eval, confidence_based_reward=False, device="cuda"):
         """
         when using confidence_based_reward, the reward received when done is exactly the confidence of the 
         termination classifier
@@ -17,7 +17,7 @@ class MonteTerminationSetWrapper(Wrapper):
         """
         super().__init__(env)
         self.env = env
-        self.override_done = override_done
+        self.eval = eval
         self.confidence_based_reward = confidence_based_reward
         # load saved classifier
         clf_path = 'resources/classifier/termination'  # hard coded for now
@@ -35,9 +35,9 @@ class MonteTerminationSetWrapper(Wrapper):
         votes, vote_confs = self.clf.get_votes(tensor_next_state)
         # aggregate the votes, use it as termination probability
         voted_done, termination_prob = get_termination_prob(votes, vote_confs)
-        if self.override_done:
+        if not self.eval:
             done = voted_done
-        reward = 1 if voted_done else 0
+            reward = 1 if voted_done else 0
         # if self.confidence_based_reward and voted_done:
         #     reward = vote_confs[np.argmax(votes==1)]
         # override needs_real_reset for EpisodicLifeEnv
