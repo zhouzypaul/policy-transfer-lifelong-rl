@@ -15,7 +15,6 @@ from skills.wrappers.agent_wrapper import MonteAgentWrapper
 from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
 from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
 from skills.wrappers.monte_initiation_set_wrapper import MonteInitiationSetWrapper
-from skills.wrappers.monte_pruned_actions import MontePrunedActions
 from skills.wrappers.monte_ladder_goal_wrapper import MonteLadderGoalWrapper
 from skills.wrappers.monte_skull_goal_wrapper import MonteSkullGoalWrapper
 from skills.wrappers.monte_spider_goal_wrapper import MonteSpiderGoalWrapper
@@ -238,9 +237,6 @@ class SingleOptionTrial(BaseTrial):
                 channel_order="chw",
                 flicker=False,
             )
-        # prunning actions
-        if not self.params['suppress_action_prunning']:
-            env = MontePrunedActions(env)
         # starting state wrappers
         if start_state is not None:
             start_state_path = self.find_start_state_ram_file(start_state)
@@ -249,7 +245,7 @@ class SingleOptionTrial(BaseTrial):
             env = MonteForwarding(env, start_state_path)
         # termination wrappers
         if self.params['termination_clf']:
-            env = MonteTerminationSetWrapper(env, override_done=not self.params['initiation_clf'], confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
+            env = MonteTerminationSetWrapper(env, override_done=not eval, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
         # initiation wrappers
         if self.params['initiation_clf']:
