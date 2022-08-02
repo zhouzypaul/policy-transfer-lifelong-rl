@@ -216,7 +216,7 @@ class SingleOptionTrial(BaseTrial):
         """
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
         # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
-        env = make_atari(env_name, max_frames=self.params['eval_max_step_limit'] if eval else self.params['training_max_step_limit'])
+        env = make_atari(env_name, max_frames=None)
         # make agent space
         if self.params['agent_space']:
             print('using the agent space to train the option right now')
