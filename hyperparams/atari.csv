@@ -15,3 +15,4 @@ ladder_epsilon_tol,6,int
 success_queue_size,10,int
 training_max_step_limit,300,int
 eval_max_step_limit,50,int
+termination_num_agreeing_votes,4,int

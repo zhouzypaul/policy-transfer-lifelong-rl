@@ -9,7 +9,7 @@ class MonteTerminationSetWrapper(Wrapper):
     """
     a wrapper that uses the portable EnsembleClassifier to determine whether a skill is done or not
     """
-    def __init__(self, env, eval, confidence_based_reward=False, device="cuda"):
+    def __init__(self, env, eval, num_agreeing_votes=4, confidence_based_reward=False, device="cuda"):
         """
         when using confidence_based_reward, the reward received when done is exactly the confidence of the 
         termination classifier
@@ -19,6 +19,7 @@ class MonteTerminationSetWrapper(Wrapper):
         self.env = env
         self.eval = eval
         self.confidence_based_reward = confidence_based_reward
+        self.num_agreeing_votes = num_agreeing_votes
         # load saved classifier
         clf_path = 'resources/classifier/termination'  # hard coded for now
         self.clf = EnsembleClassifier(device=device)
@@ -34,7 +35,7 @@ class MonteTerminationSetWrapper(Wrapper):
         tensor_next_state = build_agent_space_image_stack(self.env)
         votes, vote_confs = self.clf.get_votes(tensor_next_state)
         # aggregate the votes, use it as termination probability
-        voted_done, termination_prob = get_termination_prob(votes, vote_confs)
+        voted_done, termination_prob = get_termination_prob(votes, vote_confs, self.num_agreeing_votes)
         if not self.eval:
             done = voted_done
             reward = 1 if voted_done else 0
@@ -45,7 +46,7 @@ class MonteTerminationSetWrapper(Wrapper):
         return next_state, reward, done, info
 
 
-def get_termination_prob(votes, votes_confs):
+def get_termination_prob(votes, votes_confs, num_agreeing_votes):
     """
     aggregate the votes and use it as termination prob
     """
@@ -57,5 +58,5 @@ def get_termination_prob(votes, votes_confs):
     no_conf /= sum_conf
     # termination
     termination_prob = yes_conf
-    voted_done = np.random.rand() < termination_prob
+    voted_done = np.random.rand() < termination_prob and np.sum(votes) >= num_agreeing_votes
     return voted_done, termination_prob

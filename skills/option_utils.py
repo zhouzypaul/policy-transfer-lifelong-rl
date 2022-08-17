@@ -202,6 +202,7 @@ class SingleOptionTrial(BaseTrial):
             agent += '-termination-clf'
         if self.params['confidence_based_reward']:
             agent += '-cbr'
+        agent += f"-highconf-{self.params['termination_num_agreeing_votes']}"
         self.expanded_agent_name = agent
     
     def _set_saving_dir(self):
@@ -245,7 +246,7 @@ class SingleOptionTrial(BaseTrial):
             env = MonteForwarding(env, start_state_path)
         # termination wrappers
         if self.params['termination_clf']:
-            env = MonteTerminationSetWrapper(env, eval=eval, confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
+            env = MonteTerminationSetWrapper(env, eval=eval, num_agreeing_votes=self.params['termination_num_agreeing_votes'], confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
         # initiation wrappers
         if self.params['initiation_clf']:
