@@ -95,14 +95,13 @@ class TransferTrial(SingleOptionTrial):
 
         # create the saving directories
         self.saving_dir = self._set_saving_dir()
-        if self.params['plot']:
-            utils.create_log_dir(self.saving_dir, remove_existing=False)
-        else:
+        if not self.params['plot']:
             utils.create_log_dir(self.saving_dir, remove_existing=True)
         self.params['saving_dir'] = self.saving_dir
 
         # save the hyperparams
-        utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
+        if not self.params['plot']:
+            utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
     def plot_results(self):
         """
