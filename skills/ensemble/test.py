@@ -138,7 +138,7 @@ class TestTrial(SingleOptionTrial):
         pfrl.utils.set_random_seed(self.params['seed'])
 
         # get the hyperparams
-        hyperparams_file = Path(self.params['load']) / 'hyperparams.csv'
+        hyperparams_file = Path(self.params['load']).parent / 'hyperparams.csv'
         saved_params = utils.load_hyperparams(hyperparams_file)
 
         # create the saving directories
