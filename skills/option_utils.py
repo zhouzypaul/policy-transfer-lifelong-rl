@@ -197,9 +197,9 @@ class SingleOptionTrial(BaseTrial):
         self.detailed_agent_name = agent
 
         if self.params['initiation_clf']:
-            agent += '-initiation-clf'
+            agent += '-initclf'
         if self.params['termination_clf']:
-            agent += '-termination-clf'
+            agent += '-termclf'
         if self.params['confidence_based_reward']:
             agent += '-cbr'
         agent += f"-highconf-{self.params['termination_num_agreeing_votes']}"

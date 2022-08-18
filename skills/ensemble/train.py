@@ -71,7 +71,7 @@ def train_ensemble_agent_with_eval(
             state = env.reset()
 
         # periodically eval
-        if eval_freq and step_number % eval_freq == 0:
+        if eval_freq and (step_number+1) % eval_freq == 0:
             # success rates
             eval_success = test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=1)
             eval_success_rates.append(eval_success)
