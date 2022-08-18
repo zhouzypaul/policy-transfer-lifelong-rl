@@ -235,7 +235,7 @@ class SingleOptionTrial(BaseTrial):
             env = wrap_deepmind(
                 env,
                 warp_frames=not self.params['agent_space'],
-                episode_life=True,
+                episode_life=not eval,
                 clip_rewards=True,
                 frame_stack=True,
                 scale=False,
@@ -246,8 +246,7 @@ class SingleOptionTrial(BaseTrial):
         # starting state wrappers
         if start_state is not None:
             start_state_path = self.find_start_state_ram_file(start_state)
-            # MonteForwarding should be after EpisodicLifeEnv so that reset() is correct
-            # this does not need to be enforced once test uses the timeout wrapper
+            # MonteForwaring should immediately follow Framestack to access the _get_ob() method
             env = MonteForwarding(env, start_state_path)
         # termination wrappers
         if self.params['termination_clf']:

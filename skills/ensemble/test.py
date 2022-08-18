@@ -35,7 +35,6 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
                 os.mkdir(visualization_dir)
 
             # init
-            env.unwrapped.reset()  # real reset, or else EpisodicLife just takes Noop
             obs = env.reset()  # reset all other wrappers
             step = 0
             total_reward = 0

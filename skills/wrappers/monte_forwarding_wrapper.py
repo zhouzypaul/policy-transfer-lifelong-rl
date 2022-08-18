@@ -10,6 +10,8 @@ class MonteForwarding(Wrapper):
 	"""
 	forwards the agent to another state when the agent starts
 	this just overrides the reset method and make it start in another position
+
+	Note: because of the reset() method, this must go immediately after the FrameStack wrapper
 	"""
 	def __init__(self, env, forwarding_target: Path):
 		"""
@@ -30,4 +32,5 @@ class MonteForwarding(Wrapper):
 		# extra steps so that the original framestacks of the forwarding room cover up the remnants of the first room
 		for _ in range(4):
 			self.env.step(0)
+		obs = self.env._get_ob()  # method from FrameStack
 		return obs
