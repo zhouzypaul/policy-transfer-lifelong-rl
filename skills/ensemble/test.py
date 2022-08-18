@@ -78,7 +78,7 @@ def test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=10
             # epsidoe end
             success_rates[i] = 1 if reached_goal else 0
             if visualize:
-                print(f"episode {i} reward: {total_reward}")
+                print(f"episode {i} reward: {total_reward} len: {step}")
                 save_total_reward_info(total_reward, visualization_dir)
     
     # end of eval

@@ -10,7 +10,7 @@ import torch
 import pfrl
 
 from skills import utils
-from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
+from skills.wrappers.atari_wrappers import wrap_deepmind, SaveOriginalFrame, NoopResetEnv, MaxAndSkipEnv
 from skills.wrappers.agent_wrapper import MonteAgentWrapper
 from skills.wrappers.monte_forwarding_wrapper import MonteForwarding
 from skills.wrappers.monte_termination_set_wrapper import MonteTerminationSetWrapper
@@ -216,8 +216,9 @@ class SingleOptionTrial(BaseTrial):
             goal: None or (x, y)
         """
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
-        # ContinuingTimeLimit, NoopResetEnv, MaxAndSkipEnv
-        env = make_atari(env_name, max_frames=None)
+        env = gym.make(env_name)
+        assert isinstance(env, gym.wrappers.TimeLimit)
+        env = env.env  # unwraper TimeLimit because we use our own in Agent wrapper
         # make agent space
         if self.params['agent_space']:
             print('using the agent space to train the option right now')
@@ -226,6 +227,10 @@ class SingleOptionTrial(BaseTrial):
             agent_space=self.params['agent_space'],
             max_steps=self.params['eval_max_step_limit'] if eval else self.params['training_max_step_limit'],
         )
+        # basic wrappers
+        env = SaveOriginalFrame(env)
+        env = NoopResetEnv(env, noop_max=100)
+        env = MaxAndSkipEnv(env, skip=4)
         if self.params['use_deepmind_wrappers']:
             env = wrap_deepmind(
                 env,

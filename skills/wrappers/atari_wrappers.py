@@ -8,8 +8,9 @@ from collections import deque
 import gym
 import numpy as np
 from gym import spaces
-
 import pfrl
+
+from skills.wrappers.agent_wrapper import MonteAgentWrapper
 
 try:
     import cv2
