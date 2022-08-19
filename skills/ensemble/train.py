@@ -87,6 +87,7 @@ def train_ensemble_agent_with_eval(
         step_number += 1
 
     # testing at the end
+    save_agent(agent, step_number, saving_dir, saving_freq=1)  # always save agent at end
     test_ensemble_agent(agent, env, saving_dir, visualize=True, num_episodes=1)
 
     end_time = time.time()
