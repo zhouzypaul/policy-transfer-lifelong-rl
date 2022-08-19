@@ -73,7 +73,7 @@ def train_ensemble_agent_with_eval(
         # periodically eval
         if eval_freq and (step_number+1) % eval_freq == 0:
             # success rates
-            eval_success = test_ensemble_agent(agent, env, saving_dir, visualize=False, num_episodes=1)
+            eval_success = test_ensemble_agent(agent, eval_env, saving_dir, visualize=False, num_episodes=1)
             eval_success_rates.append(eval_success)
             save_success_rate(eval_success_rates, episode_number, saving_dir, eval=True, save_every=1)
             # if well trained 
@@ -88,7 +88,7 @@ def train_ensemble_agent_with_eval(
 
     # testing at the end
     save_agent(agent, step_number, saving_dir, saving_freq=1)  # always save agent at end
-    test_ensemble_agent(agent, env, saving_dir, visualize=True, num_episodes=1)
+    test_ensemble_agent(agent, eval_env, saving_dir, visualize=True, num_episodes=1)
 
     end_time = time.time()
 
