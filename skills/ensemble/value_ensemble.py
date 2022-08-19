@@ -1,4 +1,5 @@
 import os
+from typing import Union
 from copy import deepcopy
 
 import torch
@@ -7,7 +8,7 @@ import torch.optim as optim
 import numpy as np
 
 from skills.ensemble.criterion import batched_L_divergence
-from skills.ensemble.attention import AttentionEmbedding
+from skills.ensemble.attention import AttentionEmbedding, ImpalaAttentionEmbedding
 from skills.models.q_function import LinearQFunction, compute_q_learning_loss
 
 
@@ -19,7 +20,7 @@ class ValueEnsemble():
 
     def __init__(self, 
         device,
-        attention_embedding: AttentionEmbedding,
+        attention_embedding: Union[AttentionEmbedding, ImpalaAttentionEmbedding],
         embedding_output_size=64, 
         gru_hidden_size=128,
         learning_rate=2.5e-4,

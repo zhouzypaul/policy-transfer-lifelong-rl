@@ -3,6 +3,61 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from skills.plot import plot_attention_diversity
+from skills.models.impala import ConvSequence
+
+
+class ImpalaAttentionEmbedding(nn.Module):
+    """
+    an attention model that attempts to follow the Impala arch
+    """
+    def __init__(self, 
+                 obs_space,
+                 embedding_size=64,
+                 num_attention_modules=8,
+                 plot_dir=None,):
+        super().__init__()
+        self.out_dim = embedding_size
+        self.num_attention_modules = num_attention_modules
+        self.plot_dir = plot_dir
+        c, h, w = obs_space.shape
+        shape = (c, h, w)
+
+        self.spatial_conv = ConvSequence(input_shape=shape, out_channels=16)
+
+        self.attention_modules = nn.ModuleList(
+            [
+                nn.Conv2d(in_channels=16, out_channels=16, kernel_size=1, bias=False)
+                for _ in range(self.num_attention_modules)
+            ]
+        )
+
+        self.global_conv = ConvSequence(input_shape=(16, None, None), out_channels=32)
+        self.linear = nn.LazyLinear(self.out_dim)
+
+    def compact_global_features(self, x):
+        x = torch.flatten(x, 1)
+        x = self.linear(x)
+        x = F.normalize(x)
+        return x
+
+    def forward(self, x, return_attention_mask=False, plot=False):
+        spatial_features = self.spatial_conv(x)
+        attentions = [self.attention_modules[i](spatial_features) for i in range(self.num_attention_modules)]
+
+        # normalize attention to between [0, 1]
+        for i in range(self.num_attention_modules):
+            N, D, H, W = attentions[i].size()
+            attention = attentions[i].view(-1, H*W)
+            attention_max, _ = attention.max(dim=1, keepdim=True)
+            attention_min, _ = attention.min(dim=1, keepdim=True)
+            attentions[i] = ((attention - attention_min)/(attention_max-attention_min+1e-8)).view(N, D, H, W)
+
+        global_features = [self.global_conv(attentions[i] * spatial_features) for i in range(self.num_attention_modules)]
+        if plot:
+            plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
+        embedding = torch.cat([self.compact_global_features(f).unsqueeze(1) for f in global_features], dim=1)  # (N, num_modules, embedding_size)
+
+        return embedding if not return_attention_mask else (embedding, attentions)
 
 
 class AttentionEmbedding(nn.Module):

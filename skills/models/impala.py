@@ -64,7 +64,7 @@ class ImpalaCNN(nn.Module):
 
         super(ImpalaCNN, self).__init__()
 
-        h, w, c = obs_space.shape
+        c, h, w = obs_space.shape
         shape = (c, h, w)
 
         conv_seqs = []

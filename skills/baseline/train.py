@@ -16,7 +16,7 @@ from procgen import ProcgenEnv
 from pfrl.utils import set_random_seed
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder
-from skills.ensemble import AttentionEmbedding, ValueEnsemble
+from skills.ensemble import ImpalaAttentionEmbedding, ValueEnsemble
 from skills.agents import PPO, EnsembleAgent
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
@@ -128,9 +128,9 @@ class ProcgenTrial(BaseTrial):
             )
             return ppo_agent
         elif self.params['agent'] == 'ensemble':
-            attention_embedding = AttentionEmbedding(
+            attention_embedding = ImpalaAttentionEmbedding(
+                obs_space=env.observation_space,
                 embedding_size=64,
-                attention_depth=32,
                 num_attention_modules=self.params['num_policies'],
                 plot_dir=self.params['plots_dir'],
             )
