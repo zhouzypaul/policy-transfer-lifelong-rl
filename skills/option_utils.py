@@ -218,7 +218,7 @@ class SingleOptionTrial(BaseTrial):
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
         env = gym.make(env_name)
         assert isinstance(env, gym.wrappers.TimeLimit)
-        env = env.env  # unwraper TimeLimit because we use our own in Agent wrapper
+        env = env.env  # unwrap TimeLimit because we use our own in Agent wrapper
         # make agent space
         if self.params['agent_space']:
             print('using the agent space to train the option right now')

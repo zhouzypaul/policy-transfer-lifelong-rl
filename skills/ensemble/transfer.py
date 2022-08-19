@@ -71,7 +71,7 @@ class TransferTrial(SingleOptionTrial):
         self._set_experiment_name()
         # log more frequently because it takes less time to train
         self.params['reward_logging_freq'] = 100
-        self.params['success_rate_save_freq'] = max(1, int(self.params['steps'] / 200))
+        self.params['success_rate_save_freq'] = 10  # in episodes
         self.params['eval_freq'] = 500
         self.params['saving_freq'] = self.params['steps']
 
