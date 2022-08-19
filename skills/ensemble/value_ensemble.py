@@ -7,21 +7,25 @@ import torch.optim as optim
 import numpy as np
 
 from skills.ensemble.criterion import batched_L_divergence
-from skills.ensemble.attention import Attention
+from skills.ensemble.attention import AttentionEmbedding
 from skills.models.q_function import LinearQFunction, compute_q_learning_loss
 
 
 class ValueEnsemble():
+    """
+    the model that takes in a state and returns an ensemble of q values
+    it is the concatanation of an AttentionEmbedding and an ensemble of QFunctions
+    """
 
     def __init__(self, 
         device,
+        attention_embedding: AttentionEmbedding,
         embedding_output_size=64, 
         gru_hidden_size=128,
         learning_rate=2.5e-4,
         discount_rate=0.9,
         num_modules=8, 
         num_output_classes=18,
-        plot_dir=None,
         verbose=False,):
         
         self.num_modules = num_modules
@@ -30,11 +34,7 @@ class ValueEnsemble():
         self.gamma = discount_rate
         self.verbose = verbose
 
-        self.embedding = Attention(
-            embedding_size=embedding_output_size, 
-            num_attention_modules=self.num_modules, 
-            plot_dir=plot_dir
-        ).to(self.device)
+        self.embedding = attention_embedding.to(self.device)
 
         self.recurrent_memory = nn.GRU(
             input_size=embedding_output_size,

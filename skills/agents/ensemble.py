@@ -20,6 +20,7 @@ class EnsembleAgent(Agent):
     an agent needs to support two methods: observe() and act()
     """
     def __init__(self, 
+                ensemble_model: ValueEnsemble,
                 device, 
                 warmup_steps,
                 batch_size,
@@ -29,16 +30,12 @@ class EnsembleAgent(Agent):
                 buffer_length=100000,
                 update_interval=4,
                 q_target_update_interval=40,
-                embedding_output_size=64, 
-                learning_rate=2.5e-4,
                 final_epsilon=0.01,
                 final_exploration_frames=10**6,
                 discount_rate=0.9,
                 num_modules=8, 
                 num_output_classes=18,
-                plot_dir=None,
-                embedding_plot_freq=10000,
-                verbose=False,):
+                embedding_plot_freq=10000,):
         # vars
         self.device = device
         self.phi = phi
@@ -48,7 +45,6 @@ class EnsembleAgent(Agent):
         self.batch_size = batch_size
         self.q_target_update_interval = q_target_update_interval
         self.update_interval = update_interval
-        self.num_output_classes = num_output_classes
         self.num_modules = num_modules
         self.step_number = 0
         self.episode_number = 0
@@ -60,16 +56,7 @@ class EnsembleAgent(Agent):
         self.discount_rate = discount_rate
         
         # ensemble
-        self.value_ensemble = ValueEnsemble(
-            device=device,
-            embedding_output_size=embedding_output_size,
-            learning_rate=learning_rate,
-            discount_rate=discount_rate,
-            num_modules=num_modules,
-            num_output_classes=num_output_classes,
-            plot_dir=plot_dir,
-            verbose=verbose,
-        )
+        self.value_ensemble = ensemble_model
 
         # explorer
         self.explorer = explorers.LinearDecayEpsilonGreedy(

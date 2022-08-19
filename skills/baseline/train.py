@@ -15,7 +15,8 @@ import numpy as np
 from procgen import ProcgenEnv
 from pfrl.utils import set_random_seed
 
-from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize, VecChannelOrder
+from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder
+from skills.ensemble import AttentionEmbedding, ValueEnsemble
 from skills.agents import PPO, EnsembleAgent
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
@@ -96,7 +97,7 @@ class ProcgenTrial(BaseTrial):
         )
         venv = VecChannelOrder(venv, channel_order='chw')
         venv = VecExtractDictObs(venv, "rgb")
-        venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
+        # venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
         venv = VecNormalize(venv=venv, ob=False)
         return venv
     
@@ -127,20 +128,40 @@ class ProcgenTrial(BaseTrial):
             )
             return ppo_agent
         elif self.params['agent'] == 'ensemble':
-            agent = EnsembleAgent(
+            attention_embedding = AttentionEmbedding(
+                embedding_size=64,
+                attention_depth=32,
+                num_attention_modules=self.params['num_policies'],
+                plot_dir=self.params['plots_dir'],
+            )
+            value_model = ValueEnsemble(
                 device=self.params['device'],
-                phi=lambda x: x.astype(np.float32),
-                action_selection_strategy=self.params['action_selection_strat'],
+                attention_embedding=attention_embedding,
+                embedding_output_size=64,
+                gru_hidden_size=128,
+                learning_rate=2.5e-4,
+                discount_rate=self.params['gamma'],
+                num_modules=self.params['num_policies'],
+                num_output_classes=env.action_space.n,
+                verbose=False,
+            )
+            agent = EnsembleAgent(
+                ensemble_model=value_model,
+                device=self.params['device'],
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
+                action_selection_strategy=self.params['action_selection_strat'],
                 prioritized_replay_anneal_steps=self.params['max_steps'] / self.params['update_interval'],
+                phi=lambda x: x.astype(np.float32),
                 buffer_length=self.params['buffer_length'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
+                final_epsilon=0.01,
+                final_exploration_frames=10**6,
+                discount_rate=self.params['gamma'],
                 num_modules=self.params['num_policies'],
                 num_output_classes=env.action_space.n,
-                plot_dir=self.params['plots_dir'],
-                verbose=False,
+                embedding_plot_freq=10000,
             )
             return agent
         else:

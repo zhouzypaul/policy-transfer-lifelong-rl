@@ -5,14 +5,14 @@ import torch.nn.functional as F
 from skills.plot import plot_attention_diversity
 
 
-class Attention(nn.Module):
+class AttentionEmbedding(nn.Module):
 
     def __init__(self, 
                 embedding_size=64, 
                 attention_depth=32, 
                 num_attention_modules=8, 
                 plot_dir=None):
-        super(Attention, self).__init__()
+        super(AttentionEmbedding, self).__init__()
         self.num_attention_modules = num_attention_modules
         self.out_dim = embedding_size
         self.attention_depth = attention_depth

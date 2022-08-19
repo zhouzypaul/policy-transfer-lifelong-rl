@@ -12,8 +12,8 @@ import pfrl
 from matplotlib import pyplot as plt
 
 from skills import utils
-from skills.agents.ensemble import EnsembleAgent
-from skills.agents.dqn import make_dqn_agent
+from skills.ensemble import AttentionEmbedding, ValueEnsemble
+from skills.agents import EnsembleAgent, make_dqn_agent
 from skills.option_utils import SingleOptionTrial
 from skills.ensemble.test import test_ensemble_agent
 
@@ -285,20 +285,40 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
                 target_update_interval=self.params['target_update_interval'],
             )
         else:
-            self.agent = EnsembleAgent(
+            attention_embedding = AttentionEmbedding(
+                embedding_size=64,
+                attention_depth=32,
+                num_attention_modules=self.params['num_policies'],
+                plot_dir=self.params['plots_dir'],
+            )
+            value_model = ValueEnsemble(
                 device=self.params['device'],
-                phi=phi,
-                action_selection_strategy=self.params['action_selection_strat'],
+                attention_embedding=attention_embedding,
+                embedding_output_size=64,
+                gru_hidden_size=128,
+                learning_rate=2.5e-4,
+                discount_rate=self.params['gamma'],
+                num_modules=self.params['num_policies'],
+                num_output_classes=self.env.action_space.n,
+                verbose=False,
+            )
+            self.agent = EnsembleAgent(
+                ensemble_model=value_model,
+                device=self.params['device'],
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
+                action_selection_strategy=self.params['action_selection_strat'],
                 prioritized_replay_anneal_steps=self.params['steps'] / self.params['update_interval'],
+                phi=phi,
                 buffer_length=self.params['buffer_length'],
                 update_interval=self.params['update_interval'],
                 q_target_update_interval=self.params['target_update_interval'],
+                final_epsilon=0.01,
+                final_exploration_frames=10**6,
+                discount_rate=self.params['gamma'],
                 num_modules=self.params['num_policies'],
                 num_output_classes=self.env.action_space.n,
-                plot_dir=self.params['plots_dir'],
-                verbose=self.params['verbose']
+                embedding_plot_freq=10000,
             )
     
     def train_option(self):
