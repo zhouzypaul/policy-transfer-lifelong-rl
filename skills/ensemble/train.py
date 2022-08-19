@@ -57,25 +57,24 @@ def train_ensemble_agent_with_eval(
         agent.observe(state, action, reward, next_state, done)
         total_reward += reward
         state = next_state
-        if done or info['needs_reset']:
+
+        # log training success rate
+        if (step_number + 1) % success_rate_save_freq == 0:
             # success rate
             success_rates.append(done and not info['dead'])
-            save_success_rate(success_rates, episode_number, saving_dir, eval=False, save_every=success_rate_save_freq)
+            save_success_rate(success_rates, episode_number, saving_dir, eval=False)
             # if well trained
             well_trained = len(success_rates) >= success_queue_size/2 and get_success_rate(success_rates) >= success_threshold_for_well_trained
             if step_when_well_trained is None and well_trained:
                 save_is_well_trained(saving_dir, step_number, episode_number, file_name='training_well_trained_time.csv')
                 step_when_well_trained, episode_when_well_trained = step_number, episode_number
-            # advance to next
-            episode_number += 1
-            state = env.reset()
 
         # periodically eval
         if eval_freq and (step_number+1) % eval_freq == 0:
             # success rates
-            eval_success = test_ensemble_agent(agent, eval_env, saving_dir, visualize=False, num_episodes=1)
+            eval_success = test_ensemble_agent(agent, eval_env, saving_dir, visualize=False, num_episodes=5)
             eval_success_rates.append(eval_success)
-            save_success_rate(eval_success_rates, episode_number, saving_dir, eval=True, save_every=1)
+            save_success_rate([eval_success], episode_number, saving_dir, eval=True)
             # if well trained 
             eval_well_trained = len(eval_success_rates) >= success_queue_size/2 and get_success_rate(eval_success_rates) >= success_threshold_for_well_trained
             if step_when_eval_well_trained is None and eval_well_trained:
@@ -84,6 +83,11 @@ def train_ensemble_agent_with_eval(
         
         save_total_reward(total_reward, step_number, saving_dir, reward_save_freq)
         save_agent(agent, step_number, saving_dir, agent_save_freq)
+
+        # advance to next
+        if done or info['needs_reset']:
+            episode_number += 1
+            state = env.reset()
         step_number += 1
 
     # testing at the end
@@ -117,7 +121,7 @@ def get_success_rate(success_rates):
     return np.mean(success_rates)
 
 
-def save_success_rate(success_rates, episode_number, saving_dir, eval=False, save_every=1):
+def save_success_rate(success_rates, episode_number, saving_dir, eval=False):
     """
     log the average success rate during training/testing
     the success rate at every episode is the average success rate over the last ? episodes
@@ -125,24 +129,24 @@ def save_success_rate(success_rates, episode_number, saving_dir, eval=False, sav
     name = 'eval' if eval else 'training'
     save_file = os.path.join(saving_dir, f"{name}_success_rate.csv")
     img_file = os.path.join(saving_dir, f"{name}_success_rate.png")
-    if episode_number % save_every == 0:
-        # write to csv
-        open_mode = 'w' if episode_number == 0 else 'a'
-        with open(save_file, open_mode) as f:
-            csv_writer = csv.writer(f)
-            csv_writer.writerow([episode_number, get_success_rate(success_rates)])
-        # plot it as well
-        with open(save_file, 'r') as f:
-            reader = csv.reader(f)
-            data = np.array([row for row in reader])
-            epsidoes = data[:, 0].astype(int)
-            rates = data[:, 1].astype(np.float32)
-            plt.plot(epsidoes, rates)
-            plt.title(f"{name} success rate")
-            plt.xlabel("Episode")
-            plt.ylabel("Success rate")
-            plt.savefig(img_file)
-            plt.close()
+
+    # write to csv
+    open_mode = 'w' if episode_number == 0 else 'a'
+    with open(save_file, open_mode) as f:
+        csv_writer = csv.writer(f)
+        csv_writer.writerow([episode_number, get_success_rate(success_rates)])
+    # plot it as well
+    with open(save_file, 'r') as f:
+        reader = csv.reader(f)
+        data = np.array([row for row in reader])
+        epsidoes = data[:, 0].astype(int)
+        rates = data[:, 1].astype(np.float32)
+        plt.plot(epsidoes, rates)
+        plt.title(f"{name} success rate")
+        plt.xlabel("Episode")
+        plt.ylabel("Success rate")
+        plt.savefig(img_file)
+        plt.close()
 
 
 def save_total_reward(total_reward, step_number, saving_dir, save_every=50):
