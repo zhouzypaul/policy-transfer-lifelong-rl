@@ -82,7 +82,7 @@ def train_ensemble_agent_with_eval(
                 step_when_eval_well_trained, episode_when_eval_well_trained = step_number, episode_number
         
         save_total_reward(total_reward, step_number, saving_dir, reward_save_freq)
-        save_agent(agent, step_number, saving_dir, agent_save_freq)
+        # save_agent(agent, step_number, saving_dir, agent_save_freq)
 
         # advance to next
         if done or info['needs_reset']:
