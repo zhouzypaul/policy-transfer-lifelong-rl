@@ -59,15 +59,18 @@ def train_ensemble_agent_with_eval(
         state = next_state
 
         # log training success rate
-        if (step_number + 1) % success_rate_save_freq == 0:
+        if done or info['needs_reset']:
             # success rate
             success_rates.append(done and not info['dead'])
-            save_success_rate(success_rates, episode_number, saving_dir, eval=False)
+            if (episode_number + 1) % success_rate_save_freq == 0:
+                save_success_rate(success_rates, episode_number, saving_dir, eval=False)
             # if well trained
             well_trained = len(success_rates) >= success_queue_size/2 and get_success_rate(success_rates) >= success_threshold_for_well_trained
             if step_when_well_trained is None and well_trained:
                 save_is_well_trained(saving_dir, step_number, episode_number, file_name='training_well_trained_time.csv')
                 step_when_well_trained, episode_when_well_trained = step_number, episode_number
+            episode_number += 1
+            state = env.reset()
 
         # periodically eval
         if eval_freq and (step_number+1) % eval_freq == 0:
@@ -85,12 +88,12 @@ def train_ensemble_agent_with_eval(
         # save_agent(agent, step_number, saving_dir, agent_save_freq)
 
         # advance to next
-        if done or info['needs_reset']:
-            episode_number += 1
-            state = env.reset()
         step_number += 1
 
-    # testing at the end
+    # at the end of training
+    plot_success_rate(saving_dir, eval=True)
+    plot_success_rate(saving_dir, eval=False)
+    plot_total_reward(saving_dir)
     save_agent(agent, step_number, saving_dir, saving_freq=1)  # always save agent at end
     test_ensemble_agent(agent, eval_env, saving_dir, visualize=True, num_episodes=1)
 
@@ -128,21 +131,27 @@ def save_success_rate(success_rates, episode_number, saving_dir, eval=False):
     """
     name = 'eval' if eval else 'training'
     save_file = os.path.join(saving_dir, f"{name}_success_rate.csv")
-    img_file = os.path.join(saving_dir, f"{name}_success_rate.png")
 
     # write to csv
     open_mode = 'w' if episode_number == 0 else 'a'
     with open(save_file, open_mode) as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow([episode_number, get_success_rate(success_rates)])
-    # plot it as well
+
+
+def plot_success_rate(saving_dir, eval=False):
+    """plot the saved success rate"""
+    name = 'eval' if eval else 'training'
+    save_file = os.path.join(saving_dir, f"{name}_success_rate.csv")
+    img_file = os.path.join(saving_dir, f"{name}_success_rate.png")
     with open(save_file, 'r') as f:
         reader = csv.reader(f)
         data = np.array([row for row in reader])
-        epsidoes = data[:, 0].astype(int)
+        episodes = data[:, 0].astype(int)
         rates = data[:, 1].astype(np.float32)
-        plt.plot(epsidoes, rates)
+        plt.plot(episodes, rates)
         plt.title(f"{name} success rate")
+        plt.xticks(episodes)
         plt.xlabel("Episode")
         plt.ylabel("Success rate")
         plt.savefig(img_file)
@@ -161,18 +170,23 @@ def save_total_reward(total_reward, step_number, saving_dir, save_every=50):
         with open(save_file, open_mode) as f:
             csv_writer = csv.writer(f)
             csv_writer.writerow([step_number, total_reward])
-        # plot it as well
-        with open(save_file, 'r') as f:
-            csv_reader = csv.reader(f, delimiter=',')
-            data = np.array([row for row in csv_reader])  # (step_number, 2)
-            steps = data[:, 0].astype(int)
-            total_reward = data[:, 1].astype(np.float32)
-            plt.plot(steps, total_reward)
-            plt.title("training reward")
-            plt.xlabel("steps")
-            plt.ylabel("total reward")
-            plt.savefig(img_file)
-            plt.close()
+
+
+def plot_total_reward(saving_dir):
+    """plot the saved total reward"""
+    save_file = os.path.join(saving_dir, "total_reward.csv")
+    img_file = os.path.join(saving_dir, "total_reward.png")
+    with open(save_file, 'r') as f:
+        csv_reader = csv.reader(f, delimiter=',')
+        data = np.array([row for row in csv_reader])  # (step_number, 2)
+        steps = data[:, 0].astype(int)
+        total_reward = data[:, 1].astype(np.float32)
+        plt.plot(steps, total_reward)
+        plt.title("training reward")
+        plt.xlabel("steps")
+        plt.ylabel("total reward")
+        plt.savefig(img_file)
+        plt.close()
 
 
 def save_is_well_trained(saving_dir, steps, episode, file_name):
