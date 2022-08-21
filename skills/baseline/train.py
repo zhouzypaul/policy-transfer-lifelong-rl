@@ -15,7 +15,7 @@ import numpy as np
 from procgen import ProcgenEnv
 from pfrl.utils import set_random_seed
 
-from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder
+from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
 from skills.ensemble import ImpalaAttentionEmbedding, ValueEnsemble
 from skills.agents import PPO, EnsembleAgent
 from skills.option_utils import BaseTrial
@@ -97,7 +97,7 @@ class ProcgenTrial(BaseTrial):
         )
         venv = VecChannelOrder(venv, channel_order='chw')
         venv = VecExtractDictObs(venv, "rgb")
-        # venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
+        venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
         venv = VecNormalize(venv=venv, ob=False)
         return venv
     
