@@ -51,7 +51,6 @@ class EnsembleAgent(Agent):
         self.n_updates = 0
         self.action_leader = np.random.choice(self.num_modules)
         self.learner_accumulated_reward = np.ones((self.num_modules,))  # laplace smoothing
-        self.update_epochs_per_step = 1
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
         
@@ -117,14 +116,14 @@ class EnsembleAgent(Agent):
                     self.batch_last_obs[i] = None
                     self.batch_last_action[i] = None
                     self.replay_buffer.stop_current_episode(env_id=i)
-                    
+
             self.replay_updater.update_if_necessary(self.step_number)
 
         # action leader
         self.learner_accumulated_reward[self.action_leader] += batch_reward.sum()
         if batch_reset.any() or batch_done.any():
-            self.episode_number += 1  # may be buggy 
-            self._choose_new_leader()
+            self.episode_number += np.logical_or(batch_reset, batch_done).sum()
+            self._choose_new_leader()  # may be buggy
 
     def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_terminal):
         # need to do stuff if recurrent 
@@ -164,15 +163,9 @@ class EnsembleAgent(Agent):
             self.action_leader = np.random.choice(self.num_modules)
         elif self.action_selection_strategy == 'leader':
             acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
-            try:
-                normalized_reward = acc_reward - acc_reward.max()
-                probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
-                self.action_leader = np.random.choice(self.num_modules, p=probability)
-            except ValueError:
-                print(f"normalized reward: {normalized_reward}")
-                print(f"probability: {probability}")
-                print(probability.sum())
-                raise
+            normalized_reward = acc_reward - acc_reward.max()
+            probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
+            self.action_leader = np.random.choice(self.num_modules, p=probability)
 
     def update(self, experiences, errors_out=None):
         """
