@@ -30,27 +30,23 @@ class ImpalaAttentionEmbedding(nn.Module):
                 for _ in range(self.num_attention_modules)
             ]
         )
+        self.attention_norm = nn.BatchNorm2d(16, affine=False)
 
         self.global_conv = ConvSequence(input_shape=(16, None, None), out_channels=32)
         self.linear = nn.LazyLinear(self.out_dim)
 
     def compact_global_features(self, x):
         x = torch.flatten(x, 1)
+        x = torch.relu(x)
         x = self.linear(x)
         x = F.normalize(x)
         return x
 
     def forward(self, x, return_attention_mask=False, plot=False):
-        spatial_features = self.spatial_conv(x)
-        attentions = [self.attention_modules[i](spatial_features) for i in range(self.num_attention_modules)]
+        spatial_features = self.spatial_conv(x)  # (N, 16, 32, 32)
 
-        # normalize attention to between [0, 1]
-        for i in range(self.num_attention_modules):
-            N, D, H, W = attentions[i].size()
-            attention = attentions[i].view(-1, H*W)
-            attention_max, _ = attention.max(dim=1, keepdim=True)
-            attention_min, _ = attention.min(dim=1, keepdim=True)
-            attentions[i] = ((attention - attention_min)/(attention_max-attention_min+1e-8)).view(N, D, H, W)
+        attentions = [self.attention_modules[i](spatial_features) for i in range(self.num_attention_modules)]
+        attentions = [self.attention_norm(attention) for attention in attentions]
 
         global_features = [self.global_conv(attentions[i] * spatial_features) for i in range(self.num_attention_modules)]
         if plot:
@@ -124,5 +120,3 @@ class AttentionEmbedding(nn.Module):
         embedding = torch.cat([self.compact_global_features(f).unsqueeze(1) for f in global_features], dim=1)  # (N, num_modules, embedding_size)
 
         return embedding if not return_attention_mask else (embedding, attentions)
-
-
