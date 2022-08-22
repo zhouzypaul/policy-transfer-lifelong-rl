@@ -98,9 +98,9 @@ class EnsembleAgent(Agent):
             )
     
     def _batch_observe_train(self, batch_obs, batch_reward, batch_done, batch_reset):
-        self.step_number += 1
-
         for i in range(len(batch_obs)):
+            self.step_number += 1
+
             if self.batch_last_obs[i] is not None:
                 assert self.batch_last_action[i] is not None
                 # Add a transition to the replay buffer
@@ -117,6 +117,7 @@ class EnsembleAgent(Agent):
                     self.batch_last_obs[i] = None
                     self.batch_last_action[i] = None
                     self.replay_buffer.stop_current_episode(env_id=i)
+                    
             self.replay_updater.update_if_necessary(self.step_number)
 
         # action leader

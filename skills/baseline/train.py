@@ -77,13 +77,7 @@ class ProcgenTrial(BaseTrial):
         """
         check whether the params entered by the user is valid
         """
-        if self.params['agent'] == 'ensemble':
-            try:
-                assert self.params['target_update_interval'] == self.params['ensemble_target_update_interval'] * self.params['update_interval']
-            except AssertionError:
-                new_interval = self.params['ensemble_target_update_interval'] * self.params['update_interval']
-                print(f"updating target_update_interval to be {new_interval}")
-                self.params['target_update_interval'] = new_interval
+        pass
     
     def make_vector_env(self, eval=False):
         venv = ProcgenEnv(
@@ -145,17 +139,18 @@ class ProcgenTrial(BaseTrial):
                 num_output_classes=env.action_space.n,
                 verbose=False,
             )
+            update_interval = self.params['nsteps'] * self.params['num_envs']
             agent = EnsembleAgent(
                 ensemble_model=value_model,
                 device=self.params['device'],
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
                 action_selection_strategy=self.params['action_selection_strat'],
-                prioritized_replay_anneal_steps=self.params['max_steps'] / self.params['update_interval'],
+                prioritized_replay_anneal_steps=self.params['max_steps'] / update_interval,
                 phi=lambda x: x.astype(np.float32),
                 buffer_length=self.params['buffer_length'],
-                update_interval=self.params['update_interval'],
-                q_target_update_interval=self.params['target_update_interval'],
+                update_interval=update_interval,
+                q_target_update_interval=self.params['ensemble_target_update_interval'] * update_interval,
                 final_epsilon=0.01,
                 final_exploration_frames=10**6,
                 discount_rate=self.params['gamma'],
