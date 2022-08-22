@@ -11,3 +11,4 @@ nsteps,256,int
 nepochs,3,int
 max_steps,25_000_000,int
 save_interval,100,int
+embedding_plot_freq,10000,int

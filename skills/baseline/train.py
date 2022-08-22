@@ -161,7 +161,7 @@ class ProcgenTrial(BaseTrial):
                 discount_rate=self.params['gamma'],
                 num_modules=self.params['num_policies'],
                 num_output_classes=env.action_space.n,
-                embedding_plot_freq=10000,
+                embedding_plot_freq=self.params['embedding_plot_freq'],
             )
             return agent
         else:
@@ -212,11 +212,8 @@ class ProcgenTrial(BaseTrial):
             test_env=self.eval_env,
             num_envs=self.params['num_envs'],
             nsteps=self.params['nsteps'],
-            nepochs=self.params['nepochs'],
             max_steps=self.params['max_steps'],
-            batch_size=self.params['batch_size'],
             model_dir=self.saving_dir,
-            save_interval=self.params['save_interval'],
             model_file=self.params['load'],
         )
         plot_reward_curve(self.saving_dir)
@@ -259,11 +256,8 @@ def train_with_eval(
     test_env,
     num_envs,
     nsteps,
-    nepochs,
     max_steps,
-    batch_size,
     model_dir,
-    save_interval,
     model_file=None,
 ):
 
@@ -284,12 +278,7 @@ def train_with_eval(
     # Due to some bug-like code in baseline.ppo2,
     # (and I modified PFRL accordingly) the true batch size is
     # nbatch // batch_size.
-    n_ops_per_update = nbatch * nepochs / (nbatch // batch_size)
-    nupdates = max_steps // nbatch
     max_steps = max_steps // num_envs
-
-    logger.info('Start training for {} steps (approximately {} updates)'.format(
-        max_steps, nupdates))
 
     tstart = time.perf_counter()
     for step_cnt in range(max_steps):
@@ -316,7 +305,6 @@ def train_with_eval(
             test_epinfo_buf.extend(test_epinfo)
 
         assert agent.training
-        num_ppo_updates = agent.n_updates // n_ops_per_update
 
         if (step_cnt + 1) % nsteps == 0:
             tnow = time.perf_counter()
@@ -325,7 +313,6 @@ def train_with_eval(
             logger.logkv('steps', step_cnt + 1)
             logger.logkv('total_steps', (step_cnt + 1) * num_envs)
             logger.logkv('fps', fps)
-            logger.logkv('num_ppo_update', num_ppo_updates)
             logger.logkv('ep_reward_mean',
                          safe_mean([info['r'] for info in train_epinfo_buf]))
             logger.logkv('ep_len_mean',
@@ -338,9 +325,6 @@ def train_with_eval(
             for stats in train_stats:
                 logger.logkv(stats[0], stats[1])
             logger.dumpkvs()
-
-            if num_ppo_updates % save_interval == 0:
-                save_agent(agent, model_dir)
 
             tstart = time.perf_counter()
 
