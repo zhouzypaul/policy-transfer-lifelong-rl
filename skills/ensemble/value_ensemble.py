@@ -90,8 +90,9 @@ class ValueEnsemble():
 
         # q learning loss
         td_losses = np.zeros((self.num_modules,))
-        next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
-        next_state_embeddings, _ = self.recurrent_memory(next_state_embeddings)
+        with torch.no_grad():
+            next_state_embeddings = self.embedding(batch_next_states, return_attention_mask=False)
+            next_state_embeddings, _ = self.recurrent_memory(next_state_embeddings)
 
         # keep track of all error out for each module 
         all_errors_out = np.zeros((self.num_modules, len(batch_states)))

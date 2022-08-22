@@ -119,7 +119,7 @@ class ProcgenTrial(BaseTrial):
                 lambd=self.params['lambda'],
                 value_func_coef=self.params['value_function_coef'],
                 entropy_coef=self.params['entropy_coef'],
-                update_interval=self.params['nsteps'] * self.params['num_envs'],
+                update_interval=self.params['nsteps'] * self.params['num_envs'],  # nsteps is the number of parallel-env steps till an update
                 minibatch_size=self.params['batch_size'],
                 epochs=self.params['nepochs'],
                 clip_eps=self.params['clip_range'],
@@ -211,10 +211,10 @@ class ProcgenTrial(BaseTrial):
             train_env=self.train_env,
             test_env=self.eval_env,
             num_envs=self.params['num_envs'],
-            nsteps=self.params['nsteps'],
             max_steps=self.params['max_steps'],
             model_dir=self.saving_dir,
             model_file=self.params['load'],
+            log_interval=100,
         )
         plot_reward_curve(self.saving_dir)
 
@@ -255,12 +255,11 @@ def train_with_eval(
     train_env, 
     test_env,
     num_envs,
-    nsteps,
     max_steps,
     model_dir,
     model_file=None,
+    log_interval=100,
 ):
-
     if model_file is not None:
         load_agent(agent, model_file, plot_dir=os.path.join(model_dir, 'plots'))
     else:
@@ -274,10 +273,6 @@ def train_with_eval(
     test_obs = test_env.reset()
     test_steps = np.zeros(num_envs, dtype=int)
 
-    nbatch = num_envs * nsteps
-    # Due to some bug-like code in baseline.ppo2,
-    # (and I modified PFRL accordingly) the true batch size is
-    # nbatch // batch_size.
     max_steps = max_steps // num_envs
 
     tstart = time.perf_counter()
@@ -306,13 +301,13 @@ def train_with_eval(
 
         assert agent.training
 
-        if (step_cnt + 1) % nsteps == 0:
+        if (step_cnt + 1) % log_interval == 0:
             tnow = time.perf_counter()
-            fps = int(nbatch / (tnow - tstart))
+            fps = int((step_cnt + 1) * num_envs / (tnow - tstart))
 
             logger.logkv('steps', step_cnt + 1)
             logger.logkv('total_steps', (step_cnt + 1) * num_envs)
-            logger.logkv('fps', fps)
+            logger.logkv('steps_per_second', fps)
             logger.logkv('ep_reward_mean',
                          safe_mean([info['r'] for info in train_epinfo_buf]))
             logger.logkv('ep_len_mean',

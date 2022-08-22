@@ -462,13 +462,8 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
             all_advs = torch.tensor([b["adv"] for b in dataset], device=device)
             std_advs, mean_advs = torch.std_mean(all_advs, unbiased=False)
 
-        # Modification: I think OpenAI baselines.ppo2 has a bug here.
-        # for batch in _yield_minibatches(
-        #         dataset, minibatch_size=self.minibatch_size, num_epochs=self.epochs
-        # ):
-        batch_size = len(dataset) // self.minibatch_size
         for batch in _yield_minibatches(
-            dataset, minibatch_size=batch_size, num_epochs=self.epochs
+            dataset, minibatch_size=self.minibatch_size, num_epochs=self.epochs
         ):
             states = self.batch_states(
                 [b["state"] for b in batch], self.device, self.phi
