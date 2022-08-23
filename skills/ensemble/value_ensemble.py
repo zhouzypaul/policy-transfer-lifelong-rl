@@ -159,15 +159,17 @@ class ValueEnsemble():
             embeddings, _ = self.recurrent_memory(embeddings)
 
             actions = np.zeros((nbatch, self.num_modules), dtype=np.int)
-            q_values = np.zeros((nbatch, self.num_modules), dtype=np.float)
+            action_q_values = np.zeros((nbatch, self.num_modules), dtype=np.float)
+            all_q_values = np.zeros((nbatch, self.num_modules, self.num_output_classes), dtype=np.float)
             for idx in range(self.num_modules):
                 attention = embeddings[:,idx,:]
                 q_vals = self.q_networks[idx](attention)
                 actions[:, idx] = q_vals.greedy_actions.cpu().numpy()
-                q_values[:, idx] = q_vals.max.cpu().numpy()
+                action_q_values[:, idx] = q_vals.max.cpu().numpy()
+                all_q_values[:, idx, :] = q_vals.q_values.cpu().numpy()
 
         if return_q_values:
-            return actions, q_values
+            return actions, action_q_values, all_q_values
         return actions
 
     def get_attention(self, x):

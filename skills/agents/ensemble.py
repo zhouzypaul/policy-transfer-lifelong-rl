@@ -11,7 +11,8 @@ from pfrl.utils.batch_states import batch_states
 
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.value_ensemble import ValueEnsemble
-from skills.ensemble.aggregate import choose_most_popular, choose_leader
+from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
+    choose_max_sum_qvals, upper_confidence_bound
 
 
 class EnsembleAgent(Agent):
@@ -41,6 +42,8 @@ class EnsembleAgent(Agent):
         self.phi = phi
         self.action_selection_strategy = action_selection_strategy
         print(f"using action selection strategy: {self.action_selection_strategy}")
+        if self._using_leader():
+            self.action_leader = np.random.choice(num_modules)
         self.warmup_steps = warmup_steps
         self.batch_size = batch_size
         self.q_target_update_interval = q_target_update_interval
@@ -49,8 +52,8 @@ class EnsembleAgent(Agent):
         self.step_number = 0
         self.episode_number = 0
         self.n_updates = 0
-        self.action_leader = np.random.choice(self.num_modules)
-        self.learner_accumulated_reward = np.ones((self.num_modules,))  # laplace smoothing
+        self.learner_accumulated_reward = np.ones(self.num_modules)  # laplace smoothing
+        self.learner_selection_count = np.ones(self.num_modules)  # laplace smoothing
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
         
@@ -123,11 +126,14 @@ class EnsembleAgent(Agent):
         self.learner_accumulated_reward[self.action_leader] += batch_reward.sum()
         if batch_reset.any() or batch_done.any():
             self.episode_number += np.logical_or(batch_reset, batch_done).sum()
-            self._choose_new_leader()  # may be buggy
+            self._set_action_leader()
 
     def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_terminal):
         # need to do stuff if recurrent 
         pass
+    
+    def _using_leader(self):
+        return self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']
     
     def observe(self, obs, action, reward, next_obs, terminal):
         """
@@ -151,21 +157,29 @@ class EnsembleAgent(Agent):
                 self.replay_buffer.stop_current_episode()
 
             self.replay_updater.update_if_necessary(self.step_number)
-            self.learner_accumulated_reward[self.action_leader] += reward
+            if self._using_leader():
+                self.learner_accumulated_reward[self.action_leader] += reward
             
         # new episode
         if terminal:
             self.episode_number += 1
-            self._choose_new_leader()
-    
-    def _choose_new_leader(self):
+            if self._using_leader():
+                self._set_action_leader()
+
+    def _set_action_leader(self):
+        """choose which learner in the ensemble gets to lead the action selection process"""
         if self.action_selection_strategy == 'uniform_leader':
+            # choose a random leader
             self.action_leader = np.random.choice(self.num_modules)
-        elif self.action_selection_strategy == 'leader':
-            acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
-            normalized_reward = acc_reward - acc_reward.max()
+        elif self.action_selection_strategy == 'greedy_leader':
+            # greedily choose the leader based on the cumulated reward
+            normalized_reward = self.learner_accumulated_reward - self.learner_accumulated_reward.max()
             probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
             self.action_leader = np.random.choice(self.num_modules, p=probability)
+        elif self.action_selection_strategy == 'ucb_leader':
+            # choose a leader based on the Upper Condfience Bound algorithm 
+            self.action_leader = upper_confidence_bound(values=self.learner_accumulated_reward, t=self.step_number, visitation_count=self.learner_selection_count, c=100)
+            self.learner_selection_count[self.action_leader] += 1
 
     def update(self, experiences, errors_out=None):
         """
@@ -219,7 +233,7 @@ class EnsembleAgent(Agent):
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = choose_most_popular
-        elif self.action_selection_strategy in ['leader', 'uniform_leader']:
+        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
             action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
         else:
             raise NotImplementedError("action selection strat not supported")
@@ -250,25 +264,27 @@ class EnsembleAgent(Agent):
         """
         with torch.no_grad(), evaluating(self):
             obs = batch_states([obs], self.device, self.phi)
-            actions, q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
-            actions, q_vals = actions[0], q_vals[0]  # get rid of batch dimension
+            actions, action_q_vals, all_q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
+            actions, action_q_vals, all_q_vals = actions[0], action_q_vals[0], all_q_vals[0]  # get rid of batch dimension
         # action selection strategy
         if self.action_selection_strategy == 'vote':
-            action_selection_func = choose_most_popular
-        elif self.action_selection_strategy in ['leader', 'uniform_leader']:
-            action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
+            action_selection_func = lambda a, qvals: choose_most_popular(a)
+        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
+            action_selection_func = lambda a, qvals: choose_leader(a, leader=self.action_leader)
+        elif self.action_selection_strategy == 'add_qvals':
+            action_selection_func = lambda a, qvals: choose_max_sum_qvals(qvals)
         else:
             raise NotImplementedError("action selection strat not supported")
         # epsilon-greedy
         if self.training:
             a = self.explorer.select_action(
                 self.step_number,
-                greedy_action_func=lambda: action_selection_func(actions),
+                greedy_action_func=lambda: action_selection_func(actions, all_q_vals),
             )
         else:
-            a = action_selection_func(actions)
+            a = action_selection_func(actions, all_q_vals)
         if return_ensemble_info:
-            return a, actions, q_vals
+            return a, actions, action_q_vals
         return a
     
     def get_statistics(self):

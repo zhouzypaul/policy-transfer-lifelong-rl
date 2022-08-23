@@ -1,4 +1,4 @@
-action_selection_strat,leader,str
+action_selection_strat,ucb_leader,str
 warmup_steps,1024,int
 gamma,0.999,float
 batch_size,128,int
