@@ -128,6 +128,11 @@ class SingleOptionTrial(BaseTrial):
                             help="train with the agent space")
         parser.add_argument("--suppress_action_prunning", action='store_true', default=True,
                             help='do not prune the action space of monte')
+
+        # ensemble
+        parser.add_argument("--action_selection_strat", type=str, default="ucb_leader",
+                            choices=['vote', 'uniform_leader', 'greedy_leader', 'ucb_leader', 'add_qvals'],
+                            help="the action selection strategy when using ensemble agent")
         
         # skill type
         parser.add_argument("--skill_type", "-s", type=str, default="enemy", 
@@ -197,7 +202,8 @@ class SingleOptionTrial(BaseTrial):
         self.detailed_agent_name = agent
 
         if self.params['termination_clf']:
-            agent += '-termination-clf'
+            agent += '-termclf'
+            agent += f"-highconf-{self.params['termination_num_agreeing_votes']}"
         if self.params['confidence_based_reward']:
             agent += '-cbr'
         self.expanded_agent_name = agent

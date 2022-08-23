@@ -41,3 +41,16 @@ def choose_max_sum_qvals(q_vals):
     """
     sumed_q_vals = np.sum(q_vals, axis=0)
     return np.argmax(sumed_q_vals)
+
+
+def upper_confidence_bound(values, t, visitation_count, c=1):
+    """
+    an implementation of the upper confidence bound algorithm
+    A_t = argmax_a [Q_t(a) + c * sqrt(2 * ln(t) / n(a))]
+    args:
+        values: (num_actions) the value estimates of each action
+        t: the current timestep
+        visitation_count: (num_actions) the number of times each action has been selected
+        c: the constant used to balance exploration and exploitation
+    """
+    return np.argmax(values + c * np.sqrt(2 * np.log(t) / visitation_count))
