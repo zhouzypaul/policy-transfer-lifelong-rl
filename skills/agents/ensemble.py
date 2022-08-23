@@ -233,9 +233,13 @@ class EnsembleAgent(Agent):
             dill.dump(self, f)
 
     @classmethod
-    def load(cls, load_path, plot_dir=None):
+    def load(cls, load_path, reset=False, plot_dir=None):
         with lzma.open(load_path, 'rb') as f:
             agent = dill.load(f)
         # hack to change the plot_dir of the agent
         agent.value_ensemble.embedding.plot_dir = plot_dir
+        # reset defaults
+        if reset:
+            agent.learner_accumulated_reward = np.ones_like(agent.learner_accumulated_reward)
+            agent.learner_selection_count = np.ones_like(agent.learner_selection_count)
         return agent

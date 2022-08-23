@@ -142,7 +142,7 @@ class TransferTrial(SingleOptionTrial):
             if self.params['agent'] == 'dqn':
                 agent = DoubleDQN.load(agent_file)
             elif self.params['agent'] == 'ensemble':
-                agent = EnsembleAgent.load(agent_file, plot_dir=plots_dir)
+                agent = EnsembleAgent.load(agent_file, reset=True, plot_dir=plots_dir)
             # train
             train_ensemble_agent_with_eval(
                 agent,
