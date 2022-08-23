@@ -262,16 +262,16 @@ class SingleOptionTrial(BaseTrial):
             # ladder goals
             # should go after the forwarding wrappers, because the goals depend on the position of 
             # the agent in the starting state
-            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval)
+            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
             print('pursuing ladder skills')
         elif self.real_skill_type == 'skull':
-            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval)
+            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
             print('pursuing skull skills')
         elif self.real_skill_type == 'spider':
-            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval)
+            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
             print('pursuing spider skills')
         elif self.real_skill_type == 'snake':
-            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval)
+            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
             print('pursuing snake skills')
         print(f'making environment {env_name}')
         env.seed(env_seed)
