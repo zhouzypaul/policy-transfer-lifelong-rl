@@ -236,7 +236,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         parser.add_argument("--num_policies", type=int, default=3,
                             help="number of policies in the ensemble")
         parser.add_argument("--action_selection_strat", type=str, default="leader",
-                            choices=['vote', 'uniform_leader', 'leader'],
+                            choices=['vote', 'uniform_leader', 'leader', 'add_qvals'],
                             help="the action selection strategy when using ensemble agent")
         
         # training

@@ -28,3 +28,16 @@ def choose_leader(actions, leader=None):
         return np.random.choice(actions)
     else:
         return actions[leader]
+
+
+def choose_max_sum_qvals(q_vals):
+    """
+    choose actions by adding up the q-values of each action from all learners
+    then choose the max-q value action
+    args:
+        q_vals: (num_learners, num_actions)
+    return:
+        action: an int
+    """
+    sumed_q_vals = np.sum(q_vals, axis=0)
+    return np.argmax(sumed_q_vals)

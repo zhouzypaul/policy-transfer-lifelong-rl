@@ -11,7 +11,7 @@ from pfrl.utils.batch_states import batch_states
 
 from skills.agents.abstract_agent import Agent
 from skills.ensemble.value_ensemble import ValueEnsemble
-from skills.ensemble.aggregate import choose_most_popular, choose_leader
+from skills.ensemble.aggregate import choose_most_popular, choose_leader, choose_max_sum_qvals
 
 
 class EnsembleAgent(Agent):
@@ -46,6 +46,8 @@ class EnsembleAgent(Agent):
         self.phi = phi
         self.action_selection_strategy = action_selection_strategy
         print(f"using action selection strategy: {self.action_selection_strategy}")
+        if self._using_leader():
+            self.action_leader = np.random.choice(num_modules)
         self.warmup_steps = warmup_steps
         self.batch_size = batch_size
         self.q_target_update_interval = q_target_update_interval
@@ -54,7 +56,6 @@ class EnsembleAgent(Agent):
         self.num_modules = num_modules
         self.step_number = 0
         self.episode_number = 0
-        self.action_leader = np.random.choice(self.num_modules)
         self.learner_accumulated_reward = {l: 1 for l in range(self.num_modules)}  # laplace smoothing
         self.update_epochs_per_step = 1
         self.embedding_plot_freq = embedding_plot_freq
@@ -101,6 +102,9 @@ class EnsembleAgent(Agent):
             update_interval=update_interval,
         )
     
+    def _using_leader(self):
+        return self.action_selection_strategy in ['leader', 'uniform_leader']
+    
     def observe(self, obs, action, reward, next_obs, terminal):
         """
         store the experience tuple into the replay buffer
@@ -123,7 +127,8 @@ class EnsembleAgent(Agent):
                 self.replay_buffer.stop_current_episode()
 
             self.replay_updater.update_if_necessary(self.step_number)
-            self.learner_accumulated_reward[self.action_leader] += reward
+            if self._using_leader():
+                self.learner_accumulated_reward[self.action_leader] += reward
             
         # new episode
         if terminal:
@@ -195,24 +200,26 @@ class EnsembleAgent(Agent):
                 (action_selected, actions_selected_by_each_learner, q_values_of_each_actions_selected)
         """
         obs = batch_states([obs], self.device, self.phi)
-        actions, q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
+        actions, action_q_vals, all_q_vals = self.value_ensemble.predict_actions(obs, return_q_values=True)
         # action selection strategy
         if self.action_selection_strategy == 'vote':
-            action_selection_func = choose_most_popular
+            action_selection_func = lambda a, qvals: choose_most_popular(a)
         elif self.action_selection_strategy in ['leader', 'uniform_leader']:
-            action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
+            action_selection_func = lambda a, qvals: choose_leader(a, leader=self.action_leader)
+        elif self.action_selection_strategy == 'add_qvals':
+            action_selection_func = lambda a, qvals: choose_max_sum_qvals(qvals)
         else:
             raise NotImplementedError("action selection strat not supported")
         # epsilon-greedy
         if self.training:
             a = self.explorer.select_action(
                 self.step_number,
-                greedy_action_func=lambda: action_selection_func(actions),
+                greedy_action_func=lambda: action_selection_func(actions, all_q_vals),
             )
         else:
-            a = action_selection_func(actions)
+            a = action_selection_func(actions, all_q_vals)
         if return_ensemble_info:
-            return a, actions, q_vals
+            return a, actions, action_q_vals
         return a
 
     def save(self, save_dir):
