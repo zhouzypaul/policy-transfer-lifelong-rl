@@ -209,11 +209,12 @@ class SingleOptionTrial(BaseTrial):
         self._expand_agent_name()
         return Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(self.expanded_agent_name)
 
-    def make_env(self, env_name, env_seed, eval=False, start_state=None):
+    def make_env(self, env_name, env_seed, eval=False, start_state=None, use_ground_truth=False):
         """
         Make a monte environemnt for training skills
         Args:
             goal: None or (x, y)
+            use_ground_truth: use ground truth info about termination. This should be used for training a perfect skill, but not for transfer.
         """
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
         env = gym.make(env_name)
@@ -250,10 +251,12 @@ class SingleOptionTrial(BaseTrial):
             env = MonteForwarding(env, start_state_path)
         # termination wrappers
         if self.params['termination_clf']:
+            assert not use_ground_truth
             env = MonteTerminationSetWrapper(env, eval=eval, num_agreeing_votes=self.params['termination_num_agreeing_votes'], confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
         # initiation wrappers
         if self.params['initiation_clf']:
+            assert not use_ground_truth
             env = MonteInitiationSetWrapper(env, device=self.params['device'])
             print('using trained initiation classifier')
         # skills and goals
@@ -262,16 +265,16 @@ class SingleOptionTrial(BaseTrial):
             # ladder goals
             # should go after the forwarding wrappers, because the goals depend on the position of 
             # the agent in the starting state
-            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
+            env = MonteLadderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval and not use_ground_truth)
             print('pursuing ladder skills')
         elif self.real_skill_type == 'skull':
-            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
+            env = MonteSkullGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval and not use_ground_truth)
             print('pursuing skull skills')
         elif self.real_skill_type == 'spider':
-            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
+            env = MonteSpiderGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval and not use_ground_truth)
             print('pursuing spider skills')
         elif self.real_skill_type == 'snake':
-            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=eval)
+            env = MonteSnakeGoalWrapper(env, epsilon_tol=self.params['goal_epsilon_tol'], info_only=not eval and not use_ground_truth)
             print('pursuing snake skills')
         print(f'making environment {env_name}')
         env.seed(env_seed)
