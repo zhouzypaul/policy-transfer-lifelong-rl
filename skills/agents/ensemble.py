@@ -11,7 +11,8 @@ from pfrl.utils.batch_states import batch_states
 
 from skills.agents.abstract_agent import Agent
 from skills.ensemble.value_ensemble import ValueEnsemble
-from skills.ensemble.aggregate import choose_most_popular, choose_leader, choose_max_sum_qvals
+from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
+    choose_max_sum_qvals, upper_confidence_bound
 
 
 class EnsembleAgent(Agent):
@@ -56,7 +57,8 @@ class EnsembleAgent(Agent):
         self.num_modules = num_modules
         self.step_number = 0
         self.episode_number = 0
-        self.learner_accumulated_reward = {l: 1 for l in range(self.num_modules)}  # laplace smoothing
+        self.learner_accumulated_reward = np.ones(self.num_modules)  # laplace smoothing
+        self.learner_selection_count = np.ones(self.num_modules)  # laplace smoothing
         self.update_epochs_per_step = 1
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
@@ -103,7 +105,7 @@ class EnsembleAgent(Agent):
         )
     
     def _using_leader(self):
-        return self.action_selection_strategy in ['leader', 'uniform_leader']
+        return self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']
     
     def observe(self, obs, action, reward, next_obs, terminal):
         """
@@ -133,20 +135,23 @@ class EnsembleAgent(Agent):
         # new episode
         if terminal:
             self.episode_number += 1
-            # set leader
-            if self.action_selection_strategy == 'uniform_leader':
-                self.action_leader = np.random.choice(self.num_modules)
-            elif self.action_selection_strategy == 'leader':
-                acc_reward = np.array([self.learner_accumulated_reward[l] for l in range(self.num_modules)])
-                try:
-                    normalized_reward = acc_reward - acc_reward.max()
-                    probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
-                    self.action_leader = np.random.choice(self.num_modules, p=probability)
-                except ValueError:
-                    print(f"normalized reward: {normalized_reward}")
-                    print(f"probability: {probability}")
-                    print(probability.sum())
-                    raise
+            if self._using_leader():
+                self._set_action_leader()
+
+    def _set_action_leader(self):
+        """choose which learner in the ensemble gets to lead the action selection process"""
+        if self.action_selection_strategy == 'uniform_leader':
+            # choose a random leader
+            self.action_leader = np.random.choice(self.num_modules)
+        elif self.action_selection_strategy == 'greedy_leader':
+            # greedily choose the leader based on the cumulated reward
+            normalized_reward = self.learner_accumulated_reward - self.learner_accumulated_reward.max()
+            probability = np.exp(normalized_reward) / np.exp(normalized_reward).sum()  # softmax
+            self.action_leader = np.random.choice(self.num_modules, p=probability)
+        elif self.action_selection_strategy == 'ucb_leader':
+            # choose a leader based on the Upper Condfience Bound algorithm 
+            self.action_leader = upper_confidence_bound(values=self.learner_accumulated_reward, t=self.step_number, visitation_count=self.learner_selection_count, c=100)
+            self.learner_selection_count[self.action_leader] += 1
 
     def update(self, experiences, errors_out=None):
         """
@@ -204,7 +209,7 @@ class EnsembleAgent(Agent):
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = lambda a, qvals: choose_most_popular(a)
-        elif self.action_selection_strategy in ['leader', 'uniform_leader']:
+        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
             action_selection_func = lambda a, qvals: choose_leader(a, leader=self.action_leader)
         elif self.action_selection_strategy == 'add_qvals':
             action_selection_func = lambda a, qvals: choose_max_sum_qvals(qvals)
