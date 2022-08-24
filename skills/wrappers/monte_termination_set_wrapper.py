@@ -37,7 +37,7 @@ class MonteTerminationSetWrapper(Wrapper):
         # aggregate the votes, use it as termination probability
         voted_done, termination_prob = get_termination_prob(votes, vote_confs, self.num_agreeing_votes)
         if not self.eval:
-            done = voted_done
+            done = voted_done or info['dead']
             reward = 1 if voted_done else 0
         # if self.confidence_based_reward and voted_done:
         #     reward = vote_confs[np.argmax(votes==1)]
