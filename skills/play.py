@@ -41,7 +41,7 @@ class PlayGame(SingleOptionTrial):
         seeding.seed(self.params['seed'], np)
 
         # make env
-        self.env = self.make_env(self.params['environment'], self.params['seed'], self.params['start_state'])
+        self.env = self.make_env(self.params['environment'], self.params['seed'], eval=False, start_state=self.params['start_state'])
 
     def play(self):
         """
@@ -54,7 +54,11 @@ class PlayGame(SingleOptionTrial):
         self._log_position()
         while True:
             # render env
-            self.env.render()
+            try:
+                self.env.render()
+            except:
+                # if there's no display, don't bother
+                pass
             # print(f"state shape is {np.array(state).shape}")
             # user input an action to take
             action_input = input() 

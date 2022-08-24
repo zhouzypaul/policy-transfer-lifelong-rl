@@ -186,7 +186,7 @@ class MonteAgentWrapper(gym.Wrapper):
 
     def _get_frame(self):
         img_rgb = np.empty([210, 160, 3], dtype=np.uint8)
-        self.env.env.ale.getScreenRGB(img_rgb)
+        self.env.ale.getScreenRGB(img_rgb)
 
         return img_rgb
 
