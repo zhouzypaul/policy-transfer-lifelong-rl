@@ -282,8 +282,8 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         utils.save_hyperparams(os.path.join(self.saving_dir, "hyperparams.csv"), self.params)
 
         # set up env
-        self.env = self.make_env(self.params['environment'], self.params['seed'], eval=False, start_state=self.params['start_state'], use_ground_truth=True)
-        self.eval_env = self.make_env(self.params['environment'], self.params['seed']+1000, eval=True, start_state=self.params['start_state'], use_ground_truth=True)
+        self.env = self.make_env(self.params['environment'], self.params['seed'], eval=False, start_state=self.params['start_state'])
+        self.eval_env = self.make_env(self.params['environment'], self.params['seed']+1000, eval=True, start_state=self.params['start_state'])
 
         # set up agent
         def phi(x):  # Feature extractor

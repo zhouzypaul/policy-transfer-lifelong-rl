@@ -216,12 +216,11 @@ class SingleOptionTrial(BaseTrial):
         self._expand_agent_name()
         return Path(self.params['results_dir']).joinpath(self.params['experiment_name']).joinpath(self.expanded_agent_name)
 
-    def make_env(self, env_name, env_seed, eval=False, start_state=None, use_ground_truth=False):
+    def make_env(self, env_name, env_seed, eval=False, start_state=None):
         """
         Make a monte environemnt for training skills
         Args:
             goal: None or (x, y)
-            use_ground_truth: use ground truth info about termination. This should be used for training a perfect skill, but not for transfer.
         """
         assert env_name == 'MontezumaRevengeNoFrameskip-v4'
         env = gym.make(env_name)
@@ -258,16 +257,15 @@ class SingleOptionTrial(BaseTrial):
             env = MonteForwarding(env, start_state_path)
         # termination wrappers
         if self.params['termination_clf']:
-            assert not use_ground_truth
             env = MonteTerminationSetWrapper(env, eval=eval, num_agreeing_votes=self.params['termination_num_agreeing_votes'], confidence_based_reward=self.params['confidence_based_reward'], device=self.params['device'])
             print('using trained termination classifier')
         # initiation wrappers
         if self.params['initiation_clf']:
-            assert not use_ground_truth
             env = MonteInitiationSetWrapper(env, device=self.params['device'])
             print('using trained initiation classifier')
         # skills and goals
         self._get_real_skill_type(start_state)
+        use_ground_truth = not self.params['termination_clf'] and not self.params['initiation_clf']
         if self.real_skill_type == 'ladder':
             # ladder goals
             # should go after the forwarding wrappers, because the goals depend on the position of 
