@@ -14,6 +14,7 @@ every_tuple = None  # initialized in criterion(), so that we don't repeatedly co
 def L_divergence(feats):
     """
     feats is of shape (n_modules, n_features)
+    NOTE: this is deprecated, use batched_L_divergence instead
     """
     every_tuple_features = feats[every_tuple, :]  # (num_tuple, 2, dim)
     every_tuple_difference = every_tuple_features.diff(dim=1).squeeze(1)  # (num_tuple, dim)
@@ -32,8 +33,8 @@ def batched_L_divergence(batch_feats):
         
     every_tuple_features = batch_feats[:, every_tuple, :]  # (batch_size, num_tuple, 2, dim)
     every_tuple_difference = every_tuple_features.diff(dim=2).squeeze(2)  # (batch_size, num_tuple, dim)
-    loss = torch.clamp(1 - torch.sum(every_tuple_difference.pow(2), dim=-1), min=0)  # (batch_size, num_tuple)
-    mean_loss = loss.mean()
+    loss = torch.sum(every_tuple_difference.pow(2), dim=-1)  # (batch_size, num_tuple)
+    mean_loss = loss.sum(-1).mean()
     return mean_loss
 
 
