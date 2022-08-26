@@ -188,6 +188,20 @@ class VecEnvObservationWrapper(VecEnvWrapper):
         obs, rews, dones, infos = self.venv.step_wait()
         return self.process(obs), rews, dones, infos
 
+
+class VecEnvRewardWrapper(VecEnvWrapper):
+    @abstractmethod
+    def process(self, reward):
+        pass
+
+    def reset(self):
+        return self.venv.reset()
+
+    def step_wait(self):
+        obs, rews, dones, infos = self.venv.step_wait()
+        return obs, self.process(rews), dones, infos
+
+
 class CloudpickleWrapper(object):
     """
     Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
