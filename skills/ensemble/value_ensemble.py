@@ -59,10 +59,12 @@ class ValueEnsemble():
             os.makedirs(path)
 
         torch.save(self.embedding.state_dict(), os.path.join(path, 'embedding.pt'))
+        torch.save(self.recurrent_memory.state_dict(), os.path.join(path, 'recurrent_memory.pt'))
         torch.save(self.q_networks.state_dict(), os.path.join(path, 'policy_networks.pt'))
 
     def load(self, path):
         self.embedding.load_state_dict(torch.load(os.path.join(path, 'embedding.pt')))
+        self.recurrent_memory.load_state_dict(torch.load(os.path.join(path, 'recurrent_memory.pt')))
         self.q_networks.load_state_dict(torch.load(os.path.join(path, 'policy_networks.pt')))
 
     def train(self, exp_batch, errors_out=None, update_target_network=False, plot_embedding=False):
@@ -71,6 +73,7 @@ class ValueEnsemble():
         the sumed divergence and q learning loss
         """
         self.embedding.train()
+        self.recurrent_memory.train()
         self.q_networks.train()
         self.recurrent_memory.flatten_parameters()
 
@@ -139,6 +142,7 @@ class ValueEnsemble():
             print(f"Div loss: {l_div.item()}. Q loss: {np.sum(td_losses)}")
 
         self.embedding.eval()
+        self.recurrent_memory.eval()
         self.q_networks.eval()
 
     def predict_actions(self, state, return_q_values=False):
@@ -152,6 +156,7 @@ class ValueEnsemble():
         """
         nbatch = state.shape[0]
         self.embedding.eval()
+        self.recurrent_memory.eval()
         self.q_networks.eval()
         with torch.no_grad():
             embeddings = self.embedding(state, return_attention_mask=False).detach()
@@ -167,6 +172,10 @@ class ValueEnsemble():
                 actions[:, idx] = q_vals.greedy_actions.cpu().numpy()
                 action_q_values[:, idx] = q_vals.max.cpu().numpy()
                 all_q_values[:, idx, :] = q_vals.q_values.cpu().numpy()
+        
+        self.embedding.train()
+        self.recurrent_memory.train()
+        self.q_networks.train()
 
         if return_q_values:
             return actions, action_q_values, all_q_values
