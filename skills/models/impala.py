@@ -22,11 +22,13 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         inputs = x
-        x = torch.relu(x)
+        # x = torch.relu(x)
         x = self.conv0(x)
         x = torch.relu(x)
         x = self.conv1(x)
-        return x + inputs
+        x += inputs
+        x = torch.relu(x)
+        return x
 
 
 class ConvSequence(nn.Module):
