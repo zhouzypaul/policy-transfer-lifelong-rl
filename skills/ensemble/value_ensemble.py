@@ -107,12 +107,13 @@ class ValueEnsemble():
             batch_pred_q_all_actions = self.q_networks[idx](state_attention)  # (batch_size, num_actions)
             batch_pred_q = batch_pred_q_all_actions.evaluate_actions(batch_actions)  # (batch_size,)
 
-            # target q values 
+            # target q values with Double DQN
             with torch.no_grad():
                 next_state_attention = next_state_embeddings[:,idx,:]  # (batch_size, emb_out_size)
-                batch_next_state_q_all_actions = self.target_q_networks[idx](next_state_attention)  # (batch_size, num_actions)
-                next_state_values = batch_next_state_q_all_actions.max  # (batch_size,)
-                batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_state_values # (batch_size,)
+                next_qout = self.q_networks[idx](next_state_attention)
+                target_next_qout = self.target_q_networks[idx](next_state_attention)
+                next_q_max = target_next_qout.evaluate_actions(next_qout.greedy_actions)  # (batch_size,)
+                batch_q_target = batch_rewards + self.gamma * (1-batch_dones) *  next_q_max # (batch_size,)
             
             # loss
             td_loss = compute_q_learning_loss(exp_batch, batch_pred_q, batch_q_target, errors_out=errors_out)
