@@ -1,0 +1,7 @@
+buffer_length,100000,int
+gamma,0.999,float
+warmup_steps,1024,int
+batch_size,128,int
+update_interval,4,int
+target_update_interval,1000,int
+max_steps,25_000_000,int

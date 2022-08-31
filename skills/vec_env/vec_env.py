@@ -2,6 +2,8 @@ import contextlib
 import os
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from .tile_images import tile_images
 
 
@@ -105,6 +107,8 @@ class VecEnv(ABC):
 
         This is available for backwards compatibility.
         """
+        if type(actions) == list:
+            actions = np.array(actions)
         self.step_async(actions)
         return self.step_wait()
 

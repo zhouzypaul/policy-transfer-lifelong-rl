@@ -11,13 +11,19 @@ from pathlib import Path
 from collections import deque
 
 import torch
+import torch.nn as nn
 import numpy as np
 from procgen import ProcgenEnv
+import pfrl
+from pfrl.agents import DoubleDQN
 from pfrl.utils import set_random_seed
+from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
 from skills.ensemble import ImpalaAttentionEmbedding, ValueEnsemble
 from skills.agents import PPO, EnsembleAgent
+from skills.agents.dqn import SingleSharedBias
+from skills.models.procgen_cnn import ProcgenCNN
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
@@ -59,7 +65,7 @@ class ProcgenTrial(BaseTrial):
         
         # agent
         parser.add_argument('--agent', type=str, default='ppo',
-                            choices=['ppo', 'ensemble'])
+                            choices=['ppo', 'ensemble', 'dqn'])
         parser.add_argument('--load', '-l', type=str, default=None,
                             help='path to load agent')
         
@@ -71,6 +77,8 @@ class ProcgenTrial(BaseTrial):
             args.hyperparams = 'procgen_ppo'
         elif args.agent == 'ensemble':
             args.hyperparams = 'procgen_ensemble'
+        elif args.agent == 'dqn':
+            args.hyperparams = 'procgen_dqn'
         return args
 
     def check_params_validity(self):
@@ -121,6 +129,7 @@ class ProcgenTrial(BaseTrial):
                 max_grad_norm=self.params['max_grad_norm'],
             )
             return ppo_agent
+
         elif self.params['agent'] == 'ensemble':
             attention_embedding = ImpalaAttentionEmbedding(
                 obs_space=env.observation_space,
@@ -159,6 +168,46 @@ class ProcgenTrial(BaseTrial):
                 embedding_plot_freq=self.params['embedding_plot_freq'],
             )
             return agent
+        
+        elif self.params['agent'] == 'dqn':
+            n_actions = env.action_space.n
+            q_func = nn.Sequential(
+                ProcgenCNN(obs_space=env.observation_space, num_outputs=n_actions),  # includes linear layer for q function
+                SingleSharedBias(),
+                DiscreteActionValueHead(),
+            )
+            explorer = pfrl.explorers.LinearDecayEpsilonGreedy(
+                1.0,
+                0.01,  # final epsilon
+                10**6,  # final_exploration_frames
+                lambda: np.random.randint(n_actions),
+            )
+            # Use the Nature paper's hyperparameters
+            opt = pfrl.optimizers.RMSpropEpsInsideSqrt(
+                q_func.parameters(),
+                lr=2.5e-4,
+                alpha=0.95,
+                momentum=0.0,
+                eps=1e-2,
+                centered=True,
+            )
+            agent = DoubleDQN(
+                q_function=q_func,
+                optimizer=opt,
+                replay_buffer=pfrl.replay_buffers.ReplayBuffer(self.params['buffer_length']),
+                gamma=self.params['gamma'],
+                explorer=explorer,
+                gpu=-1 if self.params['device']=='cpu' else 0,
+                replay_start_size=self.params['warmup_steps'],
+                minibatch_size=self.params['batch_size'],
+                update_interval=self.params['update_interval'],
+                target_update_interval=self.params['target_update_interval'],
+                clip_delta=True,
+                n_times_update=1,
+                batch_accumulator="mean",
+            )
+            return agent
+
         else:
             raise NotImplementedError('Unsupported agent')
     
