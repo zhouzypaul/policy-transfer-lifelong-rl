@@ -11,7 +11,7 @@ nepochs,3,int
 max_steps,25_000_000,int
 save_interval,100,int
 action_selection_strat,ucb_leader,str
-warmup_steps,1024,int
+warmup_steps,4096,int
 buffer_length,100000,int
 num_policies,3,int
 embedding_plot_freq,10,int
