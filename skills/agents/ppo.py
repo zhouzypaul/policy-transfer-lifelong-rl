@@ -502,7 +502,7 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
                 advs=advs,
                 vs_teacher=vs_teacher,
             )
-            loss.backward()
+            loss.backward(retain_graph=True)
             if self.max_grad_norm is not None:
                 torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(), self.max_grad_norm

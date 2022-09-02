@@ -20,7 +20,7 @@ from pfrl.utils import set_random_seed
 from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
-from skills.ensemble import ImpalaAttentionEmbedding, ValueEnsemble
+from skills.ensemble import AttentionEmbedding
 from skills.agents import PPO, EnsembleAgent
 from skills.agents.dqn import SingleSharedBias
 from skills.models.procgen_cnn import ProcgenCNN
@@ -103,68 +103,59 @@ class ProcgenTrial(BaseTrial):
         venv = VecNormalize(venv=venv, ob=False)
         return venv
     
+    def _make_ppo_agent(self, env, input_shape):
+        # Create policy.
+        policy = ImpalaCNN(
+            input_shape=input_shape,
+            num_outputs=env.action_space.n,
+        )
+
+        # Create agent and train.
+        optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+        ppo_agent = PPO(
+            model=policy,
+            optimizer=optimizer,
+            gpu=-1 if self.params['device']=='cpu' else 0,
+            gamma=self.params['gamma'],
+            lambd=self.params['lambda'],
+            value_func_coef=self.params['value_function_coef'],
+            entropy_coef=self.params['entropy_coef'],
+            update_interval=self.params['nsteps'] * self.params['num_envs'],  # nsteps is the number of parallel-env steps till an update
+            minibatch_size=self.params['batch_size'],
+            epochs=self.params['nepochs'],
+            clip_eps=self.params['clip_range'],
+            clip_eps_vf=self.params['clip_range'],
+            max_grad_norm=self.params['max_grad_norm'],
+        )
+        return ppo_agent
+
     def make_agent(self, env):
         if self.params['agent'] == 'ppo':
-            # Create policy.
-            policy = ImpalaCNN(
-                obs_space=env.observation_space,
-                num_outputs=env.action_space.n,
-            )
-
-            # Create agent and train.
-            optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
-            ppo_agent = PPO(
-                model=policy,
-                optimizer=optimizer,
-                gpu=-1 if self.params['device']=='cpu' else 0,
-                gamma=self.params['gamma'],
-                lambd=self.params['lambda'],
-                value_func_coef=self.params['value_function_coef'],
-                entropy_coef=self.params['entropy_coef'],
-                update_interval=self.params['nsteps'] * self.params['num_envs'],  # nsteps is the number of parallel-env steps till an update
-                minibatch_size=self.params['batch_size'],
-                epochs=self.params['nepochs'],
-                clip_eps=self.params['clip_range'],
-                clip_eps_vf=self.params['clip_range'],
-                max_grad_norm=self.params['max_grad_norm'],
-            )
-            return ppo_agent
+            self._make_ppo_agent(env, input_shape=env.observation_space.shape)
 
         elif self.params['agent'] == 'ensemble':
-            attention_embedding = ImpalaAttentionEmbedding(
-                obs_space=env.observation_space,
+            attention_embedding = AttentionEmbedding(
                 embedding_size=64,
+                attention_depth=32,
                 num_attention_modules=self.params['num_policies'],
                 plot_dir=self.params['plots_dir'],
             )
-            value_model = ValueEnsemble(
-                device=self.params['device'],
-                attention_embedding=attention_embedding,
-                embedding_output_size=64,
-                gru_hidden_size=128,
-                learning_rate=2.5e-4,
-                discount_rate=self.params['gamma'],
-                num_modules=self.params['num_policies'],
-                num_output_classes=env.action_space.n,
-                verbose=False,
-            )
-            update_interval = self.params['nsteps'] * self.params['num_envs']
+            base_learners = [
+                self._make_ppo_agent(env, input_shape=(64, 7, 7)) for _ in range(self.params['num_policies'])
+            ]
             agent = EnsembleAgent(
-                ensemble_model=value_model,
+                attention_model=attention_embedding,
+                attention_learning_rate=2.5e-4,
+                learners=base_learners,
                 device=self.params['device'],
                 warmup_steps=self.params['warmup_steps'],
                 batch_size=self.params['batch_size'],
                 action_selection_strategy=self.params['action_selection_strat'],
-                prioritized_replay_anneal_steps=self.params['max_steps'] / update_interval,
                 phi=lambda x: x.astype(np.float32),
                 buffer_length=self.params['buffer_length'],
-                update_interval=update_interval,
-                q_target_update_interval=self.params['ensemble_target_update_interval'] * update_interval,
-                final_epsilon=0.01,
-                final_exploration_frames=10**6,
+                update_interval=self.params['nsteps'] * self.params['num_envs'],
                 discount_rate=self.params['gamma'],
                 num_modules=self.params['num_policies'],
-                num_output_classes=env.action_space.n,
                 embedding_plot_freq=self.params['embedding_plot_freq'],
             )
             return agent

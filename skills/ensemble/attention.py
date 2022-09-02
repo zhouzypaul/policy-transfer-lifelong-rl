@@ -117,6 +117,6 @@ class AttentionEmbedding(nn.Module):
         global_features = [self.global_feature_extractor(attentions[i] * spacial_features) for i in range(self.num_attention_modules)]
         if plot:
             plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
-        embedding = torch.cat([self.compact_global_features(f).unsqueeze(1) for f in global_features], dim=1)  # (N, num_modules, embedding_size)
+        # embedding = torch.cat([self.compact_global_features(f).unsqueeze(0) for f in global_features], dim=0)  # (num_modules, N, embedding_size)
 
-        return embedding if not return_attention_mask else (embedding, attentions)
+        return global_features if not return_attention_mask else (global_features, attentions)

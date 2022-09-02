@@ -60,11 +60,11 @@ class ConvSequence(nn.Module):
 class ImpalaCNN(nn.Module):
     """Network from IMPALA paper, to work with pfrl."""
 
-    def __init__(self, obs_space, num_outputs):
+    def __init__(self, input_shape, num_outputs):
 
         super(ImpalaCNN, self).__init__()
 
-        c, h, w = obs_space.shape
+        c, h, w = input_shape
         shape = (c, h, w)
 
         conv_seqs = []
