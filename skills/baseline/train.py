@@ -131,7 +131,7 @@ class ProcgenTrial(BaseTrial):
 
     def make_agent(self, env):
         if self.params['agent'] == 'ppo':
-            self._make_ppo_agent(env, input_shape=env.observation_space.shape)
+            return self._make_ppo_agent(env, input_shape=env.observation_space.shape)
 
         elif self.params['agent'] == 'ensemble':
             attention_embedding = AttentionEmbedding(
