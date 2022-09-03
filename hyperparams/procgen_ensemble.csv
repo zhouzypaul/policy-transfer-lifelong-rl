@@ -10,6 +10,8 @@ batch_size,1024,int
 nepochs,3,int
 max_steps,25_000_000,int
 save_interval,100,int
+attention_update_interval,200,int
+attention_batch_size,1024,int
 action_selection_strat,ucb_leader,str
 warmup_steps,4096,int
 buffer_length,100000,int

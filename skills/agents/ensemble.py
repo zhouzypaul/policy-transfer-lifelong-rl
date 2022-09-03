@@ -136,7 +136,7 @@ class EnsembleAgent(Agent):
     def _attention_embed_obs(self, batch_obs):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
         embedded_obs = self.attention_model(obs)
-        return embedded_obs
+        return [ob.detach().cpu().numpy() for ob in embedded_obs]
     
     def observe(self, obs, action, reward, next_obs, terminal):
         """
