@@ -83,8 +83,9 @@ class ImpalaCNN(nn.Module):
 
     def forward(self, obs):
         assert obs.ndim == 4
-        x = obs / 255.0  # scale to 0-1
+        # x = obs / 255.0  # scale to 0-1
         # x = x.permute(0, 3, 1, 2)  # NHWC => NCHW
+        x = obs
         for conv_seq in self.conv_seqs:
             x = conv_seq(x)
         x = torch.flatten(x, start_dim=1)
