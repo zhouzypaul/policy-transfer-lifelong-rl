@@ -26,6 +26,7 @@ from skills.agents.dqn import SingleSharedBias
 from skills.models.procgen_cnn import ProcgenCNN
 from skills.option_utils import BaseTrial
 from skills.models.impala import ImpalaCNN
+from skills.models.mlp import PPOMLP
 from skills.baseline import logger
 from skills import utils
 from skills.baseline.plot import plot_reward_curve
@@ -103,17 +104,11 @@ class ProcgenTrial(BaseTrial):
         venv = VecNormalize(venv=venv, ob=False)
         return venv
     
-    def _make_ppo_agent(self, env, input_shape):
-        # Create policy.
-        policy = ImpalaCNN(
-            input_shape=input_shape,
-            num_outputs=env.action_space.n,
-        )
-
+    def _make_ppo_agent(self, policy_net):
         # Create agent and train.
-        optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+        optimizer = torch.optim.Adam(policy_net.parameters(), lr=self.params['learning_rate'], eps=1e-5)
         ppo_agent = PPO(
-            model=policy,
+            model=policy_net,
             optimizer=optimizer,
             gpu=-1 if self.params['device']=='cpu' else 0,
             gamma=self.params['gamma'],
@@ -132,7 +127,11 @@ class ProcgenTrial(BaseTrial):
 
     def make_agent(self, env):
         if self.params['agent'] == 'ppo':
-            return self._make_ppo_agent(env, input_shape=env.observation_space.shape)
+            policy = ImpalaCNN(
+                input_shape=env.observation_space.shape,
+                num_outputs=env.action_space.n,
+            )
+            return self._make_ppo_agent(policy_net=policy)
 
         elif self.params['agent'] == 'ensemble':
             attention_embedding = AttentionEmbedding(
@@ -141,8 +140,12 @@ class ProcgenTrial(BaseTrial):
                 num_attention_modules=self.params['num_policies'],
                 plot_dir=self.params['plots_dir'],
             )
+            def _make_policy():
+                return PPOMLP(
+                    output_size=env.action_space.n,
+                )
             base_learners = [
-                self._make_ppo_agent(env, input_shape=(64, 7, 7)) for _ in range(self.params['num_policies'])
+                self._make_ppo_agent(policy_net=_make_policy()) for _ in range(self.params['num_policies'])
             ]
             agent = EnsembleAgent(
                 attention_model=attention_embedding,
