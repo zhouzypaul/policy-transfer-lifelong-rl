@@ -80,7 +80,7 @@ class AttentionEmbedding(nn.Module):
 
         self.conv2 = nn.Conv2d(in_channels=self.attention_depth, out_channels=64, kernel_size=3, stride=2)
         self.pool2 = nn.MaxPool2d(2)
-
+        
         self.linear = nn.LazyLinear(self.out_dim)
 
         self.plot_dir = plot_dir
@@ -117,6 +117,15 @@ class AttentionEmbedding(nn.Module):
         global_features = [self.global_feature_extractor(attentions[i] * spacial_features) for i in range(self.num_attention_modules)]
         if plot:
             plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
+
+        # normalize attention to between [0, 1]
+        for i in range(self.num_attention_modules):
+            N, D, H, W = global_features[i].size()
+            feat = global_features[i].view(-1, H*W)
+            feat_max, _ = feat.max(dim=1, keepdim=True)
+            feat_min, _ = feat.min(dim=1, keepdim=True)
+            global_features[i] = ((feat - feat_min)/(feat_max-feat_min+1e-8)).view(N, D, H, W)
+
         # embedding = torch.cat([self.compact_global_features(f).unsqueeze(0) for f in global_features], dim=0)  # (num_modules, N, embedding_size)
 
         return global_features if not return_attention_mask else (global_features, attentions)
