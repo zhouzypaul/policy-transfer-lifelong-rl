@@ -23,7 +23,7 @@ class EnsembleAgent(Agent):
     """
     def __init__(self, 
                 attention_model,
-                attention_learning_rate,
+                learning_rate,
                 learners,
                 device, 
                 warmup_steps,
@@ -55,11 +55,11 @@ class EnsembleAgent(Agent):
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
-        self.attention_optimizer = torch.optim.Adam(self.attention_model.parameters(), lr=attention_learning_rate)
+        self.attention_optimizer = torch.optim.Adam(self.attention_model.parameters(), lr=learning_rate)
         self.learners = learners
         self.optimizer = torch.optim.Adam(
             list(self.attention_model.parameters()) + list(itertools.chain.from_iterable([list(learner.model.parameters()) for learner in self.learners])),
-            lr=attention_learning_rate
+            lr=learning_rate
         )
         self.num_learners = len(learners)
 
@@ -113,7 +113,7 @@ class EnsembleAgent(Agent):
             if np.sum([loss is not None for loss in losses]) == self.num_learners:
                 learner_loss = torch.stack(losses).sum()
                 div_loss = self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=True)
-                loss = 100 * learner_loss + div_loss
+                loss = learner_loss + div_loss
 
                 self.attention_model.train()
                 self.optimizer.zero_grad()

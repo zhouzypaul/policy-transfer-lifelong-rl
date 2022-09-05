@@ -151,7 +151,7 @@ class ProcgenTrial(BaseTrial):
             ]
             agent = EnsembleAgent(
                 attention_model=attention_embedding,
-                attention_learning_rate=2.5e-4,
+                learning_rate=5e-4,
                 learners=base_learners,
                 device=self.params['device'],
                 warmup_steps=self.params['warmup_steps'],
