@@ -252,6 +252,9 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
         model (torch.nn.Module): Model to train (including recurrent models)
             state s  |->  (pi(s, _), v(s))
         optimizer (torch.optim.Optimizer): Optimizer used to train the model
+            If optimizer is set to None, then don't optimize the loss, just 
+            return it. Used for ensemble training where parent optimizer performs
+            the update.
         gpu (int): GPU device id if not None nor negative
         gamma (float): Discount factor [0, 1]
         lambd (float): Lambda-return factor [0, 1]
@@ -413,7 +416,7 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
                     max_recurrent_sequence_len=self.max_recurrent_sequence_len,
                     device=self.device,
                 )
-                self._update_recurrent(dataset)
+                maybe_loss = self._update_recurrent(dataset)
             else:
                 dataset = _make_dataset(
                     episodes=self.memory,
@@ -426,11 +429,12 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
                     device=self.device,
                 )
                 assert len(dataset) == dataset_size
-                self._update(dataset)
+                maybe_loss = self._update(dataset)
             self.explained_variance = _compute_explained_variance(
                 list(itertools.chain.from_iterable(self.memory))
             )
             self.memory = []
+            return maybe_loss
 
     def _flush_last_episode(self):
         if self.last_episode:
@@ -502,7 +506,9 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
                 advs=advs,
                 vs_teacher=vs_teacher,
             )
-            loss.backward(retain_graph=True)
+            if self.optimizer is None:
+                return loss
+            loss.backward()
             if self.max_grad_norm is not None:
                 torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(), self.max_grad_norm
@@ -655,7 +661,8 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
 
     def batch_observe(self, batch_obs, batch_reward, batch_done, batch_reset):
         if self.training:
-            self._batch_observe_train(batch_obs, batch_reward, batch_done, batch_reset)
+            maybe_loss = self._batch_observe_train(batch_obs, batch_reward, batch_done, batch_reset)
+            return maybe_loss
         else:
             self._batch_observe_eval(batch_obs, batch_reward, batch_done, batch_reset)
 
@@ -781,7 +788,8 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
                     self.train_recurrent_states, indices_that_ended
                 )
 
-        self._update_if_dataset_is_ready()
+        maybe_loss = self._update_if_dataset_is_ready()
+        return maybe_loss
 
     def get_statistics(self):
         return [
