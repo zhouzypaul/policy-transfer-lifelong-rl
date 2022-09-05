@@ -466,6 +466,7 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
             all_advs = torch.tensor([b["adv"] for b in dataset], device=device)
             std_advs, mean_advs = torch.std_mean(all_advs, unbiased=False)
 
+        total_loss = 0
         for batch in _yield_minibatches(
             dataset, minibatch_size=self.minibatch_size, num_epochs=self.epochs
         ):
@@ -506,15 +507,20 @@ class PPO(agent.AttributeSavingMixin, agent.BatchAgent):
                 advs=advs,
                 vs_teacher=vs_teacher,
             )
+
             if self.optimizer is None:
-                return loss
-            loss.backward()
-            if self.max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), self.max_grad_norm
-                )
-            self.optimizer.step()
-            self.n_updates += 1
+                total_loss += loss
+            else:
+                loss.backward()
+                if self.max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), self.max_grad_norm
+                    )
+                self.optimizer.step()
+                self.n_updates += 1
+        
+        if self.optimizer is None:
+            return total_loss
 
     def _update_once_recurrent(self, episodes, mean_advs, std_advs):
 
