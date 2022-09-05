@@ -1,6 +1,7 @@
 import os
 import lzma
 import dill
+import itertools
 from contextlib import contextmanager
 
 import torch
@@ -56,19 +57,23 @@ class EnsembleAgent(Agent):
         self.attention_model = attention_model.to(self.device)
         self.attention_optimizer = torch.optim.Adam(self.attention_model.parameters(), lr=attention_learning_rate)
         self.learners = learners
+        self.optimizer = torch.optim.Adam(
+            list(self.attention_model.parameters()) + list(itertools.chain.from_iterable([list(learner.model.parameters()) for learner in self.learners])),
+            lr=attention_learning_rate
+        )
         self.num_learners = len(learners)
 
         self.replay_buffer = replay_buffers.ReplayBuffer(capacity=buffer_length)
-        self.replay_updater = ReplayUpdater(
-            replay_buffer=self.replay_buffer,
-            update_func=self.update,
-            batchsize=batch_size,
-            episodic_update=False,
-            episodic_update_len=None,
-            n_times_update=1,
-            replay_start_size=warmup_steps,
-            update_interval=update_interval,
-        )
+        # self.replay_updater = ReplayUpdater(
+        #     replay_buffer=self.replay_buffer,
+        #     update_func=self.update_attention,
+        #     batchsize=batch_size,
+        #     episodic_update=False,
+        #     episodic_update_len=None,
+        #     n_times_update=1,
+        #     replay_start_size=warmup_steps,
+        #     update_interval=update_interval,
+        # )
     
     @contextmanager
     def set_evaluating(self):
@@ -85,19 +90,39 @@ class EnsembleAgent(Agent):
 
     def batch_observe(self, batch_obs, batch_reward, batch_done, batch_reset):
         with self.set_evaluating():
+
             # learners
             embedded_obs = self._attention_embed_obs(batch_obs)
+            losses = []
             for i, learner in enumerate(self.learners):
-                learner.batch_observe(embedded_obs[i], batch_reward, batch_done, batch_reset)
+                maybe_loss = learner.batch_observe(embedded_obs[i], batch_reward, batch_done, batch_reset)
+                losses.append(maybe_loss)
+            assert np.sum([loss is None for loss in losses]) == 0 or np.sum([loss is None for loss in losses]) == self.num_learners
+
             # for attention model
             if self.training:
-                return self._batch_observe_train(
+                self._batch_observe_train(
                     batch_obs, batch_reward, batch_done, batch_reset
                 )
             else:
-                return self._batch_observe_eval(
+                self._batch_observe_eval(
                     batch_obs, batch_reward, batch_done, batch_reset
                 )
+
+            # actual update 
+            if np.sum([loss is not None for loss in losses]) == self.num_learners:
+                learner_loss = torch.stack(losses).sum()
+                div_loss = self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=True)
+                loss = 100 * learner_loss + div_loss
+
+                self.attention_model.train()
+                self.optimizer.zero_grad()
+                loss.backward()
+                for learner in self.learners:
+                    if hasattr(learner, 'max_grad_norm') and learner.max_grad_norm is not None:
+                        torch.nn.utils.clip_grad_norm_(learner.model.parameters(), learner.max_grad_norm)
+                self.optimizer.step()
+                self.attention_model.eval()
     
     def _batch_observe_train(self, batch_obs, batch_reward, batch_done, batch_reset):
         for i in range(len(batch_obs)):
@@ -120,7 +145,7 @@ class EnsembleAgent(Agent):
                     self.batch_last_action[i] = None
                     self.replay_buffer.stop_current_episode(env_id=i)
 
-            self.replay_updater.update_if_necessary(self.step_number)
+            # self.replay_updater.update_if_necessary(self.step_number)
 
         # action leader
         self.learner_accumulated_reward[self.action_leader] += batch_reward.sum()
@@ -137,7 +162,7 @@ class EnsembleAgent(Agent):
     def _attention_embed_obs(self, batch_obs):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
         embedded_obs = self.attention_model(obs)
-        return [ob.detach().cpu().numpy() for ob in embedded_obs]
+        return embedded_obs
     
     def observe(self, obs, action, reward, next_obs, terminal):
         """
@@ -185,7 +210,7 @@ class EnsembleAgent(Agent):
             self.action_leader = upper_confidence_bound(values=self.learner_accumulated_reward, t=self.step_number, visitation_count=self.learner_selection_count, c=100)
             self.learner_selection_count[self.action_leader] += 1
 
-    def update(self, experiences, errors_out=None):
+    def update_attention(self, experiences, compute_loss_only=False, errors_out=None):
         """
         update the attention model
         accepts as argument a list of transition dicts
@@ -220,7 +245,7 @@ class EnsembleAgent(Agent):
                 if errors_out is None:
                     errors_out = []
 
-            # actual update
+            # compute loss
             self.attention_model.train()
             batch_states = exp_batch["state"]
             state_embeddings = self.attention_model(batch_states, plot=(self.n_updates % self.embedding_plot_freq == 0))  # num_modules x (batch_size, C, H, W)
@@ -228,9 +253,10 @@ class EnsembleAgent(Agent):
             state_embedding_flatten = state_embedding_flatten.view(self.batch_size, self.num_modules, -1)  # (batch_size, num_modules, d)
             div_loss = batched_L_divergence(state_embedding_flatten)
 
-            self.attention_optimizer.zero_grad()
-            div_loss.backward()
-            self.attention_optimizer.step()
+            if not compute_loss_only:
+                self.attention_optimizer.zero_grad()
+                div_loss.backward()
+                self.attention_optimizer.step()
             self.attention_model.eval()
 
             # update prioritiy
@@ -239,6 +265,8 @@ class EnsembleAgent(Agent):
                 self.replay_buffer.update_errors(errors_out)
             
             self.n_updates += 1
+
+            return div_loss
 
     def batch_act(self, batch_obs):
         with self.set_evaluating():

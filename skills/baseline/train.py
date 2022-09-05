@@ -104,16 +104,14 @@ class ProcgenTrial(BaseTrial):
         venv = VecNormalize(venv=venv, ob=False)
         return venv
     
-    def _make_ppo_agent(self, policy_net):
-        # Create agent and train.
-        optimizer = torch.optim.Adam(policy_net.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+    def _make_ppo_agent(self, policy, optimizer):
         ppo_agent = PPO(
-            model=policy_net,
+            model=policy,
             optimizer=optimizer,
             gpu=-1 if self.params['device']=='cpu' else 0,
             gamma=self.params['gamma'],
             lambd=self.params['lambda'],
-            phi=lambda x: x.astype(np.float32) / 255,
+            phi=lambda x: x / 255.0,
             value_func_coef=self.params['value_function_coef'],
             entropy_coef=self.params['entropy_coef'],
             update_interval=self.params['nsteps'] * self.params['num_envs'],  # nsteps is the number of parallel-env steps till an update
@@ -131,7 +129,8 @@ class ProcgenTrial(BaseTrial):
                 input_shape=env.observation_space.shape,
                 num_outputs=env.action_space.n,
             )
-            return self._make_ppo_agent(policy_net=policy)
+            optimizer = torch.optim.Adam(policy.parameters(), lr=self.params['learning_rate'], eps=1e-5)
+            return self._make_ppo_agent(policy, optimizer)
 
         elif self.params['agent'] == 'ensemble':
             attention_embedding = AttentionEmbedding(
@@ -140,12 +139,14 @@ class ProcgenTrial(BaseTrial):
                 num_attention_modules=self.params['num_policies'],
                 plot_dir=self.params['plots_dir'],
             )
-            def _make_policy():
-                return PPOMLP(
+            def _make_policy_and_opt():
+                policy = PPOMLP(
                     output_size=env.action_space.n,
                 )
+                optimizer = None
+                return policy, optimizer
             base_learners = [
-                self._make_ppo_agent(policy_net=_make_policy()) for _ in range(self.params['num_policies'])
+                self._make_ppo_agent(*_make_policy_and_opt()) for _ in range(self.params['num_policies'])
             ]
             agent = EnsembleAgent(
                 attention_model=attention_embedding,
