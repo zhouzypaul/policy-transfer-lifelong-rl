@@ -34,6 +34,9 @@ class PPOMLP(nn.Module):
         self.hidden = nn.LazyLinear(self.hidden_size)
         self.logits = nn.Linear(self.hidden_size, self.output_size)
         self.value = nn.Linear(self.hidden_size, 1)
+        # initialize weights and bias
+        nn.init.orthogonal_(self.logits.weight, gain=0.01)
+        nn.init.zeros_(self.logits.bias)
     
     def forward(self, x):
         x = torch.flatten(x, start_dim=1)
