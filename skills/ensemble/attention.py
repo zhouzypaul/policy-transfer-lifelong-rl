@@ -78,8 +78,10 @@ class AttentionEmbedding(nn.Module):
             ]
         )
 
-        self.conv2 = nn.Conv2d(in_channels=self.attention_depth, out_channels=64, kernel_size=3, stride=2)
+        self.conv2 = nn.ConvTranspose2d(in_channels=self.attention_depth, out_channels=16, kernel_size=3, stride=3)
         self.pool2 = nn.MaxPool2d(2)
+        self.conv3 = nn.ConvTranspose2d(in_channels=16, out_channels=3, kernel_size=3, stride=3)
+        self.pool3 = nn.MaxPool2d(2)
         
         self.linear = nn.LazyLinear(self.out_dim)
 
@@ -94,6 +96,8 @@ class AttentionEmbedding(nn.Module):
     def global_feature_extractor(self, x):
         x = F.relu(self.conv2(x))
         x = self.pool2(x)
+        x = F.relu(self.conv3(x))
+        x = self.pool3(x)
         return x
 
     def compact_global_features(self, x):

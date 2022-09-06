@@ -140,8 +140,9 @@ class ProcgenTrial(BaseTrial):
                 plot_dir=self.params['plots_dir'],
             )
             def _make_policy_and_opt():
-                policy = PPOMLP(
-                    output_size=env.action_space.n,
+                policy = ImpalaCNN(
+                    input_shape=(3, 69, 69),
+                    num_outputs=env.action_space.n,
                 )
                 optimizer = None
                 return policy, optimizer
