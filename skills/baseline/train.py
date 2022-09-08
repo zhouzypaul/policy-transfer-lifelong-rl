@@ -12,7 +12,10 @@ from collections import deque
 
 import torch
 import torch.nn as nn
+from torch import distributions
 import numpy as np
+import pfrl
+from pfrl.nn.lmbda import Lambda
 from procgen import ProcgenEnv
 import pfrl
 from pfrl.agents import DoubleDQN
@@ -21,7 +24,7 @@ from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
 from skills.ensemble import AttentionEmbedding
-from skills.agents import PPO, EnsembleAgent
+from skills.agents import PPO, SAC, EnsembleAgent
 from skills.agents.dqn import SingleSharedBias
 from skills.models.procgen_cnn import ProcgenCNN
 from skills.option_utils import BaseTrial
@@ -66,7 +69,7 @@ class ProcgenTrial(BaseTrial):
         
         # agent
         parser.add_argument('--agent', type=str, default='ppo',
-                            choices=['ppo', 'ensemble', 'dqn'])
+                            choices=['ppo', 'ensemble', 'dqn', 'sac'])
         parser.add_argument('--load', '-l', type=str, default=None,
                             help='path to load agent')
         
@@ -80,6 +83,8 @@ class ProcgenTrial(BaseTrial):
             args.hyperparams = 'procgen_ensemble'
         elif args.agent == 'dqn':
             args.hyperparams = 'procgen_dqn'
+        elif args.agent == 'sac':
+            args.hyperparams = 'procgen_sac'
         return args
 
     def check_params_validity(self):
@@ -203,6 +208,85 @@ class ProcgenTrial(BaseTrial):
                 clip_delta=True,
                 n_times_update=1,
                 batch_accumulator="mean",
+            )
+            return agent
+
+        elif self.params['agent'] == 'sac':
+            action_space = env.action_space
+            obs_space = env.observation_space
+            action_size = action_space.n
+
+            def squashed_diagonal_gaussian_head(x):
+                assert x.shape[-1] == action_size * 2
+                mean, log_scale = torch.chunk(x, 2, dim=1)
+                log_scale = torch.clamp(log_scale, -20.0, 2.0)
+                var = torch.exp(log_scale * 2)
+                base_distribution = distributions.Independent(
+                    distributions.Normal(loc=mean, scale=torch.sqrt(var)), 1
+                )
+                # cache_size=1 is required for numerical stability
+                return distributions.transformed_distribution.TransformedDistribution(
+                    base_distribution, [distributions.transforms.TanhTransform(cache_size=1)]
+                )
+
+            policy = nn.Sequential(
+                nn.Linear(obs_space.low.size, self.params['n_hidden_channels']),
+                nn.ReLU(),
+                nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
+                nn.ReLU(),
+                nn.Linear(self.params['n_hidden_channels'], action_size * 2),
+                Lambda(squashed_diagonal_gaussian_head),
+            )
+            torch.nn.init.xavier_uniform_(policy[0].weight)
+            torch.nn.init.xavier_uniform_(policy[2].weight)
+            torch.nn.init.xavier_uniform_(policy[4].weight)
+            policy_optimizer = torch.optim.Adam(
+                policy.parameters(), lr=self.params['learning_rate'], eps=self.params['adam_eps']
+            )
+
+            def make_q_func_with_optimizer():
+                q_func = nn.Sequential(
+                    pfrl.nn.ConcatObsAndAction(),
+                    nn.Linear(obs_space.low.size + action_size, self.params['n_hidden_channels']),
+                    nn.ReLU(),
+                    nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
+                    nn.ReLU(),
+                    nn.Linear(self.params['n_hidden_channels'], 1),
+                )
+                torch.nn.init.xavier_uniform_(q_func[1].weight)
+                torch.nn.init.xavier_uniform_(q_func[3].weight)
+                torch.nn.init.xavier_uniform_(q_func[5].weight)
+                q_func_optimizer = torch.optim.Adam(
+                    q_func.parameters(), lr=self.params['learning_rate'], eps=self.params['adam_eps']
+                )
+                return q_func, q_func_optimizer
+
+            q_func1, q_func1_optimizer = make_q_func_with_optimizer()
+            q_func2, q_func2_optimizer = make_q_func_with_optimizer()
+
+            rbuf = pfrl.replay_buffers.ReplayBuffer(10**6, num_steps=self.params['n_step_return'])
+
+            def burnin_action_func():
+                """Select random actions until model is updated one or more times."""
+                return action_space.sample()
+
+            # Hyperparameters in http://arxiv.org/abs/1802.09477
+            agent = SAC(
+                policy,
+                q_func1,
+                q_func2,
+                policy_optimizer,
+                q_func1_optimizer,
+                q_func2_optimizer,
+                rbuf,
+                gamma=self.params['discount'],
+                update_interval=self.params['update_interval'],
+                replay_start_size=self.params['replay_start_size'],
+                gpu=-1 if self.params['device']=='cpu' else 0,
+                minibatch_size=self.params['batch_size'],
+                burnin_action_func=burnin_action_func,
+                entropy_target=-action_size,
+                temperature_optimizer_lr=self.params['learning_rate'],
             )
             return agent
 
