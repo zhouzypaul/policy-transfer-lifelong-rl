@@ -22,7 +22,7 @@ from skills.vec_env import VecExtractDictObs, VecMonitor, VecNormalize
 from skills.agents.ppo import PPO
 from skills.agents.sac import SAC
 from skills.option_utils import BaseTrial
-from skills.models.impala import ImpalaCNN, ResNet
+from skills.models.impala import ImpalaCNN
 from skills.baseline import logger
 from skills import utils
 from skills.baseline.plot import plot_reward_curve
@@ -137,21 +137,16 @@ class ProcgenTrial(BaseTrial):
                 return distributions.transformed_distribution.TransformedDistribution(
                     base_distribution, [distributions.transforms.TanhTransform(cache_size=1)]
                 )
-            
-            def _make_encoder():
-                return ResNet(
-                    obs_space=obs_space,
-                    out_channels=[16, 32, 32],
-                )
 
             policy = nn.Sequential(
-                _make_encoder(),
+                nn.Linear(obs_space.low.size, self.params['n_hidden_channels']),
                 nn.ReLU(),
                 nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
                 nn.ReLU(),
                 nn.Linear(self.params['n_hidden_channels'], action_size * 2),
                 Lambda(squashed_diagonal_gaussian_head),
             )
+            torch.nn.init.xavier_uniform_(policy[0].weight)
             torch.nn.init.xavier_uniform_(policy[2].weight)
             torch.nn.init.xavier_uniform_(policy[4].weight)
             policy_optimizer = torch.optim.Adam(
@@ -160,13 +155,14 @@ class ProcgenTrial(BaseTrial):
 
             def make_q_func_with_optimizer():
                 q_func = nn.Sequential(
-                    _make_encoder(),
-                    nn.ReLU(),
                     pfrl.nn.ConcatObsAndAction(),
+                    nn.Linear(obs_space.low.size + action_size, self.params['n_hidden_channels']),
+                    nn.ReLU(),
                     nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
                     nn.ReLU(),
                     nn.Linear(self.params['n_hidden_channels'], 1),
                 )
+                torch.nn.init.xavier_uniform_(q_func[1].weight)
                 torch.nn.init.xavier_uniform_(q_func[3].weight)
                 torch.nn.init.xavier_uniform_(q_func[5].weight)
                 q_func_optimizer = torch.optim.Adam(

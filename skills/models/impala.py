@@ -55,27 +55,6 @@ class ConvSequence(nn.Module):
     def get_output_shape(self):
         _c, h, w = self._input_shape
         return self._out_channels, (h + 1) // 2, (w + 1) // 2
-    
-
-class ResNet(nn.Module):
-    """a n-layer residual network"""
-    def __init__(self, obs_space, out_channels=[16, 32, 32]):
-        super().__init__()
-        c, h, w = obs_space.shape
-        shape = (c, h, 2)
-
-        conv_seqs = []
-        for out_channel in out_channels:
-            conv_seq = ConvSequence(shape, out_channel)
-            shape = conv_seq.get_output_shape()
-            conv_seqs.append(conv_seq)
-        self.conv_seqs = nn.ModuleList(conv_seqs)
-    
-    def forward(self, obs):
-        assert obs.ndim == 4
-        for conv_seq in self.conv_seqs:
-            x = conv_seq(x)
-        return x
 
 
 class ImpalaCNN(nn.Module):
