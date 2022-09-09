@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 from torch import distributions
 import numpy as np
+import gym
 import pfrl
 from pfrl.nn.lmbda import Lambda
 from procgen import ProcgenEnv
@@ -23,6 +24,7 @@ from pfrl.utils import set_random_seed
 from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
+from skills.envs import make_ant_env
 from skills.ensemble import AttentionEmbedding
 from skills.agents import PPO, SAC, EnsembleAgent
 from skills.agents.dqn import SingleSharedBias
@@ -94,19 +96,25 @@ class ProcgenTrial(BaseTrial):
         pass
     
     def make_vector_env(self, eval=False):
-        venv = ProcgenEnv(
-            num_envs=self.params['num_envs'],
-            env_name=self.params['env'],
-            num_levels=0 if eval else self.params['num_levels'],
-            start_level=0 if eval else self.params['start_level'],
-            distribution_mode=self.params['distribution_mode'],
-            num_threads=self.params['num_threads'],
-            center_agent=True,
-        )
-        venv = VecChannelOrder(venv, channel_order='chw')
-        venv = VecExtractDictObs(venv, "rgb")
-        venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
-        venv = VecNormalize(venv=venv, ob=False)
+        """vector environment for mujoco and procgen"""
+        if 'ant' in self.params['env']:
+            # ant mujoco env
+            venv = make_ant_env(self.params['env'], self.params['num_envs'])
+        else:
+            # procgen env
+            venv = ProcgenEnv(
+                num_envs=self.params['num_envs'],
+                env_name=self.params['env'],
+                num_levels=0 if eval else self.params['num_levels'],
+                start_level=0 if eval else self.params['start_level'],
+                distribution_mode=self.params['distribution_mode'],
+                num_threads=self.params['num_threads'],
+                center_agent=True,
+            )
+            venv = VecChannelOrder(venv, channel_order='chw')
+            venv = VecExtractDictObs(venv, "rgb")
+            venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
+            venv = VecNormalize(venv=venv, ob=False)
         return venv
     
     def _make_ppo_agent(self, policy, optimizer, phi=lambda x: x):
@@ -212,9 +220,9 @@ class ProcgenTrial(BaseTrial):
             return agent
 
         elif self.params['agent'] == 'sac':
-            action_space = env.action_space
-            obs_space = env.observation_space
-            action_size = action_space.n
+            action_space = env.action_space[0]  # get the first env's action space
+            obs_size = env.observation_space.shape[-1]  # get rid of the num_envs dimension
+            action_size = action_space.shape[0]  # get the only elt in the tuple
 
             def squashed_diagonal_gaussian_head(x):
                 assert x.shape[-1] == action_size * 2
@@ -230,7 +238,7 @@ class ProcgenTrial(BaseTrial):
                 )
 
             policy = nn.Sequential(
-                nn.Linear(obs_space.low.size, self.params['n_hidden_channels']),
+                nn.Linear(obs_size, self.params['n_hidden_channels']),
                 nn.ReLU(),
                 nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
                 nn.ReLU(),
@@ -247,7 +255,7 @@ class ProcgenTrial(BaseTrial):
             def make_q_func_with_optimizer():
                 q_func = nn.Sequential(
                     pfrl.nn.ConcatObsAndAction(),
-                    nn.Linear(obs_space.low.size + action_size, self.params['n_hidden_channels']),
+                    nn.Linear(obs_size + action_size, self.params['n_hidden_channels']),
                     nn.ReLU(),
                     nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
                     nn.ReLU(),
