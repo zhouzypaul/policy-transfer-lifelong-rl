@@ -470,6 +470,9 @@ def save_agent(agent, saving_dir):
     elif type(agent) == EnsembleAgent:
         agent.save(saving_dir)
         logger.info(f"Model saved to {saving_dir}/agent.pkl")
+    elif type(agent) == SAC:
+        agent.save(saving_dir)
+        logger.info(f"Model saved to {saving_dir}")
     else:
         raise RuntimeError 
 
