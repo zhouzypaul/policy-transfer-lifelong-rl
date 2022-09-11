@@ -14,7 +14,8 @@ ANT_BOX_LENGTH = 26
 
 
 class AntMixLongEnv(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, task={}, n_tasks=1, env_type='train', randomize_tasks=True):
+    def __init__(self, task={}, n_tasks=1, env_type='train', randomize_tasks=True, eval=False):
+        self.eval = eval
         self._task_sets = ["antgoal0", "antbrid0", "antbox0", "antgoal1", "antbrid1", "antbox1"]
         #self.task_order = np.arange(15)
         self.task_order = np.random.choice(6, 6, replace=False)
@@ -199,7 +200,7 @@ class AntMixLongEnv(mujoco_env.MujocoEnv, utils.EzPickle):
                 success=success,
                 subtask_success=subtask_succeed,
                 sparse_reward=success_reward + substask_reward,
-                obs_img=self._get_obs()
+                obs_img = self._get_img_obs() if self.eval else self._get_obs(),
             ),
         )
 

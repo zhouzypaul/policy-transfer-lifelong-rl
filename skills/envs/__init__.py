@@ -5,7 +5,7 @@ from .ant_mixed import AntMixLongEnv
 from .ant_wrappers import DoubleToFloatWrapper
 
 
-def make_ant_env(env_name, num_envs=1):
+def make_ant_env(env_name, num_envs=1, eval=False):
     """
     create the env environment
     """
@@ -14,13 +14,13 @@ def make_ant_env(env_name, num_envs=1):
 
     assert 'ant' in env_name
     if env_name == "ant_box":
-        env = AntBoxEnv()
+        env = AntBoxEnv(eval=eval)
     elif env_name == "ant_bridge":
-        env = AntBridgeEnv()
+        env = AntBridgeEnv(eval=eval)
     elif env_name == "ant_goal":
-        env = AntGoalEnv()
+        env = AntGoalEnv(eval=eval)
     elif env_name == "ant_mixed":
-        env = AntMixLongEnv()
+        env = AntMixLongEnv(eval=eval)
     else:
         raise NotImplementedError(f"env_name {env_name} not found")
 

@@ -14,7 +14,6 @@ import torch
 import torch.nn as nn
 from torch import distributions
 import numpy as np
-import gym
 import pfrl
 from pfrl.nn.lmbda import Lambda
 from procgen import ProcgenEnv
@@ -99,7 +98,7 @@ class ProcgenTrial(BaseTrial):
         """vector environment for mujoco and procgen"""
         if 'ant' in self.params['env']:
             # ant mujoco env
-            venv = make_ant_env(self.params['env'], self.params['num_envs'])
+            venv = make_ant_env(self.params['env'], self.params['num_envs'], eval=eval)
         else:
             # procgen env
             venv = ProcgenEnv(
@@ -483,6 +482,9 @@ def load_agent(agent, load_path, plot_dir=None):
         logger.info(f"Model loaded from {load_path}")
     elif type(agent) == EnsembleAgent:
         EnsembleAgent.load(load_path, plot_dir=plot_dir)
+    elif type(agent) == SAC:
+        agent.load(load_path)
+        logger.info(f"Model loaded from {load_path}")
     else:
         raise RuntimeError
 

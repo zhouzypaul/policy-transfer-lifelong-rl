@@ -8,12 +8,13 @@ import matplotlib.pyplot as plt
 
 
 class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
-    def __init__(self, task={}, n_tasks=1, env_type='train', randomize_tasks=True):
+    def __init__(self, task={}, n_tasks=1, env_type='train', randomize_tasks=True, eval=False):
 
         self._task = task
         self.env_type = env_type
         self.tasks = self.sample_tasks(n_tasks)
         self.random_steps = 5
+        self.eval = eval
         # these will get overiden when we call reset_task from the outside.
         self.max_step = 400
         self.goal_reward = 20
@@ -99,7 +100,7 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             dict(
                 reward_ctrl=-ctrl_cost,
                 success=success,
-                obs_img=self._get_obs(),
+                obs_img = self._get_img_obs() if self.eval else self._get_obs(),
             ),
         )
 
