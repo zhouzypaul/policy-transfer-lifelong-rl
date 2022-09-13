@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 def plot_reward_curve(csv_dir):
     """
+    this is used to plot for a single agent
     read progress.csv and plot the reward curves, save in the save dir as csv
     """
     csv_path = os.path.join(csv_dir, 'progress.csv')
@@ -22,6 +23,42 @@ def plot_reward_curve(csv_dir):
     plt.ylabel('Episodic Reward')
     save_path = os.path.dirname(csv_path) + '/learning_curve.png'
     plt.savefig(save_path)
+    plt.close()
+
+
+def plot_train_eval_curve(exp_dir, kind='eval'):
+    """
+    plot the eval-curve of ensemble 1 and ensemble 3 and compare
+    """
+    assert kind in ['eval', 'train']
+    keyword = 'eval_ep_reward_mean' if kind == 'eval' else 'ep_reward_mean'
+    rewards = []
+    for agent in os.listdir(exp_dir):
+        if agent not in ['ensemble-1', 'ensemble-3']:
+            continue
+        sub_dir = os.path.join(exp_dir, agent)
+        csv_path = os.path.join(sub_dir, 'progress.csv')
+        assert os.path.exists(csv_path)
+        df = pandas.read_csv(csv_path, comment='#')
+        df = df[['total_steps', keyword]]
+        df['agent'] = agent
+        rewards.append(df)
+    rewards = pandas.concat(rewards, ignore_index=True)
+
+    # plot
+    sns.lineplot(
+        data=rewards,
+        x='total_steps',
+        y=keyword,
+        hue='agent',
+        style='agent'
+    )
+    plt.title(f'{kind} Curve')
+    plt.xlabel('Steps')
+    plt.ylabel('Episodic Reward')
+    save_path = os.path.dirname(exp_dir) + f'/{kind}_curve.png'
+    plt.savefig(save_path)
+    print(f'saved to {save_path}')
     plt.close()
 
 
@@ -111,9 +148,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', '-l', required=True, help='path to the csv file')
     parser.add_argument('--compare', '-c', action='store_true', help='compare all agents in the same dir', default=False)
+    parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
+    parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
     args = parser.parse_args()
     if args.compare:
         plot_all_agents_reward_data(args.load)
         plot_all_agents_generalization_gap(args.load)
+    elif args.evaluation:
+        plot_train_eval_curve(args.load, kind='eval')
+    elif args.train:
+        plot_train_eval_curve(args.load, kind='train')
     else:
         plot_reward_curve(args.load)
