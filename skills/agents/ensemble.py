@@ -329,6 +329,11 @@ class EnsembleAgent(Agent):
         return []
 
     def save(self, save_dir):
+        # save the bandit counts
+        if self._using_leader():
+            np.savetxt(os.path.join(save_dir, 'learner_selection_count.txt'), self.learner_selection_count)
+            np.savetxt(os.path.join(save_dir, 'learner_accumulated_reward.txt'), self.learner_accumulated_reward)
+        # save agent
         path = os.path.join(save_dir, "agent.pkl")
         with lzma.open(path, 'wb') as f:
             dill.dump(self, f)
