@@ -52,15 +52,18 @@ def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_fr
 	"""
 	assert len(embedding) == num_attentions
 	# assert embedding[0][0, :, :, :].shape == (64, 10, 10), embedding[0].shape
+	embedding_mean = [emb.cpu().detach().numpy().mean(axis=(0, 1)) for emb in embedding]
 	for i in range(num_attentions):
 		plt.subplot(2, 4, i+1)
-		plt.imshow(np.mean(embedding[i].cpu().detach().numpy(), axis=(0, 1)))
+		plt.imshow(embedding_mean[i])
 		plt.title("attention {}".format(i))
 	# show/save fig
 	if save_dir is not None:
 		if plot_attention_diversity.calls % plot_freq == 0:
 			path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}.png")
 			plt.savefig(path)
+			data_path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}_data.npy")
+			np.save(data_path, np.array(embedding_mean))
 	else:
 		plt.show()
 	plt.close()
