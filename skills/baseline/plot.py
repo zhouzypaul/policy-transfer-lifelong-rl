@@ -36,13 +36,17 @@ def plot_train_eval_curve(exp_dir, kind='eval'):
     for agent in os.listdir(exp_dir):
         if agent not in ['ensemble-1', 'ensemble-3']:
             continue
-        sub_dir = os.path.join(exp_dir, agent)
-        csv_path = os.path.join(sub_dir, 'progress.csv')
-        assert os.path.exists(csv_path)
-        df = pandas.read_csv(csv_path, comment='#')
-        df = df[['total_steps', keyword]]
-        df['agent'] = agent
-        rewards.append(df)
+        agent_dir = os.path.join(exp_dir, agent)
+        for seed in os.listdir(agent_dir):
+            seed_dir = os.path.join(agent_dir, seed)
+            csv_path = os.path.join(seed_dir, 'progress.csv')
+            assert os.path.exists(csv_path)
+            df = pandas.read_csv(csv_path, comment='#')
+            df = df[['total_steps', keyword]].copy()
+            df['agent'] = agent
+            df['seed'] = int(seed)
+            rewards.append(df)
+
     rewards = pandas.concat(rewards, ignore_index=True)
 
     # plot
@@ -69,26 +73,30 @@ def plot_all_agents_reward_data(exp_dir):
     """
     rewards = []
     for agent in os.listdir(exp_dir):
-        sub_dir = os.path.join(exp_dir, agent)
-        if not os.path.isdir(sub_dir):
+        agent_dir = os.path.join(exp_dir, agent)
+        if not os.path.isdir(agent_dir):
             continue
-        csv_path = os.path.join(sub_dir, 'progress.csv')
-        assert os.path.exists(csv_path)
-        df = pandas.read_csv(csv_path, comment='#')
-        # df = df[df['total_steps'] % 32000 == 0]
+        for seed in os.listdir(agent_dir):
+            seed_dir = os.path.join(agent_dir, seed)
+            csv_path = os.path.join(seed_dir, 'progress.csv')
+            assert os.path.exists(csv_path)
+            df = pandas.read_csv(csv_path, comment='#')
+            # df = df[df['total_steps'] % 32000 == 0]
 
-        eval_df = df[['total_steps', 'eval_ep_reward_mean']].copy()
-        eval_df['agent'] = agent
-        eval_df['kind'] = 'eval'
-        eval_df.rename(columns={'eval_ep_reward_mean': 'reward'}, copy=False, inplace=True)
+            eval_df = df[['total_steps', 'eval_ep_reward_mean']].copy()
+            eval_df['seed'] = int(seed)
+            eval_df['agent'] = agent
+            eval_df['kind'] = 'eval'
+            eval_df.rename(columns={'eval_ep_reward_mean': 'reward'}, copy=False, inplace=True)
 
-        train_df = df[['total_steps', 'ep_reward_mean']].copy()
-        train_df['agent'] = agent
-        train_df['kind'] = 'train'
-        train_df.rename(columns={'ep_reward_mean': 'reward'}, copy=False, inplace=True)
+            train_df = df[['total_steps', 'ep_reward_mean']].copy()
+            train_df['seed'] = int(seed)
+            train_df['agent'] = agent
+            train_df['kind'] = 'train'
+            train_df.rename(columns={'ep_reward_mean': 'reward'}, copy=False, inplace=True)
 
-        new_df = pandas.concat([eval_df, train_df], ignore_index=True)
-        rewards.append(new_df)
+            new_df = pandas.concat([eval_df, train_df], ignore_index=True)
+            rewards.append(new_df)
     rewards = pandas.concat(rewards, ignore_index=True)
 
     # plot
@@ -114,18 +122,21 @@ def plot_all_agents_generalization_gap(exp_dir):
     """
     rewards = []
     for agent in os.listdir(exp_dir):
-        sub_dir = os.path.join(exp_dir, agent)
-        if not os.path.isdir(sub_dir):
+        agent_dir = os.path.join(exp_dir, agent)
+        if not os.path.isdir(agent_dir):
             continue
-        csv_path = os.path.join(sub_dir, 'progress.csv')
-        assert os.path.exists(csv_path)
-        df = pandas.read_csv(csv_path, comment='#')
+        for seed in os.listdir(agent_dir):
+            seed_dir = os.path.join(agent_dir, seed)
+            csv_path = os.path.join(seed_dir, 'progress.csv')
+            assert os.path.exists(csv_path)
+            df = pandas.read_csv(csv_path, comment='#')
 
-        new_df = df[['total_steps']].copy()
-        new_df['agent'] = agent
-        new_df['reward_diff'] = df['ep_reward_mean'] - df['eval_ep_reward_mean']
-        rewards.append(new_df)
-    rewards = pandas.concat(rewards, ignore_index=True)
+            new_df = df[['total_steps']].copy()
+            new_df['seed'] = int(seed)
+            new_df['agent'] = agent
+            new_df['reward_diff'] = df['ep_reward_mean'] - df['eval_ep_reward_mean']
+            rewards.append(new_df)
+        rewards = pandas.concat(rewards, ignore_index=True)
 
     # plot
     sns.lineplot(
@@ -148,11 +159,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', '-l', required=True, help='path to the csv file')
     parser.add_argument('--compare', '-c', action='store_true', help='compare all agents in the same dir', default=False)
+    parser.add_argument('--gap', '-g', action='store_true', help='plot the generalization gap', default=False)
     parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
     parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
     args = parser.parse_args()
     if args.compare:
         plot_all_agents_reward_data(args.load)
+    elif args.gap:
         plot_all_agents_generalization_gap(args.load)
     elif args.evaluation:
         plot_train_eval_curve(args.load, kind='eval')
