@@ -43,6 +43,9 @@ def plot_train_eval_curve(exp_dir, kind='eval'):
             assert os.path.exists(csv_path)
             df = pandas.read_csv(csv_path, comment='#')
             df = df[['total_steps', keyword]].copy()
+            sparsity = 5  # only plot every 4 points
+            df = df[df.total_steps % (sparsity * 800) == 0]
+            df[[keyword]] = df[[keyword]].rolling(20).mean()  # rolling mean to denoise
             df['agent'] = agent
             df['seed'] = int(seed)
             rewards.append(df)
