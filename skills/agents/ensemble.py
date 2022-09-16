@@ -208,7 +208,7 @@ class EnsembleAgent(Agent):
             self.action_leader = np.random.choice(self.num_modules, p=probability)
         elif self.action_selection_strategy == 'ucb_leader':
             # choose a leader based on the Upper Condfience Bound algorithm 
-            self.action_leader = upper_confidence_bound(values=self.learner_accumulated_reward, t=self.step_number, visitation_count=self.learner_selection_count, c=100)
+            self.action_leader = upper_confidence_bound(values=self.learner_accumulated_reward, t=self.step_number, visitation_count=self.learner_selection_count, c=500)
             self.learner_selection_count[self.action_leader] += 1
 
     def update_attention(self, experiences, compute_loss_only=False, errors_out=None):
