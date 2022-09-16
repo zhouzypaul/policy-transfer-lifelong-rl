@@ -148,7 +148,7 @@ class EnsembleAgent(Agent):
             # self.replay_updater.update_if_necessary(self.step_number)
 
         # action leader
-        self.learner_accumulated_reward[self.action_leader] += batch_reward.sum()
+        self.learner_accumulated_reward[self.action_leader] += batch_reward.clip(0, 1).sum()
         if batch_reset.any() or batch_done.any():
             self.episode_number += np.logical_or(batch_reset, batch_done).sum()
             self._set_action_leader()
