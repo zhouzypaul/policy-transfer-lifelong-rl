@@ -34,7 +34,8 @@ class EnsembleAgent(Agent):
                 update_interval=4,
                 discount_rate=0.9,
                 num_modules=8, 
-                embedding_plot_freq=10000,):
+                embedding_plot_freq=10000,
+                bandit_exploration_weight=500):
         # vars
         self.device = device
         self.batch_size = batch_size
@@ -52,6 +53,7 @@ class EnsembleAgent(Agent):
             self.learner_selection_count = np.ones(self.num_modules)  # laplace smoothing
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
+        self.bandit_exploration_weight = bandit_exploration_weight
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
@@ -208,7 +210,12 @@ class EnsembleAgent(Agent):
             self.action_leader = np.random.choice(self.num_modules, p=probability)
         elif self.action_selection_strategy == 'ucb_leader':
             # choose a leader based on the Upper Condfience Bound algorithm 
-            self.action_leader = upper_confidence_bound(values=self.learner_accumulated_reward, t=self.step_number, visitation_count=self.learner_selection_count, c=500)
+            self.action_leader = upper_confidence_bound(
+                values=self.learner_accumulated_reward, 
+                t=self.step_number, 
+                visitation_count=self.learner_selection_count, 
+                c=self.bandit_exploration_weight
+            )
             self.learner_selection_count[self.action_leader] += 1
 
     def update_attention(self, experiences, compute_loss_only=False, errors_out=None):
@@ -337,11 +344,27 @@ class EnsembleAgent(Agent):
         path = os.path.join(save_dir, "agent.pkl")
         with lzma.open(path, 'wb') as f:
             dill.dump(self, f)
+    
+    def _reset_learner_stats(self):
+        # note that this does NOT reset self.step_number
+        assert self._using_leader()
+        self.learner_selection_count = np.ones_like(self.num_learners)
+        self.learner_accumulated_reward = np.ones_like(self.num_learners)
+
+    def _reset_step_number(self):
+        self.step_number = 0
+    
+    def reset(self):
+        self._reset_step_number()
+        self._reset_learner_stats()
 
     @classmethod
-    def load(cls, load_path, plot_dir=None):
+    def load(cls, load_path, reset=False, plot_dir=None):
         with lzma.open(load_path, 'rb') as f:
             agent = dill.load(f)
         # hack to change the plot_dir of the agent
         agent.value_ensemble.embedding.plot_dir = plot_dir
+        # reset if needed
+        if reset:
+            agent.reset()
         return agent
