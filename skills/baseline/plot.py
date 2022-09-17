@@ -5,6 +5,83 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
+def plot_transfer_exp_training_curve_across_levels(exp_dir):
+    """
+    x-axis: steps in each level
+    y-axis: reward, averaged across different levels
+    """
+    rewards = []
+    for agent in os.listdir(exp_dir):
+        agent_dir = os.path.join(exp_dir, agent)
+        for seed in os.listdir(agent_dir):
+            seed_dir = os.path.join(agent_dir, seed)
+            csv_path = os.path.join(seed_dir, 'progress.csv')
+            assert os.path.exists(csv_path)
+            df = pandas.read_csv(csv_path, comment='#')
+            df = df[['level_total_steps', 'level_index', 'ep_reward_mean']].copy()
+            df['agent'] = agent
+            df['seed'] = int(seed)
+            rewards.append(df)
+    rewards = pandas.concat(rewards, ignore_index=True)
+    # average across different level_index
+    rewards = rewards.groupby(['level_total_steps', 'agent', 'seed']).mean().reset_index()
+
+    # plot
+    sns.lineplot(
+        data=rewards,
+        x='level_total_steps',
+        y='ep_reward_mean',
+        hue='agent',
+        style='agent',
+    )
+    plt.title('Training Curve Averaged Across Levels')
+    plt.xlabel('Steps')
+    plt.ylabel('Episodic Reward')
+    save_path = os.path.dirname(exp_dir) + '/training_curve.png'
+    plt.savefig(save_path)
+    print(f'saved to {save_path}')
+    plt.close()
+
+
+def plot_transfer_exp_eval_curve(exp_dir):
+    """
+    x-axis: levels
+    y-axis: eval reward at that level, averaged across the last few timesteps
+    """
+    rewards = []
+    for agent in os.listdir(exp_dir):
+        agent_dir = os.path.join(exp_dir, agent)
+        for seed in os.listdir(agent_dir):
+            seed_dir = os.path.join(agent_dir, seed)
+            csv_path = os.path.join(seed_dir, 'progress.csv')
+            assert os.path.exists(csv_path)
+            df = pandas.read_csv(csv_path, comment='#')
+            df = df[['level_total_steps', 'eval_ep_reward_mean', 'level_index']].copy()
+            # only keep the last few timesteps, and mean across them
+            df = df.sort_values(by='level_total_steps', ascending=False).head(20).groupby('level_index').mean().reset_index()
+            df['agent'] = agent
+            df['seed'] = int(seed)
+            rewards.append(df)
+    rewards = pandas.concat(rewards, ignore_index=True)
+
+    # plot
+    sns.lineplot(
+        data=rewards,
+        x='level_index',
+        y='eval_ep_reward_mean',
+        hue='agent',
+        style='agent',
+    )
+    plt.title('Eval Reward at Each Level')
+    plt.xlabel('Level')
+    plt.ylabel('Eval Reward (averaged over last 20 steps at that level)')
+    plt.xticks(range(len(rewards['level_index'].unique())))
+    save_path = os.path.dirname(exp_dir) + '/eval_curve.png'
+    plt.savefig(save_path)
+    print(f'saved to {save_path}')
+    plt.close()
+
+
 def plot_reward_curve(csv_dir):
     """
     this is used to plot for a single agent
@@ -165,6 +242,7 @@ if __name__ == "__main__":
     parser.add_argument('--gap', '-g', action='store_true', help='plot the generalization gap', default=False)
     parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
     parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
+    parser.add_argument('--transfer', '-f', action='store_true', help='plot the transfer curve', default=False)
     args = parser.parse_args()
     if args.compare:
         plot_all_agents_reward_data(args.load)
@@ -174,5 +252,8 @@ if __name__ == "__main__":
         plot_train_eval_curve(args.load, kind='eval')
     elif args.train:
         plot_train_eval_curve(args.load, kind='train')
+    elif args.transfer:
+        plot_transfer_exp_eval_curve(args.load)
+        plot_transfer_exp_training_curve_across_levels(args.load)
     else:
         plot_reward_curve(args.load)
