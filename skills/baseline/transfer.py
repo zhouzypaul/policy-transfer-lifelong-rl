@@ -11,25 +11,17 @@ from pathlib import Path
 from collections import deque
 
 import torch
-import torch.nn as nn
 import numpy as np
 from procgen import ProcgenEnv
-import pfrl
-from pfrl.agents import DoubleDQN
 from pfrl.utils import set_random_seed
-from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
 from skills.ensemble import AttentionEmbedding
 from skills.agents import PPO, EnsembleAgent
-from skills.agents.dqn import SingleSharedBias
-from skills.models.procgen_cnn import ProcgenCNN
 from skills.option_utils import BaseTrial
-from skills.models.impala import ImpalaCNN
 from skills.models.mlp import PPOMLP
 from skills.baseline import logger
 from skills import utils
-from skills.baseline.plot import plot_reward_curve
 
 
 class ProcgenTransferTrial(BaseTrial):
