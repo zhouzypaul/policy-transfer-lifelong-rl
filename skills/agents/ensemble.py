@@ -348,8 +348,8 @@ class EnsembleAgent(Agent):
     def _reset_learner_stats(self):
         # note that this does NOT reset self.step_number
         assert self._using_leader()
-        self.learner_selection_count = np.ones_like(self.num_learners)
-        self.learner_accumulated_reward = np.ones_like(self.num_learners)
+        self.learner_selection_count = np.ones_like(self.learner_selection_count)
+        self.learner_accumulated_reward = np.ones_like(self.learner_accumulated_reward)
 
     def _reset_step_number(self):
         self.step_number = 0
