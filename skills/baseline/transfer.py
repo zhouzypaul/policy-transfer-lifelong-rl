@@ -198,7 +198,6 @@ class ProcgenTransferTrial(BaseTrial):
     def transfer(self):
         for i_level in range(self.params['num_levels']):
             self.train_env = self.make_vector_env(level_index=i_level, eval=False)
-            self.eval_env = self.make_vector_env(level_index=i_level, eval=True)
             train_with_eval(
                 agent=self.agent,
                 train_env=self.train_env,

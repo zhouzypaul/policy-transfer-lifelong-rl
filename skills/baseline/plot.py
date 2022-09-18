@@ -13,6 +13,8 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir):
     rewards = []
     for agent in os.listdir(exp_dir):
         agent_dir = os.path.join(exp_dir, agent)
+        if not os.path.isdir(agent_dir):
+            continue
         for seed in os.listdir(agent_dir):
             seed_dir = os.path.join(agent_dir, seed)
             csv_path = os.path.join(seed_dir, 'progress.csv')
@@ -51,6 +53,8 @@ def plot_transfer_exp_eval_curve(exp_dir):
     rewards = []
     for agent in os.listdir(exp_dir):
         agent_dir = os.path.join(exp_dir, agent)
+        if not os.path.isdir(agent_dir):
+            continue
         for seed in os.listdir(agent_dir):
             seed_dir = os.path.join(agent_dir, seed)
             csv_path = os.path.join(seed_dir, 'progress.csv')
@@ -72,9 +76,9 @@ def plot_transfer_exp_eval_curve(exp_dir):
         hue='agent',
         style='agent',
     )
-    plt.title('Eval Reward at Each Level')
+    plt.title('Eval Reward after Trained on Level 1 - k')
     plt.xlabel('Level')
-    plt.ylabel('Eval Reward (averaged over last 20 steps at that level)')
+    plt.ylabel('Eval Reward (averaged over last 20 steps at level k)')
     plt.xticks(range(len(rewards['level_index'].unique())))
     save_path = os.path.dirname(exp_dir) + '/eval_curve.png'
     plt.savefig(save_path)
