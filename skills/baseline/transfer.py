@@ -44,6 +44,7 @@ class ProcgenTransferTrial(BaseTrial):
 
         # training
         parser.add_argument('--transfer_steps', type=int, default=100_000)
+        parser.add_argument('--bandit_exploration_weight', type=float, default=500)
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
@@ -145,7 +146,7 @@ class ProcgenTransferTrial(BaseTrial):
             discount_rate=self.params['gamma'],
             num_modules=self.params['num_policies'],
             embedding_plot_freq=self.params['embedding_plot_freq'],
-            bandit_exploration_weight=500,
+            bandit_exploration_weight=self.params['bandit_exploration_weight'],
         )
         return agent
     
