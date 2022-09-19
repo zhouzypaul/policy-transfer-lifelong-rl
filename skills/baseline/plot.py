@@ -61,7 +61,7 @@ def plot_transfer_exp_eval_curve(exp_dir):
             assert os.path.exists(csv_path)
             df = pandas.read_csv(csv_path, comment='#')
             df = df[['level_total_steps', 'eval_ep_reward_mean', 'level_index']].copy()
-            df = df.groupby('level_index').tail(20)  # only keep the last 20 timesteps
+            df = df.groupby('level_index').tail(100)  # only keep the last 20 timesteps
             df = df.groupby('level_index').mean().reset_index()  # and mean across those timesteps
             df['agent'] = agent
             df['seed'] = int(seed)
