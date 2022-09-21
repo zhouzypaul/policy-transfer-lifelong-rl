@@ -54,7 +54,9 @@ class ProcgenTransferTrial(BaseTrial):
                             help='distribution mode of procgen')
         parser.add_argument('--num_envs', type=int, default=8,
                             help='number of environments to run in parallel')
-        parser.add_argument('--num_levels', type=int, default=10,
+        parser.add_argument('--start_level', type=int, default=0,
+                            help='start level of the procgen environment')
+        parser.add_argument('--num_levels', type=int, default=20,
                             help='number of different levels to generate during training')
         
         # agent
@@ -189,7 +191,7 @@ class ProcgenTransferTrial(BaseTrial):
         self.agent = self.make_agent(self.train_env)
     
     def transfer(self):
-        for i_level in range(self.params['num_levels']):
+        for i_level in range(self.params['start_level'], self.params['start_level'] + self.params['num_levels']):
             self.train_env = self.make_vector_env(level_index=i_level, eval=False)
             train_with_eval(
                 agent=self.agent,
@@ -198,7 +200,7 @@ class ProcgenTransferTrial(BaseTrial):
                 num_envs=self.params['num_envs'],
                 max_steps=self.params['transfer_steps'],
                 level_index=i_level,
-                steps_offset=i_level * self.params['transfer_steps'],
+                steps_offset=(i_level-self.params['start_level']) * self.params['transfer_steps'],
                 log_interval=100,
             )
             # reset the agent
