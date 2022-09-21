@@ -36,7 +36,7 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir):
         hue='agent',
         style='agent',
     )
-    plt.title('Training Curve Averaged Across Levels')
+    plt.title(f'Training Curve Averaged Across Levels :{exp_dir}')
     plt.xlabel('Steps')
     plt.ylabel('Episodic Reward')
     save_path = os.path.dirname(exp_dir) + '/training_curve.png'
@@ -76,7 +76,7 @@ def plot_transfer_exp_eval_curve(exp_dir):
         hue='agent',
         style='agent',
     )
-    plt.title('Eval Reward after Trained on Level 1 - k')
+    plt.title(f'Eval Reward after Trained on Level 1 - k: {exp_dir}')
     plt.xlabel('Level')
     plt.ylabel('Eval Reward (averaged over last 20 steps at level k)')
     plt.xticks(range(len(rewards['level_index'].unique())))
