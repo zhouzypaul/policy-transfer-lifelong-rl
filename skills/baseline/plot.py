@@ -5,46 +5,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def plot_transfer_exp_training_curve_unrolled(exp_dir):
-    """
-    x-axis: steps in total
-    y-axis: reward
-    """
-    rewards = []
-    for agent in os.listdir(exp_dir):
-        agent_dir = os.path.join(exp_dir, agent)
-        if not os.path.isdir(agent_dir):
-            continue
-        for seed in os.listdir(agent_dir):
-            # if seed not in ['0']:
-            #     continue
-            seed_dir = os.path.join(agent_dir, seed)
-            csv_path = os.path.join(seed_dir, 'progress.csv')
-            assert os.path.exists(csv_path)
-            df = pandas.read_csv(csv_path, comment='#')
-            df = df[['ep_reward_mean', 'total_steps']].copy()
-            df['agent'] = agent
-            df['seed'] = int(seed)
-            rewards.append(df)
-    rewards = pandas.concat(rewards, ignore_index=True)
-
-    # plot
-    sns.lineplot(
-        data=rewards,
-        x='total_steps',
-        y='ep_reward_mean',
-        hue='agent',
-        style='agent',
-    )
-    plt.title(f'Training Curve Averaged Across Levels :{exp_dir}')
-    plt.xlabel('Total Steps')
-    plt.ylabel('Episodic Reward')
-    save_path = os.path.dirname(exp_dir) + '/unrolled_training_curve.png'
-    plt.savefig(save_path)
-    print(f'saved to {save_path}')
-    plt.close()
-
-
 def plot_transfer_exp_training_curve_across_levels(exp_dir):
     """
     x-axis: steps in each level
@@ -65,12 +25,14 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir):
             df['seed'] = int(seed)
             rewards.append(df)
     rewards = pandas.concat(rewards, ignore_index=True)
+    max_nan_step = rewards.loc[rewards.isna().any(axis=1)]['level_total_steps'].max()
+    subset = rewards.query(f"level_total_steps > {max_nan_step}")
     # average across different level_index
-    rewards = rewards.groupby(['level_total_steps', 'agent', 'seed']).mean().reset_index()
+    rewards_mean = subset.groupby(['level_total_steps', 'agent', 'seed']).mean().reset_index()
 
     # plot
     sns.lineplot(
-        data=rewards,
+        data=rewards_mean,
         x='level_total_steps',
         y='ep_reward_mean',
         hue='agent',
@@ -133,6 +95,11 @@ def plot_reward_curve(csv_dir):
     """
     csv_path = os.path.join(csv_dir, 'progress.csv')
     df = pandas.read_csv(csv_path, comment='#')
+
+    # get rid of the NaN data points
+    max_nan_step = df.loc[df.isna().any(axis=1)]['level_total_steps'].max()
+    df = df.query(f"level_total_steps > {max_nan_step}")
+
     steps = df['total_steps']
     train_reward = df['ep_reward_mean']
     eval_reward = df['eval_ep_reward_mean']
@@ -162,7 +129,12 @@ def plot_train_eval_curve(exp_dir, kind='eval'):
             seed_dir = os.path.join(agent_dir, seed)
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
+            
             df = pandas.read_csv(csv_path, comment='#')
+            # get rid of the NaN data points
+            max_nan_step = df.loc[df.isna().any(axis=1)]['level_total_steps'].max()
+            df = df.query(f"level_total_steps > {max_nan_step}")
+
             df = df[['total_steps', keyword]].copy()
             sparsity = 5  # only plot every 4 points
             df = df[df.total_steps % (sparsity * 800) == 0]
@@ -205,6 +177,9 @@ def plot_all_agents_reward_data(exp_dir):
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
             df = pandas.read_csv(csv_path, comment='#')
+            # get rid of the NaN data points
+            max_nan_step = df.loc[df.isna().any(axis=1)]['level_total_steps'].max()
+            df = df.query(f"level_total_steps > {max_nan_step}")
             # df = df[df['total_steps'] % 32000 == 0]
 
             eval_df = df[['total_steps', 'eval_ep_reward_mean']].copy()
@@ -254,6 +229,9 @@ def plot_all_agents_generalization_gap(exp_dir):
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
             df = pandas.read_csv(csv_path, comment='#')
+            # get rid of the NaN data points
+            max_nan_step = df.loc[df.isna().any(axis=1)]['level_total_steps'].max()
+            df = df.query(f"level_total_steps > {max_nan_step}")
 
             new_df = df[['total_steps']].copy()
             new_df['seed'] = int(seed)
@@ -287,7 +265,6 @@ if __name__ == "__main__":
     parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
     parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
     parser.add_argument('--transfer', '-f', action='store_true', help='plot the transfer curve', default=False)
-    parser.add_argument('--unrolled', '-u', action='store_true', help='plot the unrolled curve', default=False)
     args = parser.parse_args()
     if args.compare:
         plot_all_agents_reward_data(args.load)
@@ -300,7 +277,5 @@ if __name__ == "__main__":
     elif args.transfer:
         plot_transfer_exp_eval_curve(args.load)
         plot_transfer_exp_training_curve_across_levels(args.load)
-    elif args.unrolled:
-        plot_transfer_exp_training_curve_unrolled(args.load)
     else:
         plot_reward_curve(args.load)
