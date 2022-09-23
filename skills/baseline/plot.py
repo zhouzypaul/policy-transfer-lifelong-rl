@@ -5,6 +5,46 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 
+def plot_transfer_exp_training_curve_unrolled(exp_dir):
+    """
+    x-axis: steps in total
+    y-axis: reward
+    """
+    rewards = []
+    for agent in os.listdir(exp_dir):
+        agent_dir = os.path.join(exp_dir, agent)
+        if not os.path.isdir(agent_dir):
+            continue
+        for seed in os.listdir(agent_dir):
+            # if seed not in ['0']:
+            #     continue
+            seed_dir = os.path.join(agent_dir, seed)
+            csv_path = os.path.join(seed_dir, 'progress.csv')
+            assert os.path.exists(csv_path)
+            df = pandas.read_csv(csv_path, comment='#')
+            df = df[['ep_reward_mean', 'total_steps']].copy()
+            df['agent'] = agent
+            df['seed'] = int(seed)
+            rewards.append(df)
+    rewards = pandas.concat(rewards, ignore_index=True)
+
+    # plot
+    sns.lineplot(
+        data=rewards,
+        x='total_steps',
+        y='ep_reward_mean',
+        hue='agent',
+        style='agent',
+    )
+    plt.title(f'Training Curve Averaged Across Levels :{exp_dir}')
+    plt.xlabel('Total Steps')
+    plt.ylabel('Episodic Reward')
+    save_path = os.path.dirname(exp_dir) + '/unrolled_training_curve.png'
+    plt.savefig(save_path)
+    print(f'saved to {save_path}')
+    plt.close()
+
+
 def plot_transfer_exp_training_curve_across_levels(exp_dir):
     """
     x-axis: steps in each level
@@ -247,6 +287,7 @@ if __name__ == "__main__":
     parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
     parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
     parser.add_argument('--transfer', '-f', action='store_true', help='plot the transfer curve', default=False)
+    parser.add_argument('--unrolled', '-u', action='store_true', help='plot the unrolled curve', default=False)
     args = parser.parse_args()
     if args.compare:
         plot_all_agents_reward_data(args.load)
@@ -259,5 +300,7 @@ if __name__ == "__main__":
     elif args.transfer:
         plot_transfer_exp_eval_curve(args.load)
         plot_transfer_exp_training_curve_across_levels(args.load)
+    elif args.unrolled:
+        plot_transfer_exp_training_curve_unrolled(args.load)
     else:
         plot_reward_curve(args.load)
