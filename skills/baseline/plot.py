@@ -20,6 +20,7 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir):
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
             df = pandas.read_csv(csv_path, comment='#')
+            assert df['total_steps'].max() == 10_000_000, "total steps is not complete (20 * 500k)"  # check that csv is complete
             df = df[['level_total_steps', 'level_index', 'ep_reward_mean']].copy()
             df['agent'] = agent
             df['seed'] = int(seed)
