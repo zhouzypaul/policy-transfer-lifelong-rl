@@ -70,20 +70,25 @@ def plot_attention_mask_with_original_obs(obs_path, attention_mask_path, save_di
 	"""
 	attention_mask = np.load(attention_mask_path)
 	assert len(attention_mask) == 3
-	# plot original obs
-	original_obs = np.load(obs_path)
-	plt.subplot(2, 2, 1)
-	plt.imshow(original_obs)
-	plt.title('Game screen')
-	# plot the attention masks
-	for i in range(3):
-		plt.subplot(2, 2, i+2)
-		plt.imshow(attention_mask[i])
-		plt.title(f"Attention mask {i}")
-		# plt.colorbar()
+	fig, axes = plt.subplots(nrows=2, ncols=2)
+
+	for i, ax in enumerate(axes.flat):
+		if i == 0:
+			# plot original obs
+			original_obs = np.load(obs_path)
+			ax.imshow(original_obs)
+			ax.set_title('Game screen')
+		else:
+			# plot the attention masks
+			im = ax.imshow(attention_mask[i-1])
+			ax.set_title(f"Attention mask {i}")
+
+	fig.subplots_adjust(right=0.8, hspace=0.3)
+	cbar_ax = fig.add_axes([0.85, 0.15, 0.03, 0.7])
+	fig.colorbar(im, cax=cbar_ax)
+
 	# save fig
 	path = os.path.join(save_dir, 'attention_mask.png')
-	plt.tight_layout()
 	plt.savefig(path)
 
 
