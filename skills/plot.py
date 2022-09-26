@@ -115,6 +115,8 @@ def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_fr
 		plt.show()
 	plt.close()
 
+	if plot_attention_diversity.calls == 393:
+		return True
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

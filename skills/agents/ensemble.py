@@ -163,7 +163,12 @@ class EnsembleAgent(Agent):
 
     def _attention_embed_obs(self, batch_obs):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
-        embedded_obs = self.attention_model(obs)
+        try:
+            embedded_obs = self.attention_model(obs)
+        except RuntimeError:
+            print('ran into exception')
+            self.save('results/coinrun-visualization')
+            exit(0)
         embedded_obs = [emb.cpu() for emb in embedded_obs]
         return embedded_obs
     
@@ -256,7 +261,12 @@ class EnsembleAgent(Agent):
             # compute loss
             self.attention_model.train()
             batch_states = exp_batch["state"]
-            state_embeddings = self.attention_model(batch_states, plot=(self.n_updates % self.embedding_plot_freq == 0))  # num_modules x (batch_size, C, H, W)
+            try:
+                state_embeddings = self.attention_model(batch_states, plot=(self.n_updates % self.embedding_plot_freq == 0))  # num_modules x (batch_size, C, H, W)
+            except RuntimeError:
+                print('ran into exception')
+                self.save('results/coinrun-visualization')
+                exit(0)
             state_embedding_flatten = torch.cat([embedding.unsqueeze(1) for embedding in state_embeddings], dim=1)  # (batch_size, num_modules, C, H, W)
             state_embedding_flatten = state_embedding_flatten.view(self.batch_size, self.num_modules, -1)  # (batch_size, num_modules, d)
             div_loss = batched_L_divergence(state_embedding_flatten)
@@ -340,6 +350,10 @@ class EnsembleAgent(Agent):
         if self._using_leader():
             np.savetxt(os.path.join(save_dir, 'learner_selection_count.txt'), self.learner_selection_count)
             np.savetxt(os.path.join(save_dir, 'learner_accumulated_reward.txt'), self.learner_accumulated_reward)
+            np.savetxt(os.path.join(save_dir, 'timestep.txt'), np.array([self.step_number]))
+            # compute bandit model
+            bandit_values = self.learner_accumulated_reward + self.bandit_exploration_weight * np.sqrt(2 * np.log(self.step_number) / self.learner_selection_count)
+            np.savetxt(os.path.join(save_dir, 'bandit_values.txt'), bandit_values)
         # save agent
         path = os.path.join(save_dir, "agent.pkl")
         with lzma.open(path, 'wb') as f:
