@@ -256,7 +256,14 @@ class EnsembleAgent(Agent):
             # compute loss
             self.attention_model.train()
             batch_states = exp_batch["state"]
-            state_embeddings = self.attention_model(batch_states, plot=(self.n_updates % self.embedding_plot_freq == 0))  # num_modules x (batch_size, C, H, W)
+            state_embeddings = self.attention_model(
+                batch_states, 
+                plot=(self.n_updates % self.embedding_plot_freq == 0),
+                value=self.learner_accumulated_reward,
+                count=self.learner_selection_count,
+                step=self.step_number,
+                weight=self.bandit_exploration_weight,
+            )  # num_modules x (batch_size, C, H, W)
             state_embedding_flatten = torch.cat([embedding.unsqueeze(1) for embedding in state_embeddings], dim=1)  # (batch_size, num_modules, C, H, W)
             state_embedding_flatten = state_embedding_flatten.view(self.batch_size, self.num_modules, -1)  # (batch_size, num_modules, d)
             div_loss = batched_L_divergence(state_embedding_flatten)

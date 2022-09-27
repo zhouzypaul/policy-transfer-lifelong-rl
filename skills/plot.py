@@ -93,7 +93,16 @@ def plot_attention_mask_with_original_obs(obs_path, attention_mask_path, save_di
 
 
 @count
-def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_freq=1):
+def plot_attention_diversity(
+	embedding, 
+	num_attentions=8, 
+	save_dir=None, 
+	plot_freq=1,
+	value=None,
+	count=None,
+	step=None,
+	weight=None,
+):
 	"""
 	visualize whether embedding of each attention is getting more and more diverse
 	"""
@@ -111,6 +120,13 @@ def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_fr
 			plt.savefig(path)
 			data_path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}_data.npy")
 			np.save(data_path, np.array(embedding_mean))
+			value_path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}_reward_values.txt")
+			np.savetxt(value_path, value)
+			count_path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}_count.txt")
+			np.savetxt(count_path, count)
+			bandit_values = value + weight * np.sqrt(2 * np.log(step) / count)
+			bandit_path = os.path.join(save_dir, f"attention_diversity_{plot_attention_diversity.calls}_bandit_values.txt")
+			np.savetxt(bandit_path, bandit_values)
 	else:
 		plt.show()
 	plt.close()

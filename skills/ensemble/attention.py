@@ -102,7 +102,15 @@ class AttentionEmbedding(nn.Module):
         x = F.normalize(x)
         return x
 
-    def forward(self, x, return_attention_mask=False, plot=False):
+    def forward(self, 
+                x, 
+                return_attention_mask=False, 
+                plot=False,
+                value=None,
+                count=None,
+                step=None,
+                weight=None,
+    ):
         spacial_features = self.spatial_feature_extractor(x)
         attentions = [self.attention_modules[i](spacial_features) for i in range(self.num_attention_modules)]
 
@@ -116,7 +124,15 @@ class AttentionEmbedding(nn.Module):
 
         global_features = [self.global_feature_extractor(attentions[i] * spacial_features) for i in range(self.num_attention_modules)]
         if plot:
-            plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
+            plot_attention_diversity(
+                global_features, 
+                self.num_attention_modules, 
+                save_dir=self.plot_dir,
+                value=value,
+                count=count,
+                step=step,
+                weight=weight,
+            )
 
         # normalize attention to between [0, 1]
         for i in range(self.num_attention_modules):
