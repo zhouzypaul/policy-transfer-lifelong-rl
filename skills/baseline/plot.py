@@ -18,8 +18,8 @@ def plot_eight_procgen_games(results_dir):
     plot the eight procgen games in one big plot
     """
     games = ['bigfish', 'coinrun', 'dodgeball', 'heist', 'jumper', 'leaper', 'maze', 'ninja']
-    nrows = 2
-    ncols = 4
+    nrows = 4
+    ncols = 2
     figsize = (22, 12)
     if ncols == 2:
         figsize = (17, 20)
@@ -48,7 +48,8 @@ def plot_eight_procgen_games(results_dir):
         axes[i // ncols, i % ncols].set_xlabel('Steps', fontsize=20)
         # ticks
         axes[i // ncols, i % ncols].tick_params(axis='y', which='major', labelsize=15)
-        # axes[i // ncols, i % ncols].tick_params(axis='x', which='major', labelsize=10)
+        if ncols == 2:
+            axes[i // ncols, i % ncols].tick_params(axis='x', which='major', labelsize=15)
         # shared legend
         axes[i // ncols, i % ncols].legend().remove()
         if i == ncols * nrows - 1:
@@ -56,7 +57,10 @@ def plot_eight_procgen_games(results_dir):
             fig.legend(handles, labels, loc='lower center', ncol=4, prop={'size': 22})
     
     # adjustments
-    plt.subplots_adjust(wspace=0.2, hspace=0.2, right=0.96, left=0.07, bottom=0.13, top=0.90)
+    if ncols == 4:
+        plt.subplots_adjust(wspace=0.2, hspace=0.2, right=0.96, left=0.07, bottom=0.13, top=0.90)
+    elif ncols == 2:
+        plt.subplots_adjust(wspace=0.2, hspace=0.25, right=0.96, left=0.07, bottom=0.08, top=0.92)
     fig.suptitle('Training Curve Averaged Across Levels', fontsize=25)
 
     # save
@@ -78,8 +82,6 @@ def process_training_curve_csv_file(exp_dir):
         if not os.path.isdir(agent_dir):
             continue
         for seed in os.listdir(agent_dir):
-            if seed != '0':
-                continue
             seed_dir = os.path.join(agent_dir, seed)
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
