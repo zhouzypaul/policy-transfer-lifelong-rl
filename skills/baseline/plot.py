@@ -1,5 +1,6 @@
 import os
 import pickle
+from tkinter import font
 
 import pandas
 import seaborn as sns
@@ -18,7 +19,7 @@ def plot_eight_procgen_games(results_dir):
     plot the eight procgen games in one big plot
     """
     games = ['bigfish', 'coinrun', 'dodgeball', 'heist', 'jumper', 'leaper', 'maze', 'ninja']
-    fig, axes = plt.subplots(2, 4, sharex=True)
+    fig, axes = plt.subplots(2, 4, sharex=True, figsize=(20, 10))
     for i, game in enumerate(games):
         experiment_dir = os.path.join(results_dir, game)
         # get data
@@ -33,26 +34,28 @@ def plot_eight_procgen_games(results_dir):
             style='agent',
         )
         # title 
-        axes[i // 4, i % 4].set_title(pretty_title(game))
+        axes[i // 4, i % 4].set_title(pretty_title(game), fontsize=15)
         # ylabel
         if i % 4 == 0:
-            axes[i // 4, i % 4].set_ylabel('Episodic Reward')
+            axes[i // 4, i % 4].set_ylabel('Episodic Reward', fontsize=15)
         else:
             axes[i // 4, i % 4].set_ylabel('')
         # xlabel
-        axes[i // 4, i % 4].set_xlabel('Steps')
+        axes[i // 4, i % 4].set_xlabel('Steps', fontsize=15)
         # shared legend
         axes[i // 4, i % 4].legend().remove()
         if i == 7:
             handles, labels = axes[i // 4, i % 4].get_legend_handles_labels()
-            fig.legend(handles, labels, loc='lower center', ncol=4)
-            plt.subplots_adjust(bottom=0.15)
+            fig.legend(handles, labels, loc='lower center', ncol=4, prop={'size': 15})
+    
+    # adjustments
+    plt.subplots_adjust(wspace=0.2, hspace=0.2, right=0.95, left=0.05, bottom=0.12, top=0.95)
 
     # save
     save_path = os.path.join(results_dir, 'procgen_results.png')
     fig.savefig(save_path)
     with open(os.path.join(results_dir, 'procgen_results.pkl'), 'wb') as f:
-        pickle.dump(fig, f)
+        pickle.dump((fig, axes), f)
     print(f'saved to {save_path}')
 
 
