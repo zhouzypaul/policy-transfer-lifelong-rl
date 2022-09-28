@@ -1,13 +1,12 @@
 import os
 import pickle
-from tkinter import font
 
 import pandas
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def pretty_title(game_name):
+def first_char_upper(game_name):
     """
     make the first letter upper case
     """
@@ -19,14 +18,19 @@ def plot_eight_procgen_games(results_dir):
     plot the eight procgen games in one big plot
     """
     games = ['bigfish', 'coinrun', 'dodgeball', 'heist', 'jumper', 'leaper', 'maze', 'ninja']
-    fig, axes = plt.subplots(2, 4, sharex=True, figsize=(20, 10))
+    nrows = 2
+    ncols = 4
+    figsize = (22, 12)
+    if ncols == 2:
+        figsize = (17, 20)
+    fig, axes = plt.subplots(nrows, ncols, sharex=True, figsize=figsize)
     for i, game in enumerate(games):
         experiment_dir = os.path.join(results_dir, game)
         # get data
         rewards_mean = process_training_curve_csv_file(experiment_dir)
         # plot
         sns.lineplot(
-            ax=axes[i // 4, i % 4],
+            ax=axes[i // ncols, i % ncols],
             data=rewards_mean,
             x='level_total_steps',
             y='ep_reward_mean',
@@ -34,22 +38,26 @@ def plot_eight_procgen_games(results_dir):
             style='agent',
         )
         # title 
-        axes[i // 4, i % 4].set_title(pretty_title(game), fontsize=15)
+        axes[i // ncols, i % ncols].set_title(first_char_upper(game), fontsize=22)
         # ylabel
-        if i % 4 == 0:
-            axes[i // 4, i % 4].set_ylabel('Episodic Reward', fontsize=15)
+        if i % ncols == 0:
+            axes[i // ncols, i % ncols].set_ylabel('Episodic Reward', fontsize=20)
         else:
-            axes[i // 4, i % 4].set_ylabel('')
+            axes[i // ncols, i % ncols].set_ylabel('')
         # xlabel
-        axes[i // 4, i % 4].set_xlabel('Steps', fontsize=15)
+        axes[i // ncols, i % ncols].set_xlabel('Steps', fontsize=20)
+        # ticks
+        axes[i // ncols, i % ncols].tick_params(axis='y', which='major', labelsize=15)
+        # axes[i // ncols, i % ncols].tick_params(axis='x', which='major', labelsize=10)
         # shared legend
-        axes[i // 4, i % 4].legend().remove()
-        if i == 7:
-            handles, labels = axes[i // 4, i % 4].get_legend_handles_labels()
-            fig.legend(handles, labels, loc='lower center', ncol=4, prop={'size': 15})
+        axes[i // ncols, i % ncols].legend().remove()
+        if i == ncols * nrows - 1:
+            handles, labels = axes[i // ncols, i % ncols].get_legend_handles_labels()
+            fig.legend(handles, labels, loc='lower center', ncol=4, prop={'size': 22})
     
     # adjustments
-    plt.subplots_adjust(wspace=0.2, hspace=0.2, right=0.95, left=0.05, bottom=0.12, top=0.95)
+    plt.subplots_adjust(wspace=0.2, hspace=0.2, right=0.96, left=0.07, bottom=0.13, top=0.90)
+    fig.suptitle('Training Curve Averaged Across Levels', fontsize=25)
 
     # save
     save_path = os.path.join(results_dir, 'procgen_results.png')
@@ -70,13 +78,15 @@ def process_training_curve_csv_file(exp_dir):
         if not os.path.isdir(agent_dir):
             continue
         for seed in os.listdir(agent_dir):
+            if seed != '0':
+                continue
             seed_dir = os.path.join(agent_dir, seed)
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
             df = pandas.read_csv(csv_path, comment='#')
             assert df['total_steps'].max() == 10_000_000, "total steps is not complete (20 * 500k)"  # check that csv is complete
             df = df[['level_total_steps', 'level_index', 'ep_reward_mean']].copy()
-            df['agent'] = agent
+            df['agent'] = first_char_upper(agent)
             df['seed'] = int(seed)
             rewards.append(df)
     rewards = pandas.concat(rewards, ignore_index=True)
