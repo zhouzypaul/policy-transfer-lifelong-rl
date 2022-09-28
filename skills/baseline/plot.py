@@ -1,14 +1,65 @@
 import os
+import pickle
 
 import pandas
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 
-def plot_transfer_exp_training_curve_across_levels(exp_dir):
+def pretty_title(game_name):
     """
-    x-axis: steps in each level
-    y-axis: reward, averaged across different levels
+    make the first letter upper case
+    """
+    return game_name[0].upper() + game_name[1:]
+
+
+def plot_eight_procgen_games(results_dir):
+    """
+    plot the eight procgen games in one big plot
+    """
+    games = ['bigfish', 'coinrun', 'dodgeball', 'heist', 'jumper', 'leaper', 'maze', 'ninja']
+    fig, axes = plt.subplots(2, 4, sharex=True)
+    for i, game in enumerate(games):
+        experiment_dir = os.path.join(results_dir, game)
+        # get data
+        rewards_mean = process_training_curve_csv_file(experiment_dir)
+        # plot
+        sns.lineplot(
+            ax=axes[i // 4, i % 4],
+            data=rewards_mean,
+            x='level_total_steps',
+            y='ep_reward_mean',
+            hue='agent',
+            style='agent',
+        )
+        # title 
+        axes[i // 4, i % 4].set_title(pretty_title(game))
+        # ylabel
+        if i % 4 == 0:
+            axes[i // 4, i % 4].set_ylabel('Episodic Reward')
+        else:
+            axes[i // 4, i % 4].set_ylabel('')
+        # xlabel
+        axes[i // 4, i % 4].set_xlabel('Steps')
+        # shared legend
+        axes[i // 4, i % 4].legend().remove()
+        if i == 7:
+            handles, labels = axes[i // 4, i % 4].get_legend_handles_labels()
+            fig.legend(handles, labels, loc='lower center', ncol=4)
+            plt.subplots_adjust(bottom=0.15)
+
+    # save
+    save_path = os.path.join(results_dir, 'procgen_results.png')
+    fig.savefig(save_path)
+    with open(os.path.join(results_dir, 'procgen_results.pkl'), 'wb') as f:
+        pickle.dump(fig, f)
+    print(f'saved to {save_path}')
+
+
+def process_training_curve_csv_file(exp_dir):
+    """
+    read from the progress.csv file and return a dataframe with the relevant information
+    find all the csv files in exp_dir (all seeds, and all agents) and process all
     """
     rewards = []
     for agent in os.listdir(exp_dir):
@@ -31,6 +82,14 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir):
     # average across different level_index
     rewards_mean = subset.groupby(['level_total_steps', 'agent', 'seed']).mean().reset_index()
 
+    return rewards_mean
+
+def plot_transfer_exp_training_curve_across_levels(exp_dir):
+    """
+    x-axis: steps in each level
+    y-axis: reward, averaged across different levels
+    """
+    rewards_mean = process_training_curve_csv_file(exp_dir)
     # plot
     sns.lineplot(
         data=rewards_mean,
@@ -266,6 +325,7 @@ if __name__ == "__main__":
     parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
     parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
     parser.add_argument('--transfer', '-f', action='store_true', help='plot the transfer curve', default=False)
+    parser.add_argument('--procgen', '-p', action='store_true', help='plot the 8 procgen games combined', default=False)
     args = parser.parse_args()
     if args.compare:
         plot_all_agents_reward_data(args.load)
@@ -278,5 +338,7 @@ if __name__ == "__main__":
     elif args.transfer:
         plot_transfer_exp_eval_curve(args.load)
         plot_transfer_exp_training_curve_across_levels(args.load)
+    elif args.procgen:
+        plot_eight_procgen_games(args.load)
     else:
         plot_reward_curve(args.load)
