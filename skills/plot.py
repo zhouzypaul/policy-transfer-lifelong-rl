@@ -70,7 +70,7 @@ def plot_attention_mask_with_original_obs(obs_path, attention_mask_path, save_di
 	"""
 	attention_mask = np.load(attention_mask_path)
 	assert len(attention_mask) == 3
-	fig, axes = plt.subplots(nrows=2, ncols=2)
+	fig, axes = plt.subplots(nrows=1, ncols=4, figsize=(12, 4.3))
 
 	for i, ax in enumerate(axes.flat):
 		if i == 0:
@@ -78,17 +78,27 @@ def plot_attention_mask_with_original_obs(obs_path, attention_mask_path, save_di
 			original_obs = np.load(obs_path)
 			ax.imshow(original_obs)
 			ax.set_title('Game screen')
+			ax.set_xticks([])
+			ax.set_yticks([])
 		else:
 			# plot the attention masks
 			im = ax.imshow(attention_mask[i-1])
 			ax.set_title(f"Attention mask {i}")
+			ax.set_xticks([])
+			ax.set_yticks([])
+	
+	fig.subplots_adjust(right=0.9, left=0.1, bottom=0.2)
+	plt.tight_layout()
+	cbar_ax = fig.add_axes([0.15, 0.1, 0.7, 0.03])
+	fig.colorbar(im, cax=cbar_ax, orientation='horizontal')
 
-	fig.subplots_adjust(right=0.8, hspace=0.3)
-	cbar_ax = fig.add_axes([0.85, 0.15, 0.03, 0.7])
-	fig.colorbar(im, cax=cbar_ax)
+	# fig.subplots_adjust(right=0.8, hspace=0.3)
+	# cbar_ax = fig.add_axes([0.85, 0.15, 0.03, 0.7])
+	# fig.colorbar(im, cax=cbar_ax)
 
 	# save fig
 	path = os.path.join(save_dir, 'attention_mask.png')
+	print(f"Saving attention mask to {path}")
 	plt.savefig(path)
 
 
