@@ -158,6 +158,32 @@ class AntGoalEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         return self._get_obs()
 
+    def render_camera(self):
+        cam = self.render(mode="rgb_array", width=128, height=128, camera_name="track")
+        plt.imshow(cam)
+        plt.pause(0.01)
+    
+    def place_ant(self, pos=None):
+        self._put_curbs()
+        qpos = self.init_qpos
+        # random position if not specified
+        if pos is None:
+            pos = (
+                self.np_random.uniform(-9, 9, size=1),  # x 
+                self.np_random.uniform(-10, 25, size=1)  # y
+            )
+
+        qpos[2] = pos[0]
+        qpos[3] = pos[1]
+        qvel = self.init_qvel
+
+        self.set_state(qpos, qvel)
+
+        # random steps to ensure proper dynamic 
+        for _ in range(8):
+            self.step(self.unwrapped.action_space.sample())
+
+
     def viewer_setup(self):
         self.viewer.cam.distance = self.model.stat.extent * 0.5
 
