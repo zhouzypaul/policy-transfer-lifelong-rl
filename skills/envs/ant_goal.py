@@ -173,14 +173,14 @@ class AntGoalEnv(mujoco_env.MujocoEnv, utils.EzPickle):
                 self.np_random.uniform(-10, 25, size=1)  # y
             )
 
-        qpos[2] = pos[0]
-        qpos[3] = pos[1]
+        qpos[0] = pos[0]
+        qpos[1] = pos[1]
         qvel = self.init_qvel
 
         self.set_state(qpos, qvel)
 
         # random steps to ensure proper dynamic 
-        for _ in range(8):
+        for _ in range(5):
             self.step(self.unwrapped.action_space.sample())
 
 

@@ -149,22 +149,22 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     
     def place_ant(self, pos=None):
         self.put_bridge()
+        self._outside = False
+
         qpos = self.init_qpos
         # random position if not specified
         if pos is None:
             pos = (
                 self.np_random.uniform(-9, 9, size=1),  # x 
-                self.np_random.uniform(-10, 25, size=1)  # y
+                self.np_random.uniform(0, 5, size=1)  # y
             )
+        qpos[0] = pos[0]
+        qpos[1] = pos[1]
 
-        qpos[2] = pos[0]
-        qpos[3] = pos[1]
-        qvel = self.init_qvel
-
-        self.set_state(qpos, qvel)
+        self.set_state(qpos, self.init_qvel)
 
         # random steps to ensure proper dynamic 
-        for _ in range(8):
+        for _ in range(2):
             self.step(self.unwrapped.action_space.sample())
 
     def viewer_setup(self):
