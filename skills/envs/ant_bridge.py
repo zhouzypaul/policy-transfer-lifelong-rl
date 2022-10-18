@@ -146,6 +146,7 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         cam = self.render(mode="rgb_array", width=128, height=128, camera_name="track")
         plt.imshow(cam)
         plt.pause(0.01)
+        return cam
     
     def place_ant(self, pos=None):
         self.put_bridge()
@@ -164,7 +165,7 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.set_state(qpos, self.init_qvel)
 
         # random steps to ensure proper dynamic 
-        for _ in range(2):
+        for _ in range(5):
             self.step(self.unwrapped.action_space.sample())
 
     def viewer_setup(self):

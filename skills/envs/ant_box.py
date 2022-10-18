@@ -202,6 +202,7 @@ class AntBoxEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         cam = self.render(mode="rgb_array", width=128, height=128, camera_name="track")
         plt.imshow(cam)
         plt.pause(0.01)
+        return cam
     
     def place_ant(self, pos=None):
         self.push_box()
