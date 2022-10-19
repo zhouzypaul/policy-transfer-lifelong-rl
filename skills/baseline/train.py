@@ -348,6 +348,7 @@ class ProcgenTrial(BaseTrial):
             model_dir=self.saving_dir,
             model_file=self.params['load'],
             log_interval=100,
+            save_interval=self.params['save_interval'],
         )
         plot_reward_curve(self.saving_dir)
 
@@ -392,6 +393,7 @@ def train_with_eval(
     model_dir,
     model_file=None,
     log_interval=100,
+    save_interval=20_000,
 ):
     if model_file is not None:
         load_agent(agent, model_file, plot_dir=os.path.join(model_dir, 'plots'))
@@ -455,6 +457,9 @@ def train_with_eval(
             logger.dumpkvs()
 
             tstart = time.perf_counter()
+        
+        if (step_cnt + 1) % save_interval == 0:
+            save_agent(agent, model_dir)
 
     # Save the final model.
     logger.info('Training done.')

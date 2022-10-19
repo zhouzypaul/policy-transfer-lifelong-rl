@@ -9,4 +9,4 @@ update_interval,1,int
 replay_start_size,10000,int
 batch_size,256,int
 max_steps,25_000_000,int
-save_interval,100,int
+save_interval,50_000,int
