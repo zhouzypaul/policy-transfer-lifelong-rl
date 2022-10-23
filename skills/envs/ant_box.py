@@ -198,10 +198,11 @@ class AntBoxEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         box_index = self.sim.model._body_name2id["box"]
         self.sim.data.xfrc_applied[box_index][2] = -100
 
-    def render_camera(self):
+    def render_camera(self, imshow=False):
         cam = self.render(mode="rgb_array", width=128, height=128, camera_name="track")
-        plt.imshow(cam)
-        plt.pause(0.01)
+        if imshow:
+            plt.imshow(cam)
+            plt.pause(0.01)
         return cam
     
     def place_ant(self, pos=None):
@@ -224,6 +225,9 @@ class AntBoxEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         # random steps to ensure proper dynamic 
         for _ in range(8):
             self.step(self.unwrapped.action_space.sample())
+        
+        x, y, z = self.get_body_com("agent_torso")
+        return x, y
 
     def _put_box(self, qpos, qvel):
         pos_y_joint, pos_z_joint  = self.get_box_joint_pos()

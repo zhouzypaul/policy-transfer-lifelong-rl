@@ -158,10 +158,11 @@ class AntGoalEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         return self._get_obs()
 
-    def render_camera(self):
+    def render_camera(self, imshow=False):
         cam = self.render(mode="rgb_array", width=128, height=128, camera_name="track")
-        plt.imshow(cam)
-        plt.pause(0.01)
+        if imshow:
+            plt.imshow(cam)
+            plt.pause(0.01)
         return cam
     
     def place_ant(self, pos=None):
@@ -184,6 +185,8 @@ class AntGoalEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         for _ in range(5):
             self.step(self.unwrapped.action_space.sample())
 
+        x, y, z = self.get_body_com("agent_torso")
+        return x, y
 
     def viewer_setup(self):
         self.viewer.cam.distance = self.model.stat.extent * 0.5
