@@ -1,5 +1,6 @@
 import os
 import copy
+import math
 
 import numpy as np
 from gym import utils
@@ -23,13 +24,21 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.floor_backAndfront_width = 10
         self.colliding_reward = 0
         self.survive_reward = 0
-        self.distanceToGoalWeight = 20
+        self.distanceToStartWeight = 20
+        self.distanceToEndWeight = 20 * 2
+        self.distanceToGoalWeight = 20 * 3
         self.wind_force_coeffecient = 0.5
         self.init_bridge_x = -9.
         self.current_step = 0
         self._outside = False
         self.ob_shape = {"joint": [29]}
         self.ob_type = self.ob_shape.keys()
+        self.bridge_start = 4.5 #5-0.5
+        self.bridge_end = 21.5 #21+0.5
+        self.start_bridge = False
+        self.pass_bridge = False
+        self.pass_reward = 10
+        self.start_reward = 5
         xml_path = os.path.join(os.getcwd(), "skills/envs/assets/ant-bridge.xml")
         mujoco_env.MujocoEnv.__init__(self, xml_path, 5)
         utils.EzPickle.__init__(self)
@@ -40,6 +49,8 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         yposbefore = self.get_body_com("agent_torso")[1]
 
+        distanceToBristartBefore = self.distance_to_bridgestart()
+        distanceToBriendBefore = self.distance_to_bridgeend()
         distanceToGoalBefore = self.distance_to_goal()
         self.do_simulation(a, self.frame_skip)
         # increment 1 step
@@ -63,10 +74,36 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         # check if the agent got tipped over
         tipped_over = self.get_body_com("agent_torso")[2] <= 0.3  # or self.get_body_com("agent_torso")[2]>=1
 
+        distanceToBristartAfter = self.distance_to_bridgestart()
+        distanceToBriendAfter = self.distance_to_bridgeend()
         distanceToGoalAfter = self.distance_to_goal()
+        #distanceToGoalReward = 0
+        #distanceDifference = distanceToGoalBefore - distanceToGoalAfter
+        #distanceToGoalReward = distanceDifference * self.distanceToGoalWeight
+        agent_xpos, agent_ypos, agent_zpos = self.get_body_com("agent_torso")
+        bri_start_reward = 0
+        bri_end_reward = 0
+        if agent_ypos >= self.bridge_end and not self.pass_bridge:
+            bri_end_reward += self.pass_reward
+            self.pass_bridge = True
+
+        if distanceToBristartAfter <= 0.5 and not self.start_bridge:
+            bri_start_reward += self.start_reward
+            self.start_bridge = True
+        distanceTostartreward = 0
+        if not self.start_bridge:
+            distanceDifference = distanceToBristartBefore - distanceToBristartAfter
+            distanceTostartreward = distanceDifference * self.distanceToStartWeight
+
+        distanceToendreward = 0
+        if self.start_bridge and not self.pass_bridge:
+            distanceDifference = distanceToBriendBefore - distanceToBriendAfter
+            distanceToendreward = distanceDifference * self.distanceToEndWeight
+
         distanceToGoalReward = 0
-        distanceDifference = distanceToGoalBefore - distanceToGoalAfter
-        distanceToGoalReward = distanceDifference * self.distanceToGoalWeight
+        if self.pass_bridge:
+            distanceDifference = distanceToGoalBefore - distanceToGoalAfter
+            distanceToGoalReward = distanceDifference * self.distanceToGoalWeight
 
         # control cost for the agent, I don't think we need it because the ball will just move, leave it for now with a smaller weight.
         ctrl_cost = 0  # 0.5 * np.square(a).sum()
@@ -90,7 +127,7 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             done = True
             success = True
             goal_reward = self.goal_reward
-        reward = outside_reward + goal_reward + distanceToGoalReward - ctrl_cost
+        reward = outside_reward + goal_reward + distanceToGoalReward + distanceToendreward + distanceTostartreward + bri_start_reward + bri_end_reward - ctrl_cost
         # cam = self.render(mode="rgb_array", width=128, height=128, camera_name="track")
         # plt.imshow(cam)
         # plt.pause(0.01)
@@ -207,6 +244,17 @@ class AntBridgeEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         #breakpoint()
         self.sim.model.geom_pos[self.model.geom_name2id("midplane")][0] = copy.deepcopy(self.init_bridge_x)
 
+    def distance_to_bridgestart(self):
+        agent_x = self.get_body_com('agent_torso')[0]
+        agent_y = self.get_body_com('agent_torso')[1]
+        distance = math.sqrt((agent_x - self.init_bridge_x) ** 2 + (agent_y - self.bridge_start) ** 2)
+        return distance
+
+    def distance_to_bridgeend(self):
+        agent_x = self.get_body_com('agent_torso')[0]
+        agent_y = self.get_body_com('agent_torso')[1]
+        distance = math.sqrt((agent_x - self.init_bridge_x) ** 2 + (agent_y - self.bridge_end) ** 2)
+        return distance
 
     def distance_to_goal(self):
         #goal_x = 0  # self.sim.data.get_geom_xpos('goal')[0]
