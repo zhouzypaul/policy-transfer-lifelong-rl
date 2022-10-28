@@ -9,6 +9,12 @@ python3 -m skills.ensemble.transfer -l experiment_name_to_load -t a_list_of_targ
 python3 -m skills.ensemble.transfer --plot -l load -t a_list_of_targets -s skill_type --agent ensemble # plot after transfer experiment
 ```
 
+## ant environment experiments
+```bash
+python3 -m skills.baseline.train --agent sac --num_envs 16 --max_steps 10_000_000 --env ant_box
+python3 -m skills.baseline.test -l ./results/ant_box/sac
+```
+
 ## getting baseline performance (DQN)
 ```bash
 python3 -m skills.baseline.train --experiment_name debug --agent dqn --env MontezumaRevengeNoFrameskip-v4 [--options]  # train  

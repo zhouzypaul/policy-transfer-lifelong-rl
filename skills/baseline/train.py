@@ -12,7 +12,10 @@ from collections import deque
 
 import torch
 import torch.nn as nn
+from torch import distributions
 import numpy as np
+import pfrl
+from pfrl.nn.lmbda import Lambda
 from procgen import ProcgenEnv
 import pfrl
 from pfrl.agents import DoubleDQN
@@ -20,8 +23,9 @@ from pfrl.utils import set_random_seed
 from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
+from skills.envs import make_ant_env
 from skills.ensemble import AttentionEmbedding
-from skills.agents import PPO, EnsembleAgent
+from skills.agents import PPO, SAC, EnsembleAgent
 from skills.agents.dqn import SingleSharedBias
 from skills.models.procgen_cnn import ProcgenCNN
 from skills.option_utils import BaseTrial
@@ -66,7 +70,7 @@ class ProcgenTrial(BaseTrial):
         
         # agent
         parser.add_argument('--agent', type=str, default='ppo',
-                            choices=['ppo', 'ensemble', 'dqn'])
+                            choices=['ppo', 'ensemble', 'dqn', 'sac'])
         parser.add_argument('--load', '-l', type=str, default=None,
                             help='path to load agent')
         
@@ -80,6 +84,8 @@ class ProcgenTrial(BaseTrial):
             args.hyperparams = 'procgen_ensemble'
         elif args.agent == 'dqn':
             args.hyperparams = 'procgen_dqn'
+        elif args.agent == 'sac':
+            args.hyperparams = 'procgen_sac'
         return args
 
     def check_params_validity(self):
@@ -89,20 +95,26 @@ class ProcgenTrial(BaseTrial):
         pass
     
     def make_vector_env(self, eval=False):
-        venv = ProcgenEnv(
-            num_envs=self.params['num_envs'],
-            env_name=self.params['env'],
-            num_levels=0 if eval else self.params['num_levels'],
-            start_level=0 if eval else self.params['start_level'],
-            distribution_mode=self.params['distribution_mode'],
-            num_threads=self.params['num_threads'],
-            center_agent=True,
-            rand_seed=self.params['seed'],
-        )
-        venv = VecChannelOrder(venv, channel_order='chw')
-        venv = VecExtractDictObs(venv, "rgb")
-        venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
-        venv = VecNormalize(venv=venv, ob=False)
+        """vector environment for mujoco and procgen"""
+        if 'ant' in self.params['env']:
+            # ant mujoco env
+            venv = make_ant_env(self.params['env'], self.params['num_envs'], eval=eval)
+        else:
+            # procgen env
+            venv = ProcgenEnv(
+                num_envs=self.params['num_envs'],
+                env_name=self.params['env'],
+                num_levels=0 if eval else self.params['num_levels'],
+                start_level=0 if eval else self.params['start_level'],
+                distribution_mode=self.params['distribution_mode'],
+                num_threads=self.params['num_threads'],
+                center_agent=True,
+                rand_seed=self.params['seed'],
+            )
+            venv = VecChannelOrder(venv, channel_order='chw')
+            venv = VecExtractDictObs(venv, "rgb")
+            venv = VecMonitor(venv=venv, filename=None, keep_buf=100)
+            venv = VecNormalize(venv=venv, ob=False)
         return venv
     
     def _make_ppo_agent(self, policy, optimizer, phi=lambda x: x):
@@ -207,6 +219,85 @@ class ProcgenTrial(BaseTrial):
             )
             return agent
 
+        elif self.params['agent'] == 'sac':
+            action_space = env.action_space[0]  # get the first env's action space
+            obs_size = env.observation_space.shape[-1]  # get rid of the num_envs dimension
+            action_size = action_space.shape[0]  # get the only elt in the tuple
+
+            def squashed_diagonal_gaussian_head(x):
+                assert x.shape[-1] == action_size * 2
+                mean, log_scale = torch.chunk(x, 2, dim=1)
+                log_scale = torch.clamp(log_scale, -20.0, 2.0)
+                var = torch.exp(log_scale * 2)
+                base_distribution = distributions.Independent(
+                    distributions.Normal(loc=mean, scale=torch.sqrt(var)), 1
+                )
+                # cache_size=1 is required for numerical stability
+                return distributions.transformed_distribution.TransformedDistribution(
+                    base_distribution, [distributions.transforms.TanhTransform(cache_size=1)]
+                )
+
+            policy = nn.Sequential(
+                nn.Linear(obs_size, self.params['n_hidden_channels']),
+                nn.ReLU(),
+                nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
+                nn.ReLU(),
+                nn.Linear(self.params['n_hidden_channels'], action_size * 2),
+                Lambda(squashed_diagonal_gaussian_head),
+            )
+            torch.nn.init.xavier_uniform_(policy[0].weight)
+            torch.nn.init.xavier_uniform_(policy[2].weight)
+            torch.nn.init.xavier_uniform_(policy[4].weight)
+            policy_optimizer = torch.optim.Adam(
+                policy.parameters(), lr=self.params['learning_rate'], eps=self.params['adam_eps']
+            )
+
+            def make_q_func_with_optimizer():
+                q_func = nn.Sequential(
+                    pfrl.nn.ConcatObsAndAction(),
+                    nn.Linear(obs_size + action_size, self.params['n_hidden_channels']),
+                    nn.ReLU(),
+                    nn.Linear(self.params['n_hidden_channels'], self.params['n_hidden_channels']),
+                    nn.ReLU(),
+                    nn.Linear(self.params['n_hidden_channels'], 1),
+                )
+                torch.nn.init.xavier_uniform_(q_func[1].weight)
+                torch.nn.init.xavier_uniform_(q_func[3].weight)
+                torch.nn.init.xavier_uniform_(q_func[5].weight)
+                q_func_optimizer = torch.optim.Adam(
+                    q_func.parameters(), lr=self.params['learning_rate'], eps=self.params['adam_eps']
+                )
+                return q_func, q_func_optimizer
+
+            q_func1, q_func1_optimizer = make_q_func_with_optimizer()
+            q_func2, q_func2_optimizer = make_q_func_with_optimizer()
+
+            rbuf = pfrl.replay_buffers.ReplayBuffer(10**6, num_steps=self.params['n_step_return'])
+
+            def burnin_action_func():
+                """Select random actions until model is updated one or more times."""
+                return action_space.sample()
+
+            # Hyperparameters in http://arxiv.org/abs/1802.09477
+            agent = SAC(
+                policy,
+                q_func1,
+                q_func2,
+                policy_optimizer,
+                q_func1_optimizer,
+                q_func2_optimizer,
+                rbuf,
+                gamma=self.params['discount'],
+                update_interval=self.params['update_interval'],
+                replay_start_size=self.params['replay_start_size'],
+                gpu=-1 if self.params['device']=='cpu' else 0,
+                minibatch_size=self.params['batch_size'],
+                burnin_action_func=burnin_action_func,
+                entropy_target=-action_size,
+                temperature_optimizer_lr=self.params['learning_rate'],
+            )
+            return agent
+
         else:
             raise NotImplementedError('Unsupported agent')
     
@@ -258,6 +349,7 @@ class ProcgenTrial(BaseTrial):
             model_dir=self.saving_dir,
             model_file=self.params['load'],
             log_interval=100,
+            save_interval=self.params['save_interval'],
         )
         plot_reward_curve(self.saving_dir)
 
@@ -302,6 +394,7 @@ def train_with_eval(
     model_dir,
     model_file=None,
     log_interval=100,
+    save_interval=20_000,
 ):
     if model_file is not None:
         load_agent(agent, model_file, plot_dir=os.path.join(model_dir, 'plots'))
@@ -365,6 +458,9 @@ def train_with_eval(
             logger.dumpkvs()
 
             tstart = time.perf_counter()
+        
+        if (step_cnt + 1) % save_interval == 0:
+            save_agent(agent, model_dir)
 
     # Save the final model.
     logger.info('Training done.')
@@ -379,6 +475,9 @@ def save_agent(agent, saving_dir):
     elif type(agent) == EnsembleAgent:
         agent.save(saving_dir)
         logger.info(f"Model saved to {saving_dir}/agent.pkl")
+    elif type(agent) == SAC:
+        agent.save(saving_dir)
+        logger.info(f"Model saved to {saving_dir}")
     else:
         raise RuntimeError 
 
@@ -389,6 +488,9 @@ def load_agent(agent, load_path, plot_dir=None):
         logger.info(f"Model loaded from {load_path}")
     elif type(agent) == EnsembleAgent:
         EnsembleAgent.load(load_path, plot_dir=plot_dir)
+    elif type(agent) == SAC:
+        agent.load(load_path)
+        logger.info(f"Model loaded from {load_path}")
     else:
         raise RuntimeError
 
