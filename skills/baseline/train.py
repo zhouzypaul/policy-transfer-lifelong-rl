@@ -109,6 +109,7 @@ class ProcgenTrial(BaseTrial):
                 distribution_mode=self.params['distribution_mode'],
                 num_threads=self.params['num_threads'],
                 center_agent=True,
+                rand_seed=self.params['seed'],
             )
             venv = VecChannelOrder(venv, channel_order='chw')
             venv = VecExtractDictObs(venv, "rgb")
@@ -308,7 +309,7 @@ class ProcgenTrial(BaseTrial):
     
     def _set_saving_dir(self):
         self._expand_agent_name()
-        return Path(self.params['results_dir'], self.params['experiment_name'], self.expanded_agent_name)
+        return Path(self.params['results_dir'], self.params['experiment_name'], self.expanded_agent_name, str(self.params['seed']))
 
     def make_logger(self, log_dir):
         logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
