@@ -36,7 +36,7 @@ from skills import utils
 from skills.baseline.plot import plot_reward_curve
 
 
-class ProcgenTrial(BaseTrial):
+class ProcgenAntTrial(BaseTrial):
     """
     trial for training procgen
     """
@@ -496,5 +496,5 @@ def load_agent(agent, load_path, plot_dir=None):
 
 
 if __name__ == '__main__':
-    trial = ProcgenTrial()
+    trial = ProcgenAntTrial()
     trial.train()

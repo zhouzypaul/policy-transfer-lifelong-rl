@@ -13,11 +13,11 @@ from matplotlib import pyplot as plt
 from skills import utils
 from skills.agents import SAC
 from skills.baseline import logger
-from skills.baseline.train import load_agent, safe_mean, ProcgenTrial
+from skills.baseline.train import load_agent, safe_mean, ProcgenAntTrial
 from skills.envs import AntBoxEnv, AntBridgeEnv, AntGoalEnv, AntMixLongEnv
 
 
-class AntTestTrial(ProcgenTrial):
+class AntTestTrial(ProcgenAntTrial):
     """
     execute the trained policy on ant, and look at the rendering
     """
