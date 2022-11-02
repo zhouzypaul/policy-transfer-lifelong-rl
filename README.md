@@ -9,6 +9,11 @@ python3 -m skills.ensemble.transfer -l experiment_name_to_load -t a_list_of_targ
 python3 -m skills.ensemble.transfer --plot -l load -t a_list_of_targets -s skill_type --agent ensemble # plot after transfer experiment
 ```
 
+## procgen experiments
+```bash
+python -m skills.baseline.transfer -e experiment_name --num_levels 20 --transfer_steps 500000 --env ENV --num_policies 3 --seed 0
+```
+
 ## ant environment experiments
 ```bash
 python3 -m skills.baseline.train --agent sac --num_envs 16 --max_steps 10_000_000 --env ant_box

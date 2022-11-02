@@ -50,7 +50,7 @@ class ProcgenTransferTrial(BaseTrial):
         parser.add_argument('--env', type=str, required=True,
                             help='name of the procgen environment')
         parser.add_argument('--distribution_mode', '-d', type=str, default='easy',
-                            choices=['easy', 'hard', 'exploration, memeory', 'extreme'],
+                            choices=['easy', 'hard', 'exploration', 'memory', 'extreme'],
                             help='distribution mode of procgen')
         parser.add_argument('--num_envs', type=int, default=8,
                             help='number of environments to run in parallel')
