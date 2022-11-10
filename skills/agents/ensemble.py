@@ -5,6 +5,7 @@ import itertools
 from contextlib import contextmanager
 
 import torch
+import torch.nn as nn
 import numpy as np
 from pfrl import replay_buffers
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
@@ -35,7 +36,8 @@ class EnsembleAgent(Agent):
                 discount_rate=0.9,
                 num_modules=8, 
                 embedding_plot_freq=10000,
-                bandit_exploration_weight=500):
+                bandit_exploration_weight=500,
+                fix_attention_mask=False,):
         # vars
         self.device = device
         self.batch_size = batch_size
@@ -54,13 +56,17 @@ class EnsembleAgent(Agent):
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
         self.bandit_exploration_weight = bandit_exploration_weight
+        self.fix_attention_mask = fix_attention_mask
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
         self.attention_optimizer = torch.optim.Adam(self.attention_model.parameters(), lr=learning_rate)
         self.learners = learners
+        learnable_params = list(itertools.chain.from_iterable([list(learner.model.parameters()) for learner in self.learners]))
+        if not self.fix_attention_mask:
+            learnable_params = list(self.attention_model.parameters()) + learnable_params
         self.optimizer = torch.optim.Adam(
-            list(self.attention_model.parameters()) + list(itertools.chain.from_iterable([list(learner.model.parameters()) for learner in self.learners])),
+            learnable_params,
             lr=learning_rate
         )
         self.num_learners = len(learners)
@@ -101,7 +107,7 @@ class EnsembleAgent(Agent):
                 losses.append(maybe_loss)
             assert np.sum([loss is None for loss in losses]) == 0 or np.sum([loss is None for loss in losses]) == self.num_learners
 
-            # for attention model
+            # add experience to buffer and update action leader
             if self.training:
                 self._batch_observe_train(
                     batch_obs, batch_reward, batch_done, batch_reset
@@ -117,7 +123,8 @@ class EnsembleAgent(Agent):
                 div_loss = self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=True)
                 loss = learner_loss + div_loss
 
-                self.attention_model.train()
+                if not self.fix_attention_mask:
+                    self.attention_model.train()
                 self.optimizer.zero_grad()
                 loss.backward()
                 for learner in self.learners:
@@ -127,6 +134,10 @@ class EnsembleAgent(Agent):
                 self.attention_model.eval()
     
     def _batch_observe_train(self, batch_obs, batch_reward, batch_done, batch_reset):
+        """
+        currently, this just adds experience to replay buffer and sets action leader as neccessary
+        the actual update is done in self.update_attention()
+        """
         for i in range(len(batch_obs)):
             self.step_number += 1
 
@@ -274,6 +285,9 @@ class EnsembleAgent(Agent):
             
             self.n_updates += 1
 
+            if self.fix_attention_mask:
+                return 0
+
             return div_loss
 
     def batch_act(self, batch_obs):
@@ -368,3 +382,30 @@ class EnsembleAgent(Agent):
         if reset:
             agent.reset()
         return agent
+    
+    def load_attention_mask(self, load_dir):
+        """
+        load attention mask from a experiment saving dir
+        learner_selection_count.txt: n numbers that tell us which learner is selected how many times
+        agent.pkl: saved agent
+        """
+        # find the portable feature
+        with open(os.path.join(load_dir, 'learner_selection_count.txt'), 'r') as f:
+            learner_selection_count = np.loadtxt(f)
+        portable_feature = np.argmax(learner_selection_count)
+
+        # load the saved attention model 
+        with lzma.open(os.path.join(load_dir, 'agent.pkl'), 'rb') as f:
+            agent = dill.load(f)
+        saved_attention_model = agent.attention_model
+
+        # make all attention the portable one
+        portable_attention_mask = saved_attention_model.attention_modules[portable_feature]
+        attention_modules = nn.ModuleList(
+            [
+                portable_attention_mask for _ in range(len(saved_attention_model.attention_modules))
+            ]
+        )
+        
+        # load the attention model
+        self.attention_model.attention_modules = attention_modules

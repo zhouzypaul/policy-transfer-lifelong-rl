@@ -62,6 +62,10 @@ class ProcgenTransferTrial(BaseTrial):
         # agent
         parser.add_argument('--agent', type=str, default='ensemble',
                             choices=['ensemble'])
+        parser.add_argument('--fix_attention_masks', action='store_true', default=False,
+                            help='fix the attention mask and no longer train them')
+        parser.add_argument('--load', type=str, default=None,
+                            help='directory to load the saved agent and attention masks')
         
         args = self.parse_common_args(parser)
         # auto fill
@@ -73,7 +77,8 @@ class ProcgenTransferTrial(BaseTrial):
         """
         check whether the params entered by the user is valid
         """
-        pass
+        if self.params['fix_attention_masks']:
+            assert self.params['load'] is not None, "must load a saved agent if fix_attention_masks is True"
     
     def make_vector_env(self, level_index, eval=False):
         """
@@ -149,7 +154,11 @@ class ProcgenTransferTrial(BaseTrial):
             num_modules=self.params['num_policies'],
             embedding_plot_freq=self.params['embedding_plot_freq'],
             bandit_exploration_weight=self.params['bandit_exploration_weight'],
+            fix_attention_mask=self.params['fix_attention_masks'],
         )
+        if self.params['fix_attention_masks']:
+            load_path = os.path.join(self.params['load'], self.expanded_agent_name, str(self.params['seed']))
+            agent.load_attention_mask(load_path)
         return agent
     
     def _expand_agent_name(self):
