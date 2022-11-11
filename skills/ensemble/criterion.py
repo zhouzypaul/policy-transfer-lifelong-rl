@@ -26,6 +26,10 @@ def batched_L_divergence(batch_feats):
     """
     batch_feats is of shape (batch_size, n_modules, n_features)
     """
+    if batch_feats.shape[1] == 1:
+        # if there is only one module, then there is no divergence
+        return 0
+
     global every_tuple
     if every_tuple is None:
         every_tuple = torch.combinations(torch.Tensor(range(batch_feats.shape[1])), 2).long()
