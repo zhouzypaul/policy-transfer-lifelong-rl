@@ -37,7 +37,8 @@ class EnsembleAgent(Agent):
                 num_modules=8, 
                 embedding_plot_freq=10000,
                 bandit_exploration_weight=500,
-                fix_attention_mask=False,):
+                fix_attention_mask=False,
+                use_feature_learner=True):
         # vars
         self.device = device
         self.batch_size = batch_size
@@ -57,6 +58,7 @@ class EnsembleAgent(Agent):
         self.discount_rate = discount_rate
         self.bandit_exploration_weight = bandit_exploration_weight
         self.fix_attention_mask = fix_attention_mask
+        self.use_feature_learner = use_feature_learner
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
@@ -176,6 +178,8 @@ class EnsembleAgent(Agent):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
         embedded_obs = self.attention_model(obs)
         embedded_obs = [emb.cpu() for emb in embedded_obs]
+        if not self.use_feature_learner:
+            embedded_obs = embedded_obs * self.num_learners  # fead same feature to all learners
         return embedded_obs
     
     def observe(self, obs, action, reward, next_obs, terminal):
@@ -269,7 +273,7 @@ class EnsembleAgent(Agent):
             batch_states = exp_batch["state"]
             state_embeddings = self.attention_model(batch_states, plot=(self.n_updates % self.embedding_plot_freq == 0))  # num_modules x (batch_size, C, H, W)
             state_embedding_flatten = torch.cat([embedding.unsqueeze(1) for embedding in state_embeddings], dim=1)  # (batch_size, num_modules, C, H, W)
-            state_embedding_flatten = state_embedding_flatten.view(self.batch_size, self.num_modules, -1)  # (batch_size, num_modules, d)
+            state_embedding_flatten = state_embedding_flatten.view(self.batch_size, len(self.attention_model.attention_modules), -1)  # (batch_size, num_modules, d)
             div_loss = batched_L_divergence(state_embedding_flatten)
 
             if not compute_loss_only:

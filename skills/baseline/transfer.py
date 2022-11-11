@@ -66,6 +66,8 @@ class ProcgenTransferTrial(BaseTrial):
                             help='fix the attention mask and no longer train them')
         parser.add_argument('--load', type=str, default=None,
                             help='directory to load the saved agent and attention masks')
+        parser.add_argument('--remove_feature_learner', action='store_true', default=False,
+                            help='only use 1 attention mask to get 1 feature, but could be multiple policies')
         
         args = self.parse_common_args(parser)
         # auto fill
@@ -126,7 +128,7 @@ class ProcgenTransferTrial(BaseTrial):
         attention_embedding = AttentionEmbedding(
             embedding_size=64,
             attention_depth=32,
-            num_attention_modules=self.params['num_policies'],
+            num_attention_modules=1 if self.params['remove_feature_learner'] else self.params['num_policies'],
             plot_dir=self.params['plots_dir'],
         )
         def _make_policy_and_opt():
@@ -155,6 +157,7 @@ class ProcgenTransferTrial(BaseTrial):
             embedding_plot_freq=self.params['embedding_plot_freq'],
             bandit_exploration_weight=self.params['bandit_exploration_weight'],
             fix_attention_mask=self.params['fix_attention_masks'],
+            use_feature_learner=not self.params['remove_feature_learner'],
         )
         if self.params['fix_attention_masks']:
             load_path = os.path.join(self.params['load'], self.expanded_agent_name, str(self.params['seed']))
