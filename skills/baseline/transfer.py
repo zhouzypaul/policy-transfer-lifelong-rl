@@ -21,6 +21,7 @@ from skills.agents import PPO, EnsembleAgent
 from skills.option_utils import BaseTrial
 from skills.models.mlp import PPOMLP
 from skills.baseline import logger
+from skills.baseline.procgen_curriculum import procgen_game_curriculum
 from skills import utils
 
 
@@ -86,6 +87,10 @@ class ProcgenTransferTrial(BaseTrial):
         """
         make a procgen environment such that the training env only focus on 1 particular level
         the testing env will sample randomly from a number of levels
+
+        NOTE: Warning: the eval environment does not guarantee sequential transition between `num_levels` levels.
+        The following level is sampled randomly, so evaluation is not deterministic, and performed on god knows
+        which levels.
         """
         venv = ProcgenEnv(
             num_envs=self.params['num_envs'],
@@ -203,7 +208,10 @@ class ProcgenTransferTrial(BaseTrial):
         self.agent = self.make_agent(self.train_env)
     
     def transfer(self):
-        for i_level in range(self.params['start_level'], self.params['start_level'] + self.params['num_levels']):
+        level_order = procgen_game_curriculum[self.params['env']]
+        assert self.params['start_level'] == 0
+        assert self.params['num_levels'] == len(level_order)  # level_order only designed for 20 levels
+        for i_level in level_order:
             self.train_env = self.make_vector_env(level_index=i_level, eval=False)
             train_with_eval(
                 agent=self.agent,
