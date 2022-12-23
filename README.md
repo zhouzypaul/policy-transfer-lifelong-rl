@@ -16,6 +16,8 @@ python -m skills.baseline.transfer -e experiment_name --num_levels 20 --transfer
 python -m skills.baseline.transfer -e experiment_name --num_levels 20 --transfer_steps 500000 --env ENV --num_policies 3 --seed 0 --fix_attention_masks --load ./results/saved_experiment
 # remove feature learners but keep ensemble policy
 python -m skills.baseline.transfer -e experiment_name --num_levels 20 --transfer_steps 500000 --env ENV --num_policies 3 --seed 0 --remove_feature_learners
+# plotting
+python -m skills.baseline.plot -f [-u] -l /results/path 
 ```
 
 ## ant environment experiments
