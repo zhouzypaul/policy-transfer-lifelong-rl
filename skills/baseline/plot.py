@@ -117,6 +117,8 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir, unrolled=False):
     rewards_mean = process_training_curve_csv_file(exp_dir, average_across_levels=not unrolled)
     to_plot_x = 'total_steps' if unrolled else 'level_total_steps'
     # plot
+    if unrolled:
+        plt.figure(figsize=(10, 5))
     sns.lineplot(
         data=rewards_mean,
         x=to_plot_x,
