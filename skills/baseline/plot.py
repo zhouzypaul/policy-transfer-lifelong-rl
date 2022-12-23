@@ -18,8 +18,8 @@ def plot_eight_procgen_games(results_dir):
     plot the eight procgen games in one big plot
     """
     games = ['bigfish', 'coinrun', 'dodgeball', 'heist', 'jumper', 'leaper', 'maze', 'ninja']
-    nrows = 4
-    ncols = 2
+    nrows = 2
+    ncols = 4
     figsize = (22, 12)
     if ncols == 2:
         figsize = (17, 20)
@@ -85,9 +85,12 @@ def process_training_curve_csv_file(exp_dir, average_across_levels=True):
             seed_dir = os.path.join(agent_dir, seed)
             csv_path = os.path.join(seed_dir, 'progress.csv')
             assert os.path.exists(csv_path)
-            df = pandas.read_csv(csv_path, comment='#')
+            try:
+                df = pandas.read_csv(csv_path, comment='#')
+            except pandas.errors.EmptyDataError:
+                raise
             assert df['total_steps'].max() == 10_000_000, f"total steps is not complete (20 * 500k): {csv_path}"  # check that csv is complete
-            df = df[['level_total_steps', 'level_index', 'ep_reward_mean']].copy()
+            df = df[['level_total_steps', 'level_index', 'ep_reward_mean', 'total_steps']].copy()
             df['agent'] = first_char_upper(agent)
             df['seed'] = int(seed)
             rewards.append(df)
@@ -96,22 +99,27 @@ def process_training_curve_csv_file(exp_dir, average_across_levels=True):
     subset = rewards.query(f"level_total_steps > {max_nan_step}")
 
     if not average_across_levels:
+        # sparsify the data because confidence interval will take a long time
+        subset = subset[subset['level_total_steps'] % 5_000 == 0]
         return subset
 
     # average across different level_index
     rewards_mean = subset.groupby(['level_total_steps', 'agent', 'seed']).mean().reset_index()
     return rewards_mean
 
-def plot_transfer_exp_training_curve_across_levels(exp_dir):
+
+def plot_transfer_exp_training_curve_across_levels(exp_dir, unrolled=False):
     """
     x-axis: steps in each level
     y-axis: reward, averaged across different levels
+    if plotting the unrolled curve, we will not average across the levels
     """
-    rewards_mean = process_training_curve_csv_file(exp_dir)
+    rewards_mean = process_training_curve_csv_file(exp_dir, average_across_levels=not unrolled)
+    to_plot_x = 'total_steps' if unrolled else 'level_total_steps'
     # plot
     sns.lineplot(
         data=rewards_mean,
-        x='level_total_steps',
+        x=to_plot_x,
         y='ep_reward_mean',
         hue='agent',
         style='agent',
@@ -119,13 +127,14 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir):
     plt.title(f'Training Curve Averaged Across Levels :{exp_dir}')
     plt.xlabel('Steps')
     plt.ylabel('Episodic Reward')
-    save_path = os.path.dirname(exp_dir) + '/training_curve.png'
+    file_name = '/training_curve.png' if not unrolled else '/training_curve_unrolled.png'
+    save_path = os.path.dirname(exp_dir) + file_name
     plt.savefig(save_path)
     print(f'saved to {save_path}')
     plt.close()
 
 
-def plot_transfer_exp_unrolled_curve(exp_dir):
+def plot_transfer_exp_all_level_curves(exp_dir):
     """
     x-axis: steps in each level
     y-axis: reward in a single level
@@ -158,7 +167,7 @@ def plot_transfer_exp_unrolled_curve(exp_dir):
         axes[i // ncols, i % ncols].set_title(agent, fontsize=20)
         # axes[i // ncols, i % ncols].set_ylim(0, 2)
 
-    save_path = os.path.dirname(exp_dir) + '/unrolled_curve.png'
+    save_path = os.path.dirname(exp_dir) + '/all_level_learning_curve.png'
     fig.savefig(save_path)
     print(f'saved to {save_path}')
     plt.close()
@@ -382,6 +391,7 @@ if __name__ == "__main__":
     parser.add_argument('--evaluation', '-e', action='store_true', help='plot the evaluation curve', default=False)
     parser.add_argument('--train', '-t', action='store_true', help='plot the training curve', default=False)
     parser.add_argument('--transfer', '-f', action='store_true', help='plot the transfer curve', default=False)
+    parser.add_argument('--unrolled', '-u', action='store_true', help='the transfer curve, but do not average acorss level', default=False)
     parser.add_argument('--procgen', '-p', action='store_true', help='plot the 8 procgen games combined', default=False)
     parser.add_argument('--debug', '-d', action='store_true', help='debug mode', default=False)
     args = parser.parse_args()
@@ -395,10 +405,10 @@ if __name__ == "__main__":
         plot_train_eval_curve(args.load, kind='train')
     elif args.transfer:
         if args.debug:
-            plot_transfer_exp_unrolled_curve(args.load)
+            plot_transfer_exp_all_level_curves(args.load)
         else:
-            plot_transfer_exp_eval_curve(args.load)
-            plot_transfer_exp_training_curve_across_levels(args.load)
+            # plot_transfer_exp_eval_curve(args.load)
+            plot_transfer_exp_training_curve_across_levels(args.load, args.unrolled)
     elif args.procgen:
         plot_eight_procgen_games(args.load)
     else:
