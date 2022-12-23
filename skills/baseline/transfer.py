@@ -44,7 +44,7 @@ class ProcgenTransferTrial(BaseTrial):
         parser.set_defaults(hyperparams='procgen_ensemble')
 
         # training
-        parser.add_argument('--transfer_steps', type=int, default=100_000)
+        parser.add_argument('--transfer_steps', type=int, default=500_000)
         parser.add_argument('--bandit_exploration_weight', type=float, default=500)
 
         # procgen environment
