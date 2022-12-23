@@ -211,7 +211,7 @@ class ProcgenTransferTrial(BaseTrial):
         level_order = procgen_game_curriculum[self.params['env']]
         assert self.params['start_level'] == 0
         assert self.params['num_levels'] == len(level_order)  # level_order only designed for 20 levels
-        for i_level in level_order:
+        for i, i_level in enumerate(level_order):
             self.train_env = self.make_vector_env(level_index=i_level, eval=False)
             train_with_eval(
                 agent=self.agent,
@@ -220,7 +220,7 @@ class ProcgenTransferTrial(BaseTrial):
                 num_envs=self.params['num_envs'],
                 max_steps=self.params['transfer_steps'],
                 level_index=i_level,
-                steps_offset=(i_level-self.params['start_level']) * self.params['transfer_steps'],
+                steps_offset=i * self.params['transfer_steps'],
                 log_interval=100,
             )
             # reset the agent
