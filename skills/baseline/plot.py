@@ -36,6 +36,7 @@ def plot_eight_procgen_games(results_dir):
             y='ep_reward_mean',
             hue='agent',
             style='agent',
+            errorbar='se',
         )
         # title 
         axes[i // ncols, i % ncols].set_title(first_char_upper(game), fontsize=22)
@@ -125,6 +126,7 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir, unrolled=False):
         y='ep_reward_mean',
         hue='agent',
         style='agent',
+        errorbar='se',
     )
     plt.title(f'Training Curve Averaged Across Levels :{exp_dir}')
     plt.xlabel('Steps')
@@ -205,6 +207,7 @@ def plot_transfer_exp_eval_curve(exp_dir):
         y='eval_ep_reward_mean',
         hue='agent',
         style='agent',
+        errorbar='se',
     )
     plt.title(f'Eval Reward after Trained on Level 1 - k: {exp_dir}')
     plt.xlabel('Level')
@@ -279,7 +282,8 @@ def plot_train_eval_curve(exp_dir, kind='eval'):
         x='total_steps',
         y=keyword,
         hue='agent',
-        style='agent'
+        style='agent',
+        errorbar='se',
     )
     plt.title(f'{kind} Curve')
     plt.xlabel('Steps')
@@ -333,6 +337,7 @@ def plot_all_agents_reward_data(exp_dir):
         y='reward',
         hue='agent',
         style='kind',
+        errorbar='se',
     )
     plt.title(f'Learning Curve: {exp_dir}')
     plt.xlabel('Steps')
@@ -375,6 +380,7 @@ def plot_all_agents_generalization_gap(exp_dir):
         y='reward_diff',
         hue='agent',
         style='agent',
+        errorbar='se',
     )
     plt.title(f'Generalization Gap: {exp_dir}')
     plt.xlabel('Steps')
