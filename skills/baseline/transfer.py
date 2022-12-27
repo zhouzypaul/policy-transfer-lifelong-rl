@@ -46,6 +46,8 @@ class ProcgenTransferTrial(BaseTrial):
         # training
         parser.add_argument('--transfer_steps', type=int, default=500_000)
         parser.add_argument('--bandit_exploration_weight', type=float, default=500)
+        parser.add_argument('--individual_spatial_feature_extractor', '-i', action='store_true', default=False,
+                            help='use individual spatial feature extractor for each attention module')
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
