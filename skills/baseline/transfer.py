@@ -59,6 +59,8 @@ class ProcgenTransferTrial(BaseTrial):
                             help='start level of the procgen environment')
         parser.add_argument('--num_levels', type=int, default=20,
                             help='number of different levels to generate during training')
+        parser.add_argument('--curriculum', action='store_true', default=False,
+                            help='arrange the levels in an order of increasing difficulty. Currently only available to a few games')
         
         # agent
         parser.add_argument('--agent', type=str, default='ensemble',
@@ -208,9 +210,14 @@ class ProcgenTransferTrial(BaseTrial):
         self.agent = self.make_agent(self.train_env)
     
     def transfer(self):
-        level_order = procgen_game_curriculum[self.params['env']]
-        assert self.params['start_level'] == 0
-        assert self.params['num_levels'] == len(level_order)  # level_order only designed for 20 levels
+        # whether to use curriculum
+        if self.params['curriculum']:
+            level_order = procgen_game_curriculum[self.params['env']]
+            assert self.params['start_level'] == 0
+            assert self.params['num_levels'] == len(level_order)  # level_order only designed for 20 levels
+        else:
+            level_order = range(self.params['start_level'], self.params['start_level'] + self.params['num_levels'])
+        # loop through training
         for i, i_level in enumerate(level_order):
             self.train_env = self.make_vector_env(level_index=i_level, eval=False)
             train_with_eval(
