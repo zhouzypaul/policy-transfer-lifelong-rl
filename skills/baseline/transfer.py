@@ -138,6 +138,7 @@ class ProcgenTransferTrial(BaseTrial):
             embedding_size=64,
             attention_depth=32,
             num_attention_modules=1 if self.params['remove_feature_learner'] else self.params['num_policies'],
+            use_individual_spatial_feature=self.params['individual_spatial_feature_extractor'],
             plot_dir=self.params['plots_dir'],
         )
         def _make_policy_and_opt():
