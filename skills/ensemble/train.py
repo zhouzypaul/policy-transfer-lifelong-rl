@@ -5,10 +5,7 @@ import csv
 import argparse
 from collections import deque
 
-import torch
-import seeding
 import numpy as np
-import pfrl
 from matplotlib import pyplot as plt
 
 from skills import utils
@@ -246,11 +243,7 @@ class TrainEnsembleOfSkills(SingleOptionTrial):
         self.check_params_validity()
 
         # setting random seeds
-        seeding.seed(self.params['seed'], random, np)
-        pfrl.utils.set_random_seed(self.params['seed'])
-
-        # torch benchmark
-        torch.backends.cudnn.benchmark = True
+        self.make_deterministic(self.params['seed'])
 
         # create the saving directories
         self.saving_dir = self._set_saving_dir()

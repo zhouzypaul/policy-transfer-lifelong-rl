@@ -8,6 +8,7 @@ import cv2
 import matplotlib.pyplot as plt
 import torch
 import pfrl
+from pfrl.utils import set_random_seed
 
 from skills import utils
 from skills.wrappers.atari_wrappers import make_atari, wrap_deepmind
@@ -78,6 +79,12 @@ class BaseTrial:
         for arg_name, arg_value in args.other_args:
             utils.update_param(params, arg_name, arg_value)
         return params
+    
+    def make_deterministic(self, seed, force_deterministic=False):
+        set_random_seed(seed)
+        torch.backends.cudnn.benchmark = False  # make alg selection determistics, but may be slower
+        if force_deterministic:
+            torch.use_deterministic_algorithms(True)  # must use deterministic algorithms
 
     def make_env(self, env_name, env_seed):
         if self.params['use_deepmind_wrappers']:

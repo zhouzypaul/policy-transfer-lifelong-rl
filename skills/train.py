@@ -1,15 +1,10 @@
 import time
 import pickle
-import random
 import os
 import argparse
-import shutil
 from pathlib import Path
 
-import torch
-import seeding
 import numpy as np
-import pfrl
 
 from skills import utils
 from skills.option_utils import SingleOptionTrial, make_done_state_plot
@@ -58,11 +53,7 @@ class TrainOptionTrial(SingleOptionTrial):
         self.check_params_validity()
 
         # setting random seeds
-        seeding.seed(self.params['seed'], random, np)
-        pfrl.utils.set_random_seed(self.params['seed'])
-
-        # torch benchmark
-        torch.backends.cudnn.benchmark = True
+        self.make_deterministic(self.params['seed'])
 
         # create the saving directories
         self.saving_dir = os.path.join(self.params['results_dir'], self.params['experiment_name'])

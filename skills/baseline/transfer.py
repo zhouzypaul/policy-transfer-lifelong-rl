@@ -10,10 +10,8 @@ import argparse
 from pathlib import Path
 from collections import deque
 
-import torch
 import numpy as np
 from procgen import ProcgenEnv
-from pfrl.utils import set_random_seed
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
 from skills.ensemble import AttentionEmbedding
@@ -189,8 +187,7 @@ class ProcgenTransferTrial(BaseTrial):
     
     def setup(self):
         self.check_params_validity()
-        set_random_seed(self.params['seed'])
-        torch.backends.cudnn.benchmark = True
+        self.make_deterministic(self.params['seed'])
 
         # set up saving dir
         self.saving_dir = self._set_saving_dir()
