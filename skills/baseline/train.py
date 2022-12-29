@@ -19,7 +19,6 @@ from pfrl.nn.lmbda import Lambda
 from procgen import ProcgenEnv
 import pfrl
 from pfrl.agents import DoubleDQN
-from pfrl.utils import set_random_seed
 from pfrl.q_functions import DiscreteActionValueHead
 
 from skills.vec_env import VecExtractDictObs, VecNormalize, VecChannelOrder, VecMonitor
@@ -316,8 +315,7 @@ class ProcgenAntTrial(BaseTrial):
     
     def setup(self):
         self.check_params_validity()
-        set_random_seed(self.params['seed'])
-        torch.backends.cudnn.benchmark = True
+        self.make_deterministic(self.params['seed'])
 
         # set up saving dir
         self.saving_dir = self._set_saving_dir()
