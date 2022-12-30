@@ -307,7 +307,7 @@ class EnsembleAgent(Agent):
             state_embedding_flatten = state_embedding_flatten.view(self.batch_size, len(self.attention_model.attention_modules), -1)  # (batch_size, num_modules, d)
             div_loss = batched_L_divergence(state_embedding_flatten)
 
-            if not compute_loss_only:
+            if not compute_loss_only and type(div_loss) != int:  # div_loss might be int(0) if there is no ensemble
                 self.attention_optimizer.zero_grad()
                 div_loss.backward()
                 self.attention_optimizer.step()
