@@ -46,6 +46,8 @@ class ProcgenTransferTrial(BaseTrial):
         # training
         parser.add_argument('--transfer_steps', type=int, default=500_000)
         parser.add_argument('--bandit_exploration_weight', type=float, default=500)
+        parser.add_argument('--on_policy_updates', '-o', action='store_true', default=False,
+                            help='only use on-policy data to update the policy learners')
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
@@ -165,6 +167,7 @@ class ProcgenTransferTrial(BaseTrial):
             bandit_exploration_weight=self.params['bandit_exploration_weight'],
             fix_attention_mask=self.params['fix_attention_masks'],
             use_feature_learner=not self.params['remove_feature_learner'],
+            only_use_on_policy_updates=self.params['on_policy_updates']
         )
         if self.params['fix_attention_masks']:
             load_path = os.path.join(self.params['load'], self.expanded_agent_name, str(self.params['seed']))

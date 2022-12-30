@@ -38,7 +38,8 @@ class EnsembleAgent(Agent):
                 embedding_plot_freq=10000,
                 bandit_exploration_weight=500,
                 fix_attention_mask=False,
-                use_feature_learner=True):
+                use_feature_learner=True,
+                only_use_on_policy_updates=False,):
         # vars
         self.device = device
         self.batch_size = batch_size
@@ -59,19 +60,27 @@ class EnsembleAgent(Agent):
         self.bandit_exploration_weight = bandit_exploration_weight
         self.fix_attention_mask = fix_attention_mask
         self.use_feature_learner = use_feature_learner
+        self.only_use_on_policy_updates = only_use_on_policy_updates
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
         self.attention_optimizer = torch.optim.Adam(self.attention_model.parameters(), lr=learning_rate)
         self.learners = learners
-        learnable_params = list(itertools.chain.from_iterable([list(learner.model.parameters()) for learner in self.learners]))
-        if not self.fix_attention_mask:
-            learnable_params = list(self.attention_model.parameters()) + learnable_params
-        self.optimizer = torch.optim.Adam(
-            learnable_params,
-            lr=learning_rate
-        )
         self.num_learners = len(learners)
+        if self.only_use_on_policy_updates:
+            # separate optimizer for each learner, and one for attention model
+            self.learner_optimizers = [
+                torch.optim.Adam(learner.model.parameters(), lr=learning_rate) for learner in self.learners
+            ]
+        else:
+            # on optimizer for all params
+            learnable_params = list(itertools.chain.from_iterable([list(learner.model.parameters()) for learner in self.learners]))
+            if not self.fix_attention_mask:
+                learnable_params = list(self.attention_model.parameters()) + learnable_params
+            self.optimizer = torch.optim.Adam(
+                learnable_params,
+                lr=learning_rate
+            )
 
         self.replay_buffer = replay_buffers.ReplayBuffer(capacity=buffer_length)
         # self.replay_updater = ReplayUpdater(
@@ -101,14 +110,6 @@ class EnsembleAgent(Agent):
     def batch_observe(self, batch_obs, batch_reward, batch_done, batch_reset):
         with self.set_evaluating():
 
-            # learners
-            embedded_obs = self._attention_embed_obs(batch_obs)
-            losses = []
-            for i, learner in enumerate(self.learners):
-                maybe_loss = learner.batch_observe(embedded_obs[i], batch_reward, batch_done, batch_reset)
-                losses.append(maybe_loss)
-            assert np.sum([loss is None for loss in losses]) == 0 or np.sum([loss is None for loss in losses]) == self.num_learners
-
             # add experience to buffer and update action leader
             if self.training:
                 self._batch_observe_train(
@@ -119,21 +120,51 @@ class EnsembleAgent(Agent):
                     batch_obs, batch_reward, batch_done, batch_reset
                 )
 
-            # actual update 
-            if np.sum([loss is not None for loss in losses]) == self.num_learners:
-                learner_loss = torch.stack(losses).sum()
-                div_loss = self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=True)
-                loss = learner_loss + div_loss
+            # calculate losses and actual updates
+            if self.only_use_on_policy_updates:
+                with torch.no_grad():
+                    embedded_obs = self._attention_embed_obs(batch_obs)
+                # just get loss from the leader, and update the leader and attention model
+                maybe_loss = self.learners[self.action_leader].batch_observe(embedded_obs[self.action_leader], batch_reward, batch_done, batch_reset)
+                if maybe_loss is None:
+                    return
 
+                # update learner
+                self.learner_optimizers[self.action_leader].zero_grad()
+                maybe_loss.backward()
+                learner = self.learners[self.action_leader]
+                if hasattr(learner, 'max_grad_norm') and learner.max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(learner.model.parameters(), learner.max_grad_norm)
+                self.learner_optimizers[self.action_leader].step()
+
+                # update attention
                 if not self.fix_attention_mask:
-                    self.attention_model.train()
-                self.optimizer.zero_grad()
-                loss.backward()
-                for learner in self.learners:
-                    if hasattr(learner, 'max_grad_norm') and learner.max_grad_norm is not None:
-                        torch.nn.utils.clip_grad_norm_(learner.model.parameters(), learner.max_grad_norm)
-                self.optimizer.step()
-                self.attention_model.eval()
+                    self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=False)
+                
+            else:
+                embedded_obs = self._attention_embed_obs(batch_obs)
+                # get losses from all learners and update all
+                losses = []
+                for i, learner in enumerate(self.learners):
+                    maybe_loss = learner.batch_observe(embedded_obs[i], batch_reward, batch_done, batch_reset)
+                    losses.append(maybe_loss)
+                assert np.sum([loss is None for loss in losses]) == 0 or np.sum([loss is None for loss in losses]) == self.num_learners
+
+                # update
+                if np.sum([loss is not None for loss in losses]) == self.num_learners:
+                    learner_loss = torch.stack(losses).sum()
+                    div_loss = self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=True)
+                    loss = learner_loss + div_loss
+
+                    if not self.fix_attention_mask:
+                        self.attention_model.train()
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    for learner in self.learners:
+                        if hasattr(learner, 'max_grad_norm') and learner.max_grad_norm is not None:
+                            torch.nn.utils.clip_grad_norm_(learner.model.parameters(), learner.max_grad_norm)
+                    self.optimizer.step()
+                    self.attention_model.eval()
     
     def _batch_observe_train(self, batch_obs, batch_reward, batch_done, batch_reset):
         """
@@ -295,7 +326,7 @@ class EnsembleAgent(Agent):
             return div_loss
 
     def batch_act(self, batch_obs):
-        with self.set_evaluating():
+        with self.set_evaluating() and torch.no_grad():
             # action selection strategy
             if self.action_selection_strategy == 'vote':
                 action_selection_func = choose_most_popular
