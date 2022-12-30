@@ -46,8 +46,10 @@ class ProcgenTransferTrial(BaseTrial):
         # training
         parser.add_argument('--transfer_steps', type=int, default=500_000)
         parser.add_argument('--bandit_exploration_weight', type=float, default=500)
-        parser.add_argument('--on_policy_updates', '-o', action='store_true', default=False,
-                            help='only use on-policy data to update the policy learners')
+        parser.add_argument('--on_policy_update_probability', '-o', type=float, default=0,
+                            help="""The probability that each agent in the ensemble is updated on-policy.
+                            0 is completely off-policy, 1 is completely on-policy.
+                            For p \in [0, 1], p is the probability that each agent is updated on-policy.""")
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
@@ -86,6 +88,7 @@ class ProcgenTransferTrial(BaseTrial):
         """
         if self.params['fix_attention_masks']:
             assert self.params['load'] is not None, "must load a saved agent if fix_attention_masks is True"
+        assert 0 <= self.params['on_policy_update_probability'] <= 1, "on_policy_update_probability must be in [0, 1]"
     
     def make_vector_env(self, level_index, eval=False):
         """
@@ -167,7 +170,7 @@ class ProcgenTransferTrial(BaseTrial):
             bandit_exploration_weight=self.params['bandit_exploration_weight'],
             fix_attention_mask=self.params['fix_attention_masks'],
             use_feature_learner=not self.params['remove_feature_learner'],
-            only_use_on_policy_updates=self.params['on_policy_updates']
+            on_policy_update_prob=self.params['on_policy_update_probability']
         )
         if self.params['fix_attention_masks']:
             load_path = os.path.join(self.params['load'], self.expanded_agent_name, str(self.params['seed']))

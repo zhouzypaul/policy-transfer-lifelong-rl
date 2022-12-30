@@ -39,7 +39,7 @@ class EnsembleAgent(Agent):
                 bandit_exploration_weight=500,
                 fix_attention_mask=False,
                 use_feature_learner=True,
-                only_use_on_policy_updates=False,):
+                on_policy_update_prob=0,):
         # vars
         self.device = device
         self.batch_size = batch_size
@@ -60,14 +60,14 @@ class EnsembleAgent(Agent):
         self.bandit_exploration_weight = bandit_exploration_weight
         self.fix_attention_mask = fix_attention_mask
         self.use_feature_learner = use_feature_learner
-        self.only_use_on_policy_updates = only_use_on_policy_updates
+        self.on_policy_update_prob = on_policy_update_prob
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
         self.attention_optimizer = torch.optim.Adam(self.attention_model.parameters(), lr=learning_rate)
         self.learners = learners
         self.num_learners = len(learners)
-        if self.only_use_on_policy_updates:
+        if self.on_policy_update_prob > 0:
             # separate optimizer for each learner, and one for attention model
             self.learner_optimizers = [
                 torch.optim.Adam(learner.model.parameters(), lr=learning_rate) for learner in self.learners
@@ -121,25 +121,27 @@ class EnsembleAgent(Agent):
                 )
 
             # calculate losses and actual updates
-            if self.only_use_on_policy_updates:
+            if self.on_policy_update_prob > 0:
                 with torch.no_grad():
                     embedded_obs = self._attention_embed_obs(batch_obs)
-                # just get loss from the leader, and update the leader and attention model
-                maybe_loss = self.learners[self.action_leader].batch_observe(embedded_obs[self.action_leader], batch_reward, batch_done, batch_reset)
-                if maybe_loss is None:
-                    return
+                attention_module_updated = False  # only update attention module once per step
+                for idx_learner, learner in enumerate(self.learners):
+                    if np.random.random() < self.on_policy_update_prob or idx_learner == self.action_leader:  # update the learner
+                        
+                        # update learner
+                        maybe_loss = learner.batch_observe(embedded_obs[idx_learner], batch_reward, batch_done, batch_reset)
+                        if maybe_loss is None:
+                            continue
+                        self.learner_optimizers[idx_learner].zero_grad()
+                        maybe_loss.backward()
+                        if hasattr(learner, 'max_grad_norm') and learner.max_grad_norm is not None:
+                            torch.nn.utils.clip_grad_norm_(learner.model.parameters(), learner.max_grad_norm)
+                        self.learner_optimizers[idx_learner].step()
 
-                # update learner
-                self.learner_optimizers[self.action_leader].zero_grad()
-                maybe_loss.backward()
-                learner = self.learners[self.action_leader]
-                if hasattr(learner, 'max_grad_norm') and learner.max_grad_norm is not None:
-                    torch.nn.utils.clip_grad_norm_(learner.model.parameters(), learner.max_grad_norm)
-                self.learner_optimizers[self.action_leader].step()
-
-                # update attention
-                if not self.fix_attention_mask:
-                    self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=False)
+                        # update attention
+                        if not self.fix_attention_mask and not attention_module_updated:
+                            self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=False)
+                            attention_module_updated = True
                 
             else:
                 embedded_obs = self._attention_embed_obs(batch_obs)
