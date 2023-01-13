@@ -14,7 +14,7 @@ from pfrl.utils.batch_states import batch_states
 from skills.ensemble.criterion import batched_L_divergence
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
-    choose_max_sum_qvals, upper_confidence_bound
+    choose_max_sum_qvals, upper_confidence_bound, exp3_bandit_algorithm
 
 
 class EnsembleAgent(Agent):
@@ -163,16 +163,18 @@ class EnsembleAgent(Agent):
             # self.replay_updater.update_if_necessary(self.step_number)
 
         # action leader
-        self.learner_accumulated_reward[self.action_leader] += batch_reward.clip(0, 1).sum()
+        self.learner_accumulated_reward[self.action_leader] += batch_reward.clip(0, 1).sum()  # assume non-zero reward only at episode end
         if batch_reset.any() or batch_done.any():
             self.episode_number += np.logical_or(batch_reset, batch_done).sum()
-            self._set_action_leader()
+            self._set_action_leader(batch_reward.clip(0, 1).sum())
+            self.learner_selection_count[self.action_leader] += 1
+            print(self.learner_selection_count)  # TODO: remove
 
     def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_reset):
         pass
     
     def _using_leader(self):
-        return self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']
+        return self.action_selection_strategy in ['exp3_leader', 'ucb_leader', 'greedy_leader', 'uniform_leader']
 
     def _attention_embed_obs(self, batch_obs):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
@@ -211,9 +213,9 @@ class EnsembleAgent(Agent):
         if terminal:
             self.episode_number += 1
             if self._using_leader():
-                self._set_action_leader()
+                self._set_action_leader(reward)
 
-    def _set_action_leader(self):
+    def _set_action_leader(self, reward):
         """choose which learner in the ensemble gets to lead the action selection process"""
         if self.action_selection_strategy == 'uniform_leader':
             # choose a random leader
@@ -231,7 +233,13 @@ class EnsembleAgent(Agent):
                 visitation_count=self.learner_selection_count, 
                 c=self.bandit_exploration_weight
             )
-            self.learner_selection_count[self.action_leader] += 1
+        elif self.action_selection_strategy == 'exp3_leader':
+            # choose a leader based on the EXP3 algorithm
+            self.action_leader = exp3_bandit_algorithm(
+                reward=reward,
+                num_arms=self.num_modules,
+                gamma=0.1,  # exploration parameter, in (0, 1]
+            )
 
     def update_attention(self, experiences, compute_loss_only=False, errors_out=None):
         """
@@ -299,7 +307,7 @@ class EnsembleAgent(Agent):
             # action selection strategy
             if self.action_selection_strategy == 'vote':
                 action_selection_func = choose_most_popular
-            elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
+            elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader']:
                 action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
             else:
                 raise NotImplementedError("action selection strat not supported")
@@ -332,7 +340,7 @@ class EnsembleAgent(Agent):
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = lambda a, qvals: choose_most_popular(a)
-        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
+        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader']:
             action_selection_func = lambda a, qvals: choose_leader(a, leader=self.action_leader)
         elif self.action_selection_strategy == 'add_qvals':
             action_selection_func = lambda a, qvals: choose_max_sum_qvals(qvals)

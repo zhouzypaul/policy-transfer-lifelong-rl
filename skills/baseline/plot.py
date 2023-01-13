@@ -116,6 +116,7 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir, unrolled=False):
     if plotting the unrolled curve, we will not average across the levels
     """
     rewards_mean = process_training_curve_csv_file(exp_dir, average_across_levels=not unrolled)
+    rewards_mean.sort_values(by='agent', inplace=True)
     to_plot_x = 'total_steps' if unrolled else 'level_total_steps'
     # plot
     if unrolled:
@@ -128,7 +129,8 @@ def plot_transfer_exp_training_curve_across_levels(exp_dir, unrolled=False):
         style='agent',
         errorbar='se',
     )
-    plt.title(f'Training Curve Averaged Across Levels :{exp_dir}')
+    plt_title = exp_dir.split('/')[-2]
+    plt.title(f'Training Curve Averaged Across Levels :{plt_title}')
     plt.xlabel('Steps')
     plt.ylabel('Episodic Reward')
     file_name = '/training_curve.png' if not unrolled else '/training_curve_unrolled.png'

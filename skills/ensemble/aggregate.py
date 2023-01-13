@@ -54,3 +54,27 @@ def upper_confidence_bound(values, t, visitation_count, c=1):
         c: the constant used to balance exploration and exploitation
     """
     return np.argmax(values + c * np.sqrt(2 * np.log(t) / visitation_count))
+
+
+weights = None
+
+
+def exp3_bandit_algorithm(reward, num_arms, gamma=0.1):
+    """
+    an implementation of the exp3 bandit algorithm
+    See: https://cseweb.ucsd.edu/~yfreund/papers/bandits.pdf
+    args:
+        gamma: a parameter in (0, 1] that controls exploration (I think) by mixing a uniform distribution with the current weights
+    """
+    # make sure weights are initialized
+    global weights
+    if weights is None:
+        weights = np.ones(num_arms)
+    # choose an action
+    probs = (1 - gamma) * weights / np.sum(weights) + gamma / len(weights)
+    a = np.random.choice(len(probs), p=probs)
+    # update weights
+    x_hat = np.zeros_like(weights)
+    x_hat[a] = reward / probs[a]
+    weights = weights * np.exp(gamma * x_hat / len(weights))
+    return a
