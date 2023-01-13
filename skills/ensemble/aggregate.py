@@ -77,4 +77,7 @@ def exp3_bandit_algorithm(reward, num_arms, gamma=0.1):
     x_hat = np.zeros_like(weights)
     x_hat[a] = reward / probs[a]
     weights = weights * np.exp(gamma * x_hat / len(weights))
+    # my own addition - keep weights from exploding
+    if np.max(weights) > 100:
+        weights = weights / np.max(weights)
     return a
