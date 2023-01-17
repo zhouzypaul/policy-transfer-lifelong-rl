@@ -56,6 +56,22 @@ def upper_confidence_bound(values, t, visitation_count, c=1):
     return np.argmax(values + c * np.sqrt(2 * np.log(t) / visitation_count))
 
 
+def upper_confidence_bound_agent_57(mean_rewards, t, visitation_count, beta=1):
+    """
+    the (stationary) upper confidence bound algorithm from the agent 57 paper
+    https://arxiv.org/pdf/2003.13350.pdf
+    after k steps:
+    for 0 <= k <= N - 1:
+        A_t = k
+    for N <= k <= K-1:
+        A_t = argmax_a [miu_a + beta * sqrt(ln(k-1) / N(a))]
+    """
+    if t <= len(mean_rewards) - 1:
+        return t
+    else:
+        return np.argmax(mean_rewards + beta * np.sqrt(np.log(t - 1) / visitation_count))
+
+
 weights = None
 
 

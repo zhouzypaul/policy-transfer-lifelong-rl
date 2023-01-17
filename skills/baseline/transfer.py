@@ -43,7 +43,7 @@ class ProcgenTransferTrial(BaseTrial):
 
         # training
         parser.add_argument('--transfer_steps', type=int, default=500_000)
-        parser.add_argument('--bandit_exploration_weight', type=float, default=500)
+        parser.add_argument('--bandit_exploration_weight', type=float, default=1)
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
@@ -70,7 +70,7 @@ class ProcgenTransferTrial(BaseTrial):
         parser.add_argument('--remove_feature_learner', action='store_true', default=False,
                             help='only use 1 attention mask to get 1 feature, but could be multiple policies')
         parser.add_argument('--action_selection_strat', type=str, default='ucb_leader',
-                            choices=['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader'],
+                            choices=['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader', "ucb_57"],
                             help='how to select the ensemble-action to take')
         
         args = self.parse_common_args(parser)

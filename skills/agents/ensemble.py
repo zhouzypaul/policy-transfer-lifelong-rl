@@ -14,7 +14,8 @@ from pfrl.utils.batch_states import batch_states
 from skills.ensemble.criterion import batched_L_divergence
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
-    choose_max_sum_qvals, upper_confidence_bound, exp3_bandit_algorithm
+    choose_max_sum_qvals, upper_confidence_bound, exp3_bandit_algorithm, \
+    upper_confidence_bound_agent_57
 
 
 class EnsembleAgent(Agent):
@@ -168,13 +169,14 @@ class EnsembleAgent(Agent):
             self.episode_number += np.logical_or(batch_reset, batch_done).sum()
             self._set_action_leader(batch_reward.clip(0, 1).sum())
             self.learner_selection_count[self.action_leader] += 1
-            print(self.learner_selection_count)  # TODO: remove
+            print(f"count: {self.learner_selection_count}")  # TODO: remove
+            print(f"r: {self.learner_accumulated_reward}")
 
     def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_reset):
         pass
     
     def _using_leader(self):
-        return self.action_selection_strategy in ['exp3_leader', 'ucb_leader', 'greedy_leader', 'uniform_leader']
+        return self.action_selection_strategy in ['exp3_leader', 'ucb_leader', 'greedy_leader', 'uniform_leader', 'ucb_57']
 
     def _attention_embed_obs(self, batch_obs):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
@@ -232,6 +234,13 @@ class EnsembleAgent(Agent):
                 t=self.step_number, 
                 visitation_count=self.learner_selection_count, 
                 c=self.bandit_exploration_weight
+            )
+        elif self.action_selection_strategy == 'ucb_57':
+            self.action_leader = upper_confidence_bound_agent_57(
+                mean_rewards=self.learner_accumulated_reward / self.learner_selection_count,
+                t=self.step_number,
+                visitation_count=self.learner_selection_count,
+                beta=self.bandit_exploration_weight,
             )
         elif self.action_selection_strategy == 'exp3_leader':
             # choose a leader based on the EXP3 algorithm
@@ -307,7 +316,7 @@ class EnsembleAgent(Agent):
             # action selection strategy
             if self.action_selection_strategy == 'vote':
                 action_selection_func = choose_most_popular
-            elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader']:
+            elif self._using_leader():
                 action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
             else:
                 raise NotImplementedError("action selection strat not supported")
