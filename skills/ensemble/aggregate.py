@@ -72,6 +72,28 @@ def upper_confidence_bound_agent_57(mean_rewards, t, visitation_count, beta=1):
         return np.argmax(mean_rewards + beta * np.sqrt(np.log(t - 1) / visitation_count))
 
 
+def upper_confidence_bound_with_window_size(mean_rewards, t, visitation_count, beta=1, epsilon=0.5):
+    """
+    the nonstationary upper confidence bound algorithm from the agent 57 paper
+    https://arxiv.org/pdf/2003.13350.pdf
+    This is the simplified sliding window UCB with epsilon-greedy exploration
+    for 0 <= k <= N - 1:
+        A_t = k
+    for N <= k <= K-1 and U_k >= epsilon:
+        A_t = argmax_a [miu_a_tau + beta * sqrt(1 / N(a, tau))]
+    for N <= k <= K-1 and U_k < epsilon:
+        A_t = random uniform
+    """
+    if t <= len(mean_rewards) - 1:
+        return t
+    else:
+        u = np.random.uniform()
+        if u >= epsilon:
+            return np.argmax(mean_rewards + beta * np.sqrt(1 / visitation_count))
+        else:
+            return np.random.choice(len(mean_rewards))
+
+
 weights = None
 
 
