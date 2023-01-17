@@ -11,6 +11,7 @@ from pfrl import replay_buffers
 from pfrl.replay_buffer import ReplayUpdater, batch_experiences
 from pfrl.utils.batch_states import batch_states
 
+from skills.baseline import logger
 from skills.ensemble.criterion import batched_L_divergence
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
@@ -38,7 +39,8 @@ class EnsembleAgent(Agent):
                 embedding_plot_freq=10000,
                 bandit_exploration_weight=500,
                 fix_attention_mask=False,
-                use_feature_learner=True):
+                use_feature_learner=True,
+                saving_dir=None,):
         # vars
         self.device = device
         self.batch_size = batch_size
@@ -59,6 +61,9 @@ class EnsembleAgent(Agent):
         self.bandit_exploration_weight = bandit_exploration_weight
         self.fix_attention_mask = fix_attention_mask
         self.use_feature_learner = use_feature_learner
+        self.saving_dir = saving_dir
+        if self.saving_dir is not None and self._using_leader():
+            self.logger = logger.configure(dir=self.saving_dir, format_strs=['csv'], log_suffix="_bandit_stats")
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
@@ -167,6 +172,7 @@ class EnsembleAgent(Agent):
         if batch_reset.any() or batch_done.any():
             self.episode_number += np.logical_or(batch_reset, batch_done).sum()
             self._set_action_leader()
+            self._log_bandit_stats()
 
     def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_reset):
         pass
@@ -212,6 +218,17 @@ class EnsembleAgent(Agent):
             self.episode_number += 1
             if self._using_leader():
                 self._set_action_leader()
+                self._log_bandit_stats()
+    
+    def _log_bandit_stats(self):
+        self.logger.logkv('episode_number', self.episode_number)
+        self.logger.logkv('time_step', self.step_number)
+        self.logger.logkv('action_leader', self.action_leader)
+        self.logger.logkv('num_learners', self.num_learners)
+        for i in range(self.num_modules):
+            self.logger.logkv(f'learner_{i}_reward', self.learner_accumulated_reward[i])
+            self.logger.logkv(f'learner_{i}_selection_count', self.learner_selection_count[i])
+        self.logger.dumpkvs()
 
     def _set_action_leader(self):
         """choose which learner in the ensemble gets to lead the action selection process"""
