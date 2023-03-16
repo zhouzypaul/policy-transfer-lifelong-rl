@@ -114,6 +114,7 @@ def plot_attention_diversity(embedding, num_attentions=8, save_dir=None, plot_fr
 		plt.subplot(2, 4, i+1)
 		plt.imshow(embedding_mean[i])
 		plt.title("attention {}".format(i))
+	plt.colorbar()
 	# show/save fig
 	if save_dir is not None:
 		if plot_attention_diversity.calls % plot_freq == 0:

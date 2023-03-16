@@ -163,13 +163,15 @@ class AttentionEmbedding(nn.Module):
         if plot:
             plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
 
-        # normalize attention to between [0, 1]
+        # normalize global features to between [0, 1]
         for i in range(self.num_attention_modules):
             N, D, H, W = global_features[i].size()
             feat = global_features[i].view(-1, H*W)
             feat_max, _ = feat.max(dim=1, keepdim=True)
             feat_min, _ = feat.min(dim=1, keepdim=True)
             global_features[i] = ((feat - feat_min)/(feat_max-feat_min+1e-8)).view(N, D, H, W)
+        if plot:
+            plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
 
         # embedding = torch.cat([self.compact_global_features(f).unsqueeze(0) for f in global_features], dim=0)  # (num_modules, N, embedding_size)
 

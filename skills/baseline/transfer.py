@@ -73,6 +73,9 @@ class ProcgenTransferTrial(BaseTrial):
                             help='directory to load the saved agent and attention masks')
         parser.add_argument('--remove_feature_learner', action='store_true', default=False,
                             help='only use 1 attention mask to get 1 feature, but could be multiple policies')
+        parser.add_argument('--action_selection_strat', type=str, default='ucb_leader',
+                            choices=['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader', "ucb_57", "ucb_window_size"],
+                            help='how to select the ensemble-action to take')
         
         args = self.parse_common_args(parser)
         # auto fill
@@ -169,6 +172,7 @@ class ProcgenTransferTrial(BaseTrial):
             bandit_exploration_weight=self.params['bandit_exploration_weight'],
             fix_attention_mask=self.params['fix_attention_masks'],
             use_feature_learner=not self.params['remove_feature_learner'],
+            saving_dir=self.saving_dir,
         )
         if self.params['fix_attention_masks']:
             load_path = os.path.join(self.params['load'], self.expanded_agent_name, str(self.params['seed']))
@@ -186,7 +190,7 @@ class ProcgenTransferTrial(BaseTrial):
         return Path(self.params['results_dir'], self.params['experiment_name'], self.expanded_agent_name, str(self.params['seed']))
 
     def make_logger(self, log_dir):
-        logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
+        return logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
     
     def setup(self):
         self.check_params_validity()
@@ -232,6 +236,7 @@ class ProcgenTransferTrial(BaseTrial):
                 level_index=i_level,
                 steps_offset=i * self.params['transfer_steps'],
                 log_interval=100,
+                logger=self.logger,
             )
             # reset the agent
             # self.agent.reset()  # if we use this, should tune down bandit exploration
@@ -280,6 +285,7 @@ def train_with_eval(
     steps_offset=0,
     level_index=0,
     log_interval=100,
+    logger=None,
 ):
     logger.info('Train agent from scratch.')
 
