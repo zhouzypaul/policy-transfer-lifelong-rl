@@ -43,7 +43,11 @@ class ProcgenTransferTrial(BaseTrial):
 
         # training
         parser.add_argument('--transfer_steps', type=int, default=500_000)
-        parser.add_argument('--bandit_exploration_weight', type=float, default=1)
+        parser.add_argument('--bandit_exploration_weight', type=float, default=500)
+        parser.add_argument('--individual_spatial_feature_extractor', '-s', action='store_true', default=False,
+                            help='use individual spatial feature extractor for each attention module')
+        parser.add_argument('--individual_global_feature_extractor', '-g', action='store_true', default=False,
+                            help='use individual global feature extractor for each attention module')
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
@@ -137,6 +141,8 @@ class ProcgenTransferTrial(BaseTrial):
             embedding_size=64,
             attention_depth=32,
             num_attention_modules=1 if self.params['remove_feature_learner'] else self.params['num_policies'],
+            use_individual_spatial_feature=self.params['individual_spatial_feature_extractor'],
+            use_individual_global_feature=self.params['individual_global_feature_extractor'],
             plot_dir=self.params['plots_dir'],
         )
         def _make_policy_and_opt():

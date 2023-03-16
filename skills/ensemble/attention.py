@@ -62,14 +62,32 @@ class AttentionEmbedding(nn.Module):
                 embedding_size=64, 
                 attention_depth=32, 
                 num_attention_modules=8, 
+                use_individual_spatial_feature=False,
+                use_individual_global_feature=False,
                 plot_dir=None):
         super(AttentionEmbedding, self).__init__()
         self.num_attention_modules = num_attention_modules
         self.out_dim = embedding_size
         self.attention_depth = attention_depth
+        self.use_individual_spatial_feature = use_individual_spatial_feature
+        self.use_individual_global_feature = use_individual_global_feature
 
-        self.conv1 = nn.LazyConv2d(out_channels=self.attention_depth, kernel_size=3, stride=1)
-        self.pool1 = nn.MaxPool2d(2)
+        if not self.use_individual_spatial_feature:
+            self.conv1 = nn.LazyConv2d(out_channels=self.attention_depth, kernel_size=3, stride=1)
+            self.pool1 = nn.MaxPool2d(2)
+        else:
+            self.conv1 = nn.ModuleList(
+                [
+                    nn.LazyConv2d(out_channels=self.attention_depth, kernel_size=3, stride=1)
+                    for _ in range(self.num_attention_modules)
+                ]
+            )
+            self.pool1 = nn.ModuleList(
+                [
+                    nn.MaxPool2d(2)
+                    for _ in range(self.num_attention_modules)
+                ]
+            )
 
         self.attention_modules = nn.ModuleList(
             [
@@ -78,22 +96,44 @@ class AttentionEmbedding(nn.Module):
             ]
         )
 
-        self.conv2 = nn.Conv2d(in_channels=self.attention_depth, out_channels=64, kernel_size=3, stride=2)
-        self.pool2 = nn.MaxPool2d(2)
+        if not self.use_individual_global_feature:
+            self.conv2 = nn.Conv2d(in_channels=self.attention_depth, out_channels=64, kernel_size=3, stride=2)
+            self.pool2 = nn.MaxPool2d(2)
+        else:
+            self.conv2 = nn.ModuleList(
+                [
+                    nn.Conv2d(in_channels=self.attention_depth, out_channels=64, kernel_size=3, stride=2)
+                    for _ in range(self.num_attention_modules)
+                ]
+            )
+            self.pool2 = nn.ModuleList(
+                [
+                    nn.MaxPool2d(2)
+                    for _ in range(self.num_attention_modules)
+                ]
+            )
         
         self.linear = nn.LazyLinear(self.out_dim)
 
         self.plot_dir = plot_dir
 
     def spatial_feature_extractor(self, x):
-        x = F.relu(self.conv1(x))
-        x = self.pool1(x)
+        if not self.use_individual_spatial_feature:
+            x = F.relu(self.conv1(x))
+            x = self.pool1(x)
+        else:
+            x = [F.relu(self.conv1[i](x)) for i in range(self.num_attention_modules)]
+            x = [self.pool1[i](x[i]) for i in range(self.num_attention_modules)]
 
         return x
 
     def global_feature_extractor(self, x):
-        x = F.relu(self.conv2(x))
-        x = self.pool2(x)
+        if not self.use_individual_global_feature:
+            x = F.relu(self.conv2(x))
+            x = self.pool2(x)
+        else:
+            x = [F.relu(self.conv2[i](x[i])) for i in range(self.num_attention_modules)]
+            x = [self.pool2[i](x[i]) for i in range(self.num_attention_modules)]
         return x
 
     def compact_global_features(self, x):
@@ -104,7 +144,9 @@ class AttentionEmbedding(nn.Module):
 
     def forward(self, x, return_attention_mask=False, plot=False):
         spacial_features = self.spatial_feature_extractor(x)
-        attentions = [self.attention_modules[i](spacial_features) for i in range(self.num_attention_modules)]
+        if not self.use_individual_spatial_feature:
+            spacial_features = [spacial_features] * self.num_attention_modules
+        attentions = [self.attention_modules[i](spacial_features[i]) for i in range(self.num_attention_modules)]
 
         # normalize attention to between [0, 1]
         for i in range(self.num_attention_modules):
@@ -114,7 +156,12 @@ class AttentionEmbedding(nn.Module):
             attention_min, _ = attention.min(dim=1, keepdim=True)
             attentions[i] = ((attention - attention_min)/(attention_max-attention_min+1e-8)).view(N, D, H, W)
 
-        global_features = [self.global_feature_extractor(attentions[i] * spacial_features) for i in range(self.num_attention_modules)]
+        if not self.use_individual_global_feature:
+            global_features = [self.global_feature_extractor(attentions[i] * spacial_features[i]) for i in range(self.num_attention_modules)]
+        else:
+            global_features = self.global_feature_extractor([attentions[i] * spacial_features[i] for i in range(self.num_attention_modules)])
+        if plot:
+            plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
 
         # normalize global features to between [0, 1]
         for i in range(self.num_attention_modules):
