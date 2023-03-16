@@ -28,6 +28,9 @@ def plot_eight_procgen_games(results_dir):
         experiment_dir = os.path.join(results_dir, game)
         # get data
         rewards_mean = process_training_curve_csv_file(experiment_dir)
+        # replace the name of agent Ensemble-1 with Baseline (singular)
+        rewards_mean['agent'] = rewards_mean['agent'].replace('Ensemble-1', 'Baseline (singular)')
+        # rewards_mean[rewards_mean['agent'] == 'Ensemble-1'].replace('Ensemble-1', 'Baseline (singular)', inplace=True)
         # plot
         sns.lineplot(
             ax=axes[i // ncols, i % ncols],
@@ -38,24 +41,27 @@ def plot_eight_procgen_games(results_dir):
             style='agent',
             errorbar='se',
         )
+        big_size = 25
+        med_size = 22
+        small_size = 20
         # title 
-        axes[i // ncols, i % ncols].set_title(first_char_upper(game), fontsize=22)
+        axes[i // ncols, i % ncols].set_title(first_char_upper(game), fontsize=big_size)
         # ylabel
         if i % ncols == 0:
-            axes[i // ncols, i % ncols].set_ylabel('Episodic Reward', fontsize=20)
+            axes[i // ncols, i % ncols].set_ylabel('Episodic Reward', fontsize=med_size)
         else:
             axes[i // ncols, i % ncols].set_ylabel('')
         # xlabel
-        axes[i // ncols, i % ncols].set_xlabel('Steps', fontsize=20)
+        axes[i // ncols, i % ncols].set_xlabel('Steps', fontsize=med_size)
         # ticks
-        axes[i // ncols, i % ncols].tick_params(axis='y', which='major', labelsize=15)
+        axes[i // ncols, i % ncols].tick_params(axis='y', which='major', labelsize=small_size)
         if ncols == 2:
-            axes[i // ncols, i % ncols].tick_params(axis='x', which='major', labelsize=15)
+            axes[i // ncols, i % ncols].tick_params(axis='x', which='major', labelsize=med_size)
         # shared legend
         axes[i // ncols, i % ncols].legend().remove()
         if i == ncols * nrows - 1:
             handles, labels = axes[i // ncols, i % ncols].get_legend_handles_labels()
-            fig.legend(handles, labels, loc='lower center', ncol=4, prop={'size': 22})
+            fig.legend(handles, labels, loc='lower center', ncol=4, prop={'size': big_size})
     
     # adjustments
     if ncols == 4:
