@@ -2,6 +2,7 @@ import os
 import lzma
 import dill
 import itertools
+from collections import deque
 from contextlib import contextmanager
 
 import torch
@@ -15,7 +16,8 @@ from skills.baseline import logger
 from skills.ensemble.criterion import batched_L_divergence
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
-    choose_max_sum_qvals, upper_confidence_bound
+    choose_max_sum_qvals, upper_confidence_bound, exp3_bandit_algorithm, \
+    upper_confidence_bound_agent_57, upper_confidence_bound_with_window_size
 
 
 class EnsembleAgent(Agent):
@@ -56,6 +58,10 @@ class EnsembleAgent(Agent):
         if self._using_leader():
             self.learner_accumulated_reward = np.ones(self.num_modules)  # laplace smoothing
             self.learner_selection_count = np.ones(self.num_modules)  # laplace smoothing
+        if self.action_selection_strategy == "ucb_window_size":
+            self.ucb_window_size = 90  # from the agent 57 paper
+            self.learner_accumulated_reward_queue = [deque(maxlen=self.ucb_window_size) for _ in range(self.num_modules)]
+            self.learner_selection_count_queue = [deque(maxlen=self.ucb_window_size) for _ in range(self.num_modules)]
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
         self.bandit_exploration_weight = bandit_exploration_weight
@@ -168,17 +174,38 @@ class EnsembleAgent(Agent):
             # self.replay_updater.update_if_necessary(self.step_number)
 
         # action leader
-        self.learner_accumulated_reward[self.action_leader] += batch_reward.clip(0, 1).sum()
         if batch_reset.any() or batch_done.any():
             self.episode_number += np.logical_or(batch_reset, batch_done).sum()
-            self._set_action_leader()
-            self._log_bandit_stats()
+            self._set_action_leader(batch_reward.clip(0, 1).sum())
+            self._update_learner_stats(batch_reward.clip(0, 1).sum())  # assume non-zero reward only at episode end
+            if self.episode_number % 20 == 0:
+                self._log_bandit_stats()
 
     def _batch_observe_eval(self, batch_obs, batch_reward, batch_done, batch_reset):
         pass
     
     def _using_leader(self):
-        return self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']
+        return self.action_selection_strategy in ['exp3_leader', 'ucb_leader', 'greedy_leader', 'uniform_leader', 'ucb_57', 'ucb_window_size']
+
+    def _update_learner_stats(self, reward):
+        def safe_mean(x):
+            return np.mean(x) if len(x) > 0 else 0
+        if self.action_selection_strategy == "ucb_window_size":
+            # udpate queue
+            for i in range(self.num_learners):
+                if i == self.action_leader:
+                    self.learner_accumulated_reward_queue[i].append(reward)
+                    self.learner_selection_count_queue[i].append(1)
+                else:
+                    self.learner_accumulated_reward_queue[i].append(0)
+                    self.learner_selection_count_queue[i].append(0)
+            # update the stats
+            for i in range(self.num_learners):
+                self.learner_accumulated_reward[i] = safe_mean(self.learner_accumulated_reward_queue[i])
+                self.learner_selection_count[i] = np.sum(self.learner_selection_count_queue[i])
+        else:
+            self.learner_accumulated_reward[self.action_leader] += reward
+            self.learner_selection_count[self.action_leader] += 1
 
     def _attention_embed_obs(self, batch_obs):
         obs = torch.as_tensor(batch_obs.copy(), dtype=torch.float32, device=self.device)
@@ -190,6 +217,7 @@ class EnsembleAgent(Agent):
     
     def observe(self, obs, action, reward, next_obs, terminal):
         """
+        DEPRECATED
         store the experience tuple into the replay buffer
         and update the agent if necessary
         """
@@ -217,7 +245,7 @@ class EnsembleAgent(Agent):
         if terminal:
             self.episode_number += 1
             if self._using_leader():
-                self._set_action_leader()
+                self._set_action_leader(reward)
                 self._log_bandit_stats()
     
     def _log_bandit_stats(self):
@@ -230,7 +258,7 @@ class EnsembleAgent(Agent):
             self.logger.logkv(f'learner_{i}_selection_count', self.learner_selection_count[i])
         self.logger.dumpkvs()
 
-    def _set_action_leader(self):
+    def _set_action_leader(self, reward):
         """choose which learner in the ensemble gets to lead the action selection process"""
         if self.action_selection_strategy == 'uniform_leader':
             # choose a random leader
@@ -248,7 +276,28 @@ class EnsembleAgent(Agent):
                 visitation_count=self.learner_selection_count, 
                 c=self.bandit_exploration_weight
             )
-            self.learner_selection_count[self.action_leader] += 1
+        elif self.action_selection_strategy == 'ucb_57':
+            self.action_leader = upper_confidence_bound_agent_57(
+                mean_rewards=self.learner_accumulated_reward / self.learner_selection_count,
+                t=self.step_number,
+                visitation_count=self.learner_selection_count,
+                beta=self.bandit_exploration_weight,
+            )
+        elif self.action_selection_strategy == 'ucb_window_size':
+            self.action_leader = upper_confidence_bound_with_window_size(
+                mean_rewards=self.learner_accumulated_reward,
+                t=self.step_number,
+                visitation_count=self.learner_selection_count,
+                beta=self.bandit_exploration_weight,
+                epsilon=0.5,
+            )
+        elif self.action_selection_strategy == 'exp3_leader':
+            # choose a leader based on the EXP3 algorithm
+            self.action_leader = exp3_bandit_algorithm(
+                reward=reward,
+                num_arms=self.num_modules,
+                gamma=0.1,  # exploration parameter, in (0, 1]
+            )
 
     def update_attention(self, experiences, compute_loss_only=False, errors_out=None):
         """
@@ -316,7 +365,7 @@ class EnsembleAgent(Agent):
             # action selection strategy
             if self.action_selection_strategy == 'vote':
                 action_selection_func = choose_most_popular
-            elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
+            elif self._using_leader():
                 action_selection_func = lambda a: choose_leader(a, leader=self.action_leader)
             else:
                 raise NotImplementedError("action selection strat not supported")
@@ -349,7 +398,7 @@ class EnsembleAgent(Agent):
         # action selection strategy
         if self.action_selection_strategy == 'vote':
             action_selection_func = lambda a, qvals: choose_most_popular(a)
-        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader']:
+        elif self.action_selection_strategy in ['ucb_leader', 'greedy_leader', 'uniform_leader', 'exp3_leader']:
             action_selection_func = lambda a, qvals: choose_leader(a, leader=self.action_leader)
         elif self.action_selection_strategy == 'add_qvals':
             action_selection_func = lambda a, qvals: choose_max_sum_qvals(qvals)
