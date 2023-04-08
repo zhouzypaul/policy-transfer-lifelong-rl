@@ -311,7 +311,7 @@ class ProcgenAntTrial(BaseTrial):
         return Path(self.params['results_dir'], self.params['experiment_name'], self.expanded_agent_name, str(self.params['seed']))
 
     def make_logger(self, log_dir):
-        logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
+        return logger.configure(dir=log_dir, format_strs=['csv', 'stdout'])
     
     def setup(self):
         self.check_params_validity()
@@ -329,6 +329,7 @@ class ProcgenAntTrial(BaseTrial):
 
         # logger
         self.logger = self.make_logger(self.saving_dir)
+        assert self.logger is not None
 
         # env
         self.train_env = self.make_vector_env(eval=False)
@@ -348,6 +349,7 @@ class ProcgenAntTrial(BaseTrial):
             model_file=self.params['load'],
             log_interval=100,
             save_interval=self.params['save_interval'],
+            logger=self.logger,
         )
         plot_reward_curve(self.saving_dir)
 
@@ -393,9 +395,10 @@ def train_with_eval(
     model_file=None,
     log_interval=100,
     save_interval=20_000,
+    logger=None,
 ):
     if model_file is not None:
-        load_agent(agent, model_file, plot_dir=os.path.join(model_dir, 'plots'))
+        load_agent(agent, model_file, plot_dir=os.path.join(model_dir, 'plots'), logger=logger)
     else:
         logger.info('Train agent from scratch.')
 
@@ -458,14 +461,14 @@ def train_with_eval(
             tstart = time.perf_counter()
         
         if (step_cnt + 1) % save_interval == 0:
-            save_agent(agent, model_dir)
+            save_agent(agent, model_dir, logger=logger)
 
     # Save the final model.
     logger.info('Training done.')
-    save_agent(agent, model_dir)
+    save_agent(agent, model_dir, logger=logger)
 
 
-def save_agent(agent, saving_dir):
+def save_agent(agent, saving_dir, logger):
     if type(agent) == PPO:
         model_path = os.path.join(saving_dir, 'model.pt')
         agent.model.save_to_file(model_path)
@@ -480,7 +483,7 @@ def save_agent(agent, saving_dir):
         raise RuntimeError 
 
 
-def load_agent(agent, load_path, plot_dir=None):
+def load_agent(agent, load_path, plot_dir=None, logger=None):
     if type(agent) == PPO:
         agent.model.load_from_file(load_path)
         logger.info(f"Model loaded from {load_path}")
