@@ -242,7 +242,7 @@ class ProcgenTransferTrial(BaseTrial):
             # self.agent.reset()  # if we use this, should tune down bandit exploration
         
         # save agent
-        save_agent(self.agent, self.saving_dir)
+        save_agent(self.agent, self.saving_dir, self.logger)
 
 
 def safe_mean(xs):
@@ -350,7 +350,7 @@ def train_with_eval(
             tstart = time.perf_counter()
 
 
-def save_agent(agent, saving_dir):
+def save_agent(agent, saving_dir, logger):
     if type(agent) == PPO:
         model_path = os.path.join(saving_dir, 'model.pt')
         agent.model.save_to_file(model_path)
