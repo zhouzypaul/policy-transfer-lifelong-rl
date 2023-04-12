@@ -43,17 +43,36 @@ def choose_max_sum_qvals(q_vals):
     return np.argmax(sumed_q_vals)
 
 
-def upper_confidence_bound(values, t, visitation_count, c=1):
+class UCB:
     """
-    an implementation of the upper confidence bound algorithm
-    A_t = argmax_a [Q_t(a) + c * sqrt(2 * ln(t) / n(a))]
-    args:
-        values: (num_actions) the value estimates of each action
-        t: the current timestep
-        visitation_count: (num_actions) the number of times each action has been selected
-        c: the constant used to balance exploration and exploitation
+    UCB: Upper Confidence Bound
     """
-    return np.argmax(values + c * np.sqrt(2 * np.log(t) / visitation_count))
+    def __init__(self, score_normalization='sum') -> None:
+        self.bandit_scores = None
+        self.normalized_bandit_scores = None
+        self.score_normalization = score_normalization
+
+    def softmax_stable(self, x):
+        return(np.exp(x - np.max(x)) / np.exp(x - np.max(x)).sum())
+
+    def upper_confidence_bound(self, values, t, visitation_count, c=1):
+        """
+        an implementation of the upper confidence bound algorithm
+        A_t = argmax_a [Q_t(a) + c * sqrt(2 * ln(t) / n(a))]
+        args:
+            values: (num_actions) the value estimates of each action
+            t: the current timestep
+            visitation_count: (num_actions) the number of times each action has been selected
+            c: the constant used to balance exploration and exploitation
+        """
+        self.bandit_scores = values + c * np.sqrt(2 * np.log(t) / visitation_count)
+        if self.score_normalization == 'softmax':
+            # Should not use this normalization method
+            # because `values` might be very big, and relatively small differences will be amplified
+            self.normalized_bandit_scores = self.softmax_stable(self.bandit_scores)
+        elif self.score_normalization == 'sum':
+            self.normalized_bandit_scores = self.bandit_scores / np.sum(self.bandit_scores)
+        return np.argmax(self.bandit_scores)
 
 
 def upper_confidence_bound_agent_57(mean_rewards, t, visitation_count, beta=1):

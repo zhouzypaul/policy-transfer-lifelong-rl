@@ -16,8 +16,9 @@ from skills.baseline import logger
 from skills.ensemble.criterion import batched_L_divergence
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
-    choose_max_sum_qvals, upper_confidence_bound, exp3_bandit_algorithm, \
+    choose_max_sum_qvals, UCB, exp3_bandit_algorithm, \
     upper_confidence_bound_agent_57, upper_confidence_bound_with_window_size
+ucb = UCB(score_normalization='sum')
 
 
 class EnsembleAgent(Agent):
@@ -270,7 +271,7 @@ class EnsembleAgent(Agent):
             self.action_leader = np.random.choice(self.num_modules, p=probability)
         elif self.action_selection_strategy == 'ucb_leader':
             # choose a leader based on the Upper Condfience Bound algorithm 
-            self.action_leader = upper_confidence_bound(
+            self.action_leader = ucb.upper_confidence_bound(
                 values=self.learner_accumulated_reward, 
                 t=self.step_number, 
                 visitation_count=self.learner_selection_count, 
@@ -340,7 +341,8 @@ class EnsembleAgent(Agent):
             state_embeddings = self.attention_model(batch_states, plot=(self.n_updates % self.embedding_plot_freq == 0))  # num_modules x (batch_size, C, H, W)
             state_embedding_flatten = torch.cat([embedding.unsqueeze(1) for embedding in state_embeddings], dim=1)  # (batch_size, num_modules, C, H, W)
             state_embedding_flatten = state_embedding_flatten.view(self.batch_size, len(self.attention_model.attention_modules), -1)  # (batch_size, num_modules, d)
-            div_loss = batched_L_divergence(state_embedding_flatten)
+            loss_weights = ucb.normalized_bandit_scores if ucb.normalized_bandit_scores is not None else np.ones(self.num_modules)
+            div_loss = batched_L_divergence(state_embedding_flatten, weights=loss_weights)
 
             if not compute_loss_only:
                 self.attention_optimizer.zero_grad()
