@@ -13,15 +13,24 @@ def first_char_upper(game_name):
     return game_name[0].upper() + game_name[1:]
 
 
-def plot_eight_procgen_games(results_dir, require_complete=True):
+def plot_procgen_games(results_dir, require_complete=True, plot_all_16_games=False):
     """
     plot the eight procgen games in one big plot
+    args:
+        require_complete: if True, raise an error if the csv file is not complete
+        plot_all_16_games: if True, will plot all 16 games, else plot the 8 games
     """
-    games = ['bigfish', 'coinrun', 'dodgeball', 'heist', 'jumper', 'leaper', 'maze', 'ninja']
-    nrows = 2
+    if plot_all_16_games:
+        games = ['bigfish', 'bossfight', 'caveflyer', 'chaser', 'climber', 'coinrun', 'dodgeball', 'fruitbot', 'heist', 'jumper', 'leaper', 'maze', 'miner', 'ninja', 'plunder', 'starpilot']
+        nrows = 4
+        figsize = (22, 22)
+    else:
+        games = ['dodgeball', 'miner', 'jumper', 'maze', 'bigfish', 'heist', 'climber', 'ninja']
+        nrows = 2
+        figsize = (22, 12)
     ncols = 4
-    figsize = (22, 12)
     if ncols == 2:
+        assert not plot_all_16_games
         figsize = (17, 20)
     fig, axes = plt.subplots(nrows, ncols, sharex=True, figsize=figsize)
     for i, game in enumerate(games):
@@ -29,6 +38,9 @@ def plot_eight_procgen_games(results_dir, require_complete=True):
         # get data
         rewards_mean = process_training_curve_csv_file(experiment_dir, require_complete=require_complete)
         # replace the name of agent Ensemble-1 with Baseline (singular)
+        if plot_all_16_games:
+            # only allow Ensembe-1 and Ensemble-7 for agent
+            rewards_mean = rewards_mean[rewards_mean['agent'].isin(['Ensemble-1', 'Ensemble-7'])]
         rewards_mean['agent'] = rewards_mean['agent'].replace('Ensemble-1', 'Baseline (singular)')
         # rewards_mean[rewards_mean['agent'] == 'Ensemble-1'].replace('Ensemble-1', 'Baseline (singular)', inplace=True)
         # plot
@@ -71,7 +83,8 @@ def plot_eight_procgen_games(results_dir, require_complete=True):
     fig.suptitle('Training Curve Averaged Across Levels', fontsize=25)
 
     # save
-    save_path = os.path.join(results_dir, 'procgen_results.png')
+    file_name = 'procgen_results_all.png' if plot_all_16_games else 'procgen_results.png'
+    save_path = os.path.join(results_dir, file_name)
     fig.savefig(save_path)
     with open(os.path.join(results_dir, 'procgen_results.pkl'), 'wb') as f:
         pickle.dump((fig, axes), f)
@@ -95,14 +108,20 @@ def process_training_curve_csv_file(exp_dir, average_across_levels=True, require
             try:
                 df = pandas.read_csv(csv_path, comment='#')
             except pandas.errors.EmptyDataError:
-                raise
+                if require_complete:
+                    print(f"{csv_path} is empty")
+                    raise
+                else:
+                    print(f"WARNING: {csv_path} is EMPTY, but we will continue anyway")
+                    continue  # skip this seed
             try:
-                assert df['total_steps'].max() == 10_000_000, f"total steps is not complete (20 * 500k): {csv_path}"  # check that csv is complete
+                max_steps = df['total_steps'].max()
+                assert max_steps == 10_000_000, f"total steps is not complete (20 * 500k): {csv_path}"  # check that csv is complete
             except AssertionError:
                 if require_complete:
                     raise
                 else:
-                    print(f"{csv_path} is not complete, but we will continue anyway")
+                    print(f"{csv_path} is not complete (at {max_steps} steps), but we will continue anyway")
             df = df[['level_total_steps', 'level_index', 'ep_reward_mean', 'total_steps']].copy()
             df['agent'] = first_char_upper(agent)
             df['seed'] = int(seed)
@@ -415,6 +434,7 @@ if __name__ == "__main__":
     parser.add_argument('--transfer', '-f', action='store_true', help='plot the transfer curve', default=False)
     parser.add_argument('--unrolled', '-u', action='store_true', help='the transfer curve, but do not average acorss level', default=False)
     parser.add_argument('--procgen', '-p', action='store_true', help='plot the 8 procgen games combined', default=False)
+    parser.add_argument('--all_procgen', '-a', action='store_true', help='plot all 16 procgen games', default=False)
     parser.add_argument('--not_require_complete', '-n', action='store_true', help='do not require the csv file to be complete', default=False)
     parser.add_argument('--debug', '-d', action='store_true', help='debug mode', default=False)
     args = parser.parse_args()
@@ -432,7 +452,7 @@ if __name__ == "__main__":
         else:
             # plot_transfer_exp_eval_curve(args.load)
             plot_transfer_exp_training_curve_across_levels(args.load, args.unrolled, require_complete=not args.not_require_complete)
-    elif args.procgen:
-        plot_eight_procgen_games(args.load, require_complete=not args.not_require_complete)
+    elif args.procgen or args.all_procgen:
+        plot_procgen_games(args.load, require_complete=not args.not_require_complete, plot_all_16_games=args.all_procgen)
     else:
         plot_reward_curve(args.load)
