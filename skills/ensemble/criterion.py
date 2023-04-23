@@ -41,7 +41,8 @@ def batched_L_divergence(batch_feats, weights):
 
     every_tuple_features = batch_feats[:, every_tuple, :]  # (batch_size, num_tuple, 2, dim)
     every_tuple_difference = every_tuple_features.diff(dim=2).squeeze(2)  # (batch_size, num_tuple, dim)
-    loss = torch.clamp(1000 - torch.sum(every_tuple_difference.pow(2), dim=-1), min=0)  # (batch_size, num_tuple)
+    loss = torch.sum(every_tuple_difference.pow(2), dim=-1)  * every_tuple_weights
+    loss = torch.clamp(1000 - loss, min=0)  # (batch_size, num_tuple)
     loss = every_tuple_weights * loss
     mean_loss = loss.sum(-1).mean()
     return mean_loss
