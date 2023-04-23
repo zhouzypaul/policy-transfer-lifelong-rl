@@ -257,6 +257,7 @@ class EnsembleAgent(Agent):
         for i in range(self.num_modules):
             self.logger.logkv(f'learner_{i}_reward', self.learner_accumulated_reward[i])
             self.logger.logkv(f'learner_{i}_selection_count', self.learner_selection_count[i])
+            self.logger.logkv(f'learner_{i}_loss_weight', ucb.normalized_bandit_scores[i])
         self.logger.dumpkvs()
 
     def _set_action_leader(self, reward):
