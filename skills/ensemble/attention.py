@@ -160,8 +160,6 @@ class AttentionEmbedding(nn.Module):
             global_features = [self.global_feature_extractor(attentions[i] * spacial_features[i]) for i in range(self.num_attention_modules)]
         else:
             global_features = self.global_feature_extractor([attentions[i] * spacial_features[i] for i in range(self.num_attention_modules)])
-        if plot:
-            plot_attention_diversity(global_features, self.num_attention_modules, save_dir=self.plot_dir)
 
         # normalize global features to between [0, 1]
         for i in range(self.num_attention_modules):
