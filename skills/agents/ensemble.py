@@ -70,6 +70,7 @@ class EnsembleAgent(Agent):
         self.saving_dir = saving_dir
         if self.saving_dir is not None and self._using_leader():
             self.logger = logger.configure(dir=self.saving_dir, format_strs=['csv'], log_suffix="_bandit_stats")
+            self.loss_logger = logger.configure(dir=self.saving_dir, format_strs=['csv', 'stdout'], log_suffix="_loss_stats")
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
@@ -135,6 +136,13 @@ class EnsembleAgent(Agent):
                 learner_loss = torch.stack(losses).sum()
                 div_loss = self.update_attention(experiences=self.replay_buffer.sample(self.batch_size), compute_loss_only=True)
                 loss = learner_loss + div_loss
+                
+                # log the stats
+                self.loss_logger.logkv("step_number", self.step_number)
+                self.loss_logger.logkv('episode_number', self.episode_number)
+                self.loss_logger.logkv("learner_loss", learner_loss.item())
+                self.loss_logger.logkv("div_loss", div_loss.item())
+                self.loss_logger.dumpkvs()
 
                 if not self.fix_attention_mask:
                     self.attention_model.train()
