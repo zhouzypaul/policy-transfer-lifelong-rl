@@ -27,7 +27,8 @@ def batched_L_divergence(batch_feats, weights):
     batch_feats is of shape (batch_size, n_modules, n_features)
     """
     if batch_feats.shape[1] == 1:
-        return 0  # no need to compute the loss if there is only one module
+        # if there is only one module, then there is no divergence
+        return torch.Tensor([0]).to(batch_feats.device)
 
     global every_tuple
     if every_tuple is None:
@@ -41,10 +42,9 @@ def batched_L_divergence(batch_feats, weights):
 
     every_tuple_features = batch_feats[:, every_tuple, :]  # (batch_size, num_tuple, 2, dim)
     every_tuple_difference = every_tuple_features.diff(dim=2).squeeze(2)  # (batch_size, num_tuple, dim)
-    loss = torch.sum(every_tuple_difference.pow(2), dim=-1)  * every_tuple_weights
-    loss = torch.clamp(1000 - loss, min=0)  # (batch_size, num_tuple)
-    loss = every_tuple_weights * loss
-    mean_loss = loss.sum(-1).mean()
+    loss = torch.mean(every_tuple_difference.pow(2), dim=-1)  * every_tuple_weights
+    loss = torch.clamp(1 - loss, min=0)  # (batch_size, num_tuple)
+    mean_loss = loss.mean()
     return mean_loss
 
 
