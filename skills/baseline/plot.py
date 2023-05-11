@@ -25,7 +25,7 @@ def plot_procgen_games(results_dir, require_complete=True, plot_all_16_games=Fal
         nrows = 4
         figsize = (22, 22)
     else:
-        games = ['dodgeball', 'miner', 'jumper', 'maze', 'bigfish', 'heist', 'climber', 'ninja']
+        games = ['bigfish', 'climber', 'dodgeball', 'heist', 'jumper', 'maze', 'miner', 'ninja']
         nrows = 2
         figsize = (22, 12)
     ncols = 4
