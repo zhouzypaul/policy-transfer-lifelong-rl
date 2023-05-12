@@ -155,6 +155,14 @@ class ProcgenTransferTrial(BaseTrial):
             self._make_ppo_agent(*_make_policy_and_opt(), phi=lambda x: x) 
             for _ in range(self.params['num_policies'])
         ]
+        
+        # enforce that all learner weights are the same
+        # or else, the initialized torch params will be different because learners
+        # or initialized sequentially and torch random number generator is at different states
+        from copy import deepcopy
+        for i in range(1, len(base_learners)):
+            base_learners[i] = deepcopy(base_learners[0])
+        
         agent = EnsembleAgent(
             attention_model=attention_embedding,
             learning_rate=5e-4,
@@ -194,7 +202,7 @@ class ProcgenTransferTrial(BaseTrial):
     
     def setup(self):
         self.check_params_validity()
-        self.make_deterministic(self.params['seed'])
+        self.make_deterministic(self.params['seed'], force_deterministic=True)
 
         # set up saving dir
         self.saving_dir = self._set_saving_dir()

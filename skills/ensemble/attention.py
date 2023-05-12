@@ -73,12 +73,12 @@ class AttentionEmbedding(nn.Module):
         self.use_individual_global_feature = use_individual_global_feature
 
         if not self.use_individual_spatial_feature:
-            self.conv1 = nn.LazyConv2d(out_channels=self.attention_depth, kernel_size=3, stride=1)
+            self.conv1 = nn.Conv2d(in_channels=3, out_channels=self.attention_depth, kernel_size=3, stride=1)
             self.pool1 = nn.MaxPool2d(2)
         else:
             self.conv1 = nn.ModuleList(
                 [
-                    nn.LazyConv2d(out_channels=self.attention_depth, kernel_size=3, stride=1)
+                    nn.Conv2d(in_channels=3, out_channels=self.attention_depth, kernel_size=3, stride=1)
                     for _ in range(self.num_attention_modules)
                 ]
             )

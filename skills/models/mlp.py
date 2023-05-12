@@ -31,7 +31,7 @@ class PPOMLP(nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
 
-        self.hidden = nn.LazyLinear(self.hidden_size)
+        self.hidden = nn.Linear(3136, self.hidden_size)
         self.logits = nn.Linear(self.hidden_size, self.output_size)
         self.value = nn.Linear(self.hidden_size, 1)
         # initialize weights and bias
