@@ -56,6 +56,17 @@ def upper_confidence_bound(values, t, visitation_count, c=1):
     return np.argmax(values + c * np.sqrt(2 * np.log(t) / visitation_count))
 
 
+def upper_confidence_bound_with_gestation(values, t, visitation_count, gestation_period, c=1):
+    """
+    the same bandit as upper_confidence_bound
+    but when t <= gestation_period, the agent will choose actions uniformly at random
+    """
+    if t <= gestation_period:
+        return np.random.choice(len(values))
+    else:
+        return upper_confidence_bound(values, t, visitation_count, c)
+
+
 def upper_confidence_bound_agent_57(mean_rewards, t, visitation_count, beta=1):
     """
     the (stationary) upper confidence bound algorithm from the agent 57 paper
@@ -72,7 +83,7 @@ def upper_confidence_bound_agent_57(mean_rewards, t, visitation_count, beta=1):
         return np.argmax(mean_rewards + beta * np.sqrt(np.log(t - 1) / visitation_count))
 
 
-def upper_confidence_bound_with_window_size(mean_rewards, t, visitation_count, beta=1, epsilon=0.5):
+def upper_confidence_bound_with_window_size(mean_rewards, t, visitation_count, beta=1, epsilon=0.1):
     """
     the nonstationary upper confidence bound algorithm from the agent 57 paper
     https://arxiv.org/pdf/2003.13350.pdf

@@ -17,7 +17,8 @@ from skills.ensemble.criterion import batched_L_divergence
 from skills.agents.abstract_agent import Agent, evaluating
 from skills.ensemble.aggregate import choose_most_popular, choose_leader, \
     choose_max_sum_qvals, upper_confidence_bound, exp3_bandit_algorithm, \
-    upper_confidence_bound_agent_57, upper_confidence_bound_with_window_size
+    upper_confidence_bound_agent_57, upper_confidence_bound_with_window_size, \
+    upper_confidence_bound_with_gestation
 
 
 class EnsembleAgent(Agent):
@@ -193,7 +194,8 @@ class EnsembleAgent(Agent):
         pass
     
     def _using_leader(self):
-        return self.action_selection_strategy in ['exp3_leader', 'ucb_leader', 'greedy_leader', 'uniform_leader', 'ucb_57', 'ucb_window_size']
+        return self.action_selection_strategy in ['exp3_leader', 'ucb_leader', 'greedy_leader', 
+            'uniform_leader', 'ucb_57', 'ucb_window_size', 'ucb_gestation']
 
     def _update_learner_stats(self, reward):
         def safe_mean(x):
@@ -212,7 +214,7 @@ class EnsembleAgent(Agent):
                 self.learner_accumulated_reward[i] = safe_mean(self.learner_accumulated_reward_queue[i])
                 self.learner_selection_count[i] = np.sum(self.learner_selection_count_queue[i])
         else:
-            self.learner_accumulated_reward[self.action_leader] += reward
+            self.learner_accumulated_reward[self.action_leader] += np.clip(reward, a_min=None, a_max=1)
             self.learner_selection_count[self.action_leader] += 1
 
     def _attention_embed_obs(self, batch_obs):
@@ -284,6 +286,14 @@ class EnsembleAgent(Agent):
                 visitation_count=self.learner_selection_count, 
                 c=self.bandit_exploration_weight
             )
+        elif self.action_selection_strategy == 'ucb_gestation':
+            self.action_leader = upper_confidence_bound_with_gestation(
+                values=self.learner_accumulated_reward,
+                t=self.step_number,
+                visitation_count=self.learner_selection_count,
+                gestation_period=1_000_000,
+                c=self.bandit_exploration_weight,
+            )
         elif self.action_selection_strategy == 'ucb_57':
             self.action_leader = upper_confidence_bound_agent_57(
                 mean_rewards=self.learner_accumulated_reward / self.learner_selection_count,
@@ -297,7 +307,7 @@ class EnsembleAgent(Agent):
                 t=self.step_number,
                 visitation_count=self.learner_selection_count,
                 beta=self.bandit_exploration_weight,
-                epsilon=0.5,
+                epsilon=0.1,
             )
         elif self.action_selection_strategy == 'exp3_leader':
             # choose a leader based on the EXP3 algorithm
