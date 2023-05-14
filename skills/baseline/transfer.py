@@ -243,8 +243,7 @@ class ProcgenTransferTrial(BaseTrial):
             div_losses[ensemble_size] = div_loss
         
         # clear the previous loggings
-        utils.create_log_dir(self.saving_dir, remove_existing=True)
-        os.mkdir(self.params['plots_dir'])
+        self.setup()
         
         # select the best ensemble size
         num_learners = min(div_losses, key=div_losses.get)
