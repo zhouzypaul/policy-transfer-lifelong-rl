@@ -134,13 +134,13 @@ class ProcgenTransferTrial(BaseTrial):
         )
         return ppo_agent
 
-    def make_agent(self, env):
+    def make_agent(self, env, num_learners):
         assert self.params['agent'] == 'ensemble'
 
         attention_embedding = AttentionEmbedding(
             embedding_size=64,
             attention_depth=32,
-            num_attention_modules=1 if self.params['remove_feature_learner'] else self.params['num_policies'],
+            num_attention_modules=1 if self.params['remove_feature_learner'] else num_learners,
             use_individual_spatial_feature=self.params['individual_spatial_feature_extractor'],
             use_individual_global_feature=self.params['individual_global_feature_extractor'],
             plot_dir=self.params['plots_dir'],
@@ -153,7 +153,7 @@ class ProcgenTransferTrial(BaseTrial):
             return policy, optimizer
         base_learners = [
             self._make_ppo_agent(*_make_policy_and_opt(), phi=lambda x: x) 
-            for _ in range(self.params['num_policies'])
+            for _ in range(num_learners)
         ]
         agent = EnsembleAgent(
             attention_model=attention_embedding,
@@ -167,7 +167,7 @@ class ProcgenTransferTrial(BaseTrial):
             buffer_length=self.params['buffer_length'],
             update_interval=self.params['attention_update_interval'],
             discount_rate=self.params['gamma'],
-            num_modules=self.params['num_policies'],
+            num_modules=num_learners,
             embedding_plot_freq=self.params['embedding_plot_freq'],
             bandit_exploration_weight=self.params['bandit_exploration_weight'],
             fix_attention_mask=self.params['fix_attention_masks'],
@@ -212,9 +212,6 @@ class ProcgenTransferTrial(BaseTrial):
         # env
         self.train_env = self.make_vector_env(level_index=0, eval=False)
         self.eval_env = self.make_vector_env(level_index= 0, eval=True)
-
-        # agent
-        self.agent = self.make_agent(self.train_env)
     
     def transfer(self):
         # whether to use curriculum
@@ -224,6 +221,43 @@ class ProcgenTransferTrial(BaseTrial):
             assert self.params['num_levels'] == len(level_order)  # level_order only designed for 20 levels
         else:
             level_order = range(self.params['start_level'], self.params['start_level'] + self.params['num_levels'])
+            
+        # for the first level, do ensemble-size selection
+        env = self.make_vector_env(level_index=level_order[0], eval=False)
+        div_losses = {}
+        
+        for ensemble_size in range(2, self.params['num_policies']+1):
+            agent = self.make_agent(self.train_env, ensemble_size)
+            train_with_eval(
+                agent=agent,
+                train_env=env,
+                test_env=self.eval_env,
+                num_envs=self.params['num_envs'],
+                max_steps=self.params['transfer_steps'],
+                level_index=level_order[0],
+                steps_offset=0,
+                log_interval=100,
+                logger=self.logger,
+            )
+            div_loss = np.mean(agent.loss_logger.queue)
+            div_losses[ensemble_size] = div_loss
+        
+        # clear the previous loggings
+        utils.create_log_dir(self.saving_dir, remove_existing=True)
+        os.mkdir(self.params['plots_dir'])
+        
+        # select the best ensemble size
+        num_learners = min(div_losses, key=div_losses.get)
+        print(f"Ensemble size selection: \n div_losses: {div_losses}")
+        with open(os.path.join(self.saving_dir, 'size_selection_info.txt'), 'w') as f:
+            for ensemble_size, div_loss in div_losses.items():
+                f.write(f"ensemble_size: {ensemble_size}, div_loss: {div_loss}\n")
+            f.write('')
+            f.write(f"selected ensemble size: {num_learners}")
+        
+        # build agent
+        agent = self.agent = self.make_agent(self.train_env, num_learners)
+        
         # loop through training
         for i, i_level in enumerate(level_order):
             self.train_env = self.make_vector_env(level_index=i_level, eval=False)

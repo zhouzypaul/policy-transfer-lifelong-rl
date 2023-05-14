@@ -71,6 +71,7 @@ class EnsembleAgent(Agent):
         if self.saving_dir is not None and self._using_leader():
             self.logger = logger.configure(dir=self.saving_dir, format_strs=['csv'], log_suffix="_bandit_stats")
             self.loss_logger = logger.configure(dir=self.saving_dir, format_strs=['csv', 'stdout'], log_suffix="_loss_stats")
+            self.loss_logger.queue = deque(maxlen=5)
         
         # ensemble
         self.attention_model = attention_model.to(self.device)
@@ -143,6 +144,7 @@ class EnsembleAgent(Agent):
                 self.loss_logger.logkv("learner_loss", learner_loss.item())
                 self.loss_logger.logkv("div_loss", div_loss.item())
                 self.loss_logger.dumpkvs()
+                self.loss_logger.queue.append(div_loss.item())
 
                 if not self.fix_attention_mask:
                     self.attention_model.train()
