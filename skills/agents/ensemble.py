@@ -63,6 +63,9 @@ class EnsembleAgent(Agent):
             self.ucb_window_size = 90  # from the agent 57 paper
             self.learner_accumulated_reward_queue = [deque(maxlen=self.ucb_window_size) for _ in range(self.num_modules)]
             self.learner_selection_count_queue = [deque(maxlen=self.ucb_window_size) for _ in range(self.num_modules)]
+        if self.action_selection_strategy == 'ucb_gestation':
+            self.gestation_period = 1_000_000
+            self.gestation_bandit_reset = False
         self.embedding_plot_freq = embedding_plot_freq
         self.discount_rate = discount_rate
         self.bandit_exploration_weight = bandit_exploration_weight
@@ -200,6 +203,14 @@ class EnsembleAgent(Agent):
     def _update_learner_stats(self, reward):
         def safe_mean(x):
             return np.mean(x) if len(x) > 0 else 0
+        
+        # if need to reset bandit counts
+        if self.action_selection_strategy == "ucb_gestation":
+            if self.step_number > self.gestation_period and not self.gestation_bandit_reset:
+                self.learner_accumulated_reward = np.ones_like(self.learner_accumulated_reward)
+                self.learner_selection_count = np.ones_like(self.learner_selection_count)
+                self.gestation_bandit_reset = True
+        
         if self.action_selection_strategy == "ucb_window_size":
             # udpate queue
             for i in range(self.num_learners):
@@ -291,7 +302,7 @@ class EnsembleAgent(Agent):
                 values=self.learner_accumulated_reward,
                 t=self.step_number,
                 visitation_count=self.learner_selection_count,
-                gestation_period=1_000_000,
+                gestation_period=self.gestation_period,
                 c=self.bandit_exploration_weight,
             )
         elif self.action_selection_strategy == 'ucb_57':
