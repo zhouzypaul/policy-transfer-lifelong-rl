@@ -48,6 +48,8 @@ class ProcgenTransferTrial(BaseTrial):
                             help='use individual spatial feature extractor for each attention module')
         parser.add_argument('--individual_global_feature_extractor', '-g', action='store_true', default=False,
                             help='use individual global feature extractor for each attention module')
+        parser.add_argument('--ensemble_size_selection_levels', type=int, default=3,
+                            help='number of levels to use for ensemble size selection')
 
         # procgen environment
         parser.add_argument('--env', type=str, required=True,
@@ -227,26 +229,35 @@ class ProcgenTransferTrial(BaseTrial):
         div_losses = {}
         
         for ensemble_size in range(2, self.params['num_policies']+1):
-            agent = self.make_agent(self.train_env, ensemble_size)
-            train_with_eval(
-                agent=agent,
-                train_env=env,
-                test_env=self.eval_env,
-                num_envs=self.params['num_envs'],
-                max_steps=self.params['transfer_steps'],
-                level_index=level_order[0],
-                steps_offset=0,
-                log_interval=100,
-                logger=self.logger,
-            )
-            div_loss = np.mean(agent.loss_logger.queue)
-            div_losses[ensemble_size] = div_loss
+            
+            agent_div_loss = []
+            agent = self.make_agent(env, ensemble_size)
+            
+            for i, i_level in enumerate(level_order):
+                if i >= self.params['ensemble_size_selection_levels']:
+                    break
+                env = self.make_vector_env(level_index=i_level, eval=False)
+                train_with_eval(
+                    agent=agent,
+                    train_env=env,
+                    test_env=self.eval_env,
+                    num_envs=self.params['num_envs'],
+                    max_steps=self.params['transfer_steps'],
+                    level_index=i_level,
+                    steps_offset=0,
+                    log_interval=100,
+                    logger=self.logger,
+                )
+                div_loss = np.mean(agent.loss_logger.queue)
+                agent_div_loss.append(div_loss)
+                
+            div_losses[ensemble_size] = agent_div_loss
         
         # clear the previous loggings
         self.setup()
         
         # select the best ensemble size
-        num_learners = min(div_losses, key=div_losses.get)
+        num_learners = min(div_losses, key=lambda x: np.mean(div_losses.get(x)))
         print(f"Ensemble size selection: \n div_losses: {div_losses}")
         with open(os.path.join(self.saving_dir, 'size_selection_info.txt'), 'w') as f:
             for ensemble_size, div_loss in div_losses.items():
