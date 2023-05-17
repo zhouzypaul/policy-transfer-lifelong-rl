@@ -127,8 +127,11 @@ def process_training_curve_csv_file(exp_dir, average_across_levels=True, require
             df['seed'] = int(seed)
             rewards.append(df)
     rewards = pandas.concat(rewards, ignore_index=True)
-    max_nan_step = rewards.loc[rewards.isna().any(axis=1)]['level_total_steps'].max()
-    subset = rewards.query(f"level_total_steps > {max_nan_step}")
+    if rewards.isna().any(axis=1).sum() > 0:
+        max_nan_step = rewards.loc[rewards.isna().any(axis=1)]['level_total_steps'].max()
+        subset = rewards.query(f"level_total_steps > {max_nan_step}")
+    else:
+        subset = rewards
 
     if not average_across_levels:
         # sparsify the data because confidence interval will take a long time
